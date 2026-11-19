@@ -1,58 +1,67 @@
-// serve.ts — a static file server for trying the cover maker in
-// desktop Chrome: http://localhost:8080. No build step, no bundler —
-// it serves index.html, its scripts, the vendored fonts and the
-// sample photos straight from app/.
+// serve.ts — a tiny static server for app/ (Node 22, stdlib only).
+// Run `node serve.ts` and open http://localhost:8080. It serves only
+// files under app/, with the MIME types an offline web app needs, and
+// refuses any path that escapes the root. A development convenience,
+// not a server for the internet.
 
-import { createServer } from "node:http";
-import { readFile } from "node:fs/promises";
-import { join, extname } from "node:path";
+import { createReadStream, statSync } from 'node:fs';
+import { createServer } from 'node:http';
+import { extname, join, normalize, resolve, sep } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-// The app directory, next to this file.
-const appDir = new URL("./app", import.meta.url).pathname;
+const root = resolve(fileURLToPath(new URL('./app', import.meta.url)));
+const args = process.argv.slice(2);
+const portIndex = args.indexOf('--port');
+const wanted = portIndex === -1 ? 8080 : Number(args[portIndex + 1]);
+const port = Number.isInteger(wanted) && wanted > 0 && wanted < 65536 ? wanted : 8080;
 
-// Content types by extension; anything unknown is a generic binary.
-const MIME: Record<string, string> = {
-  ".css": "text/css; charset=utf-8",
-  ".html": "text/html; charset=utf-8",
-  ".jpeg": "image/jpeg",
-  ".jpg": "image/jpeg",
-  ".js": "text/javascript; charset=utf-8",
-  ".json": "application/json",
-  ".mjs": "text/javascript; charset=utf-8",
-  ".png": "image/png",
-  ".ttf": "font/ttf",
+const MIME = {
+  '.html': 'text/html; charset=utf-8',
+  '.js': 'text/javascript; charset=utf-8',
+  '.mjs': 'text/javascript; charset=utf-8',
+  '.css': 'text/css; charset=utf-8',
+  '.json': 'application/json; charset=utf-8',
+  '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.gif': 'image/gif',
+  '.webp': 'image/webp',
+  '.svg': 'image/svg+xml',
+  '.ico': 'image/x-icon',
+  '.woff2': 'font/woff2',
+  '.woff': 'font/woff',
+  '.ttf': 'font/ttf',
+  '.otf': 'font/otf',
+  '.txt': 'text/plain; charset=utf-8',
 };
 
-// Map a request path to a file under app/. A path that escapes the
-// app directory (../ and friends) maps to null and is refused.
-function mapToFile(pathname) {
-  const target = join(appDir, pathname === "/" ? "index.html" : pathname);
-  return target.startsWith(appDir) ? target : null;
-}
-
-// Send one file, or 404 when it is not there.
-async function serveFile(res, target) {
-  try {
-    const bytes = await readFile(target);
-    res.writeHead(200, { "content-type": MIME[extname(target)] || "application/octet-stream" });
-    res.end(bytes);
-  } catch {
-    res.writeHead(404);
-    res.end("not found");
-  }
-}
-
-const server = createServer(async (req, res) => {
-  const parsed = new URL(req.url || "/", "http://localhost");
-  const target = mapToFile(decodeURIComponent(parsed.pathname));
-  if (!target) {
-    res.writeHead(403);
-    res.end("forbidden");
+const server = createServer((req, res) => {
+  const url = new URL(req.url ?? '/', 'http://localhost');
+  let rel = normalize(decodeURIComponent(url.pathname)).replace(/^[/\\]+/, '');
+  if (rel === '' || rel.endsWith(sep)) rel = join(rel, 'index.html');
+  const file = resolve(join(root, rel));
+  if (!file.startsWith(root + sep) && file !== root) {
+    res.writeHead(403, { 'content-type': 'text/plain' });
+    res.end('forbidden\n');
     return;
   }
-  await serveFile(res, target);
+  let stat;
+  try {
+    stat = statSync(file);
+  } catch {
+    res.writeHead(404, { 'content-type': 'text/plain' });
+    res.end('not found\n');
+    return;
+  }
+  if (!stat.isFile()) {
+    res.writeHead(404, { 'content-type': 'text/plain' });
+    res.end('not found\n');
+    return;
+  }
+  res.writeHead(200, { 'content-type': MIME[extname(file)] ?? 'application/octet-stream' });
+  createReadStream(file).pipe(res);
 });
 
-server.listen(8080, () => {
-  console.log("Afterglow Cover Studio at http://localhost:8080");
+server.listen(port, () => {
+  console.log(`Afterglow Cover Studio at http://localhost:${port}/`);
 });

@@ -1,194 +1,295 @@
-/* Afterglow Cover Studio — editor chrome.
-   Every colour and font comes from the :root tokens below; no literal
-   colour or font-family appears anywhere else. Dark warm chrome, gold
-   accent, no purple-blue gradient. */
+/* style.css — the Afterglow editor chrome: warm dark panels, sunset
+   accents, and a calm layout that keeps the cover as the hero. */
+
+@font-face {
+  font-family: 'Anton';
+  src: url('fonts/Anton-Regular.ttf') format('truetype');
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Bebas Neue';
+  src: url('fonts/BebasNeue-Regular.ttf') format('truetype');
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Kaushan Script';
+  src: url('fonts/KaushanScript-Regular.ttf') format('truetype');
+  font-display: swap;
+}
 
 :root {
-  --bg: #150a0e;
-  --bg-deep: #0d0508;
-  --panel: #241016;
-  --panel-line: #3a1c22;
-  --text: #ffe9c4;
-  --text-muted: #c9a89a;
-  --accent: #f5b942;
-  --accent-ink: #14060a;
-  --pink: #ff5f7e;
-  --pink-soft: #ff9ec4;
-  --danger: #ff6b5e;
-  --radius: 10px;
-  --radius-sm: 6px;
-  --font-display: "Anton", "Arial Narrow", sans-serif;
-  --font-script: "Kaushan Script", cursive;
-  --font-label: "Bebas Neue", "Arial Narrow", sans-serif;
-  --font-body: system-ui, -apple-system, "Segoe UI", sans-serif;
-  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --bg: #150a10;
+  --panel: #221016;
+  --panel-2: #2c141d;
+  --line: #3d1f2a;
+  --ink: #f7ead9;
+  --muted: #c9a89b;
+  --gold: #ffd166;
+  --pink: #ff5e8a;
+  --teal: #2ec4b6;
+  --radius: 12px;
 }
 
-@font-face { font-family: "Anton"; src: url("fonts/Anton-Regular.ttf") format("truetype"); font-weight: 400; font-display: swap; }
-@font-face { font-family: "Kaushan Script"; src: url("fonts/KaushanScript-Regular.ttf") format("truetype"); font-weight: 400; font-display: swap; }
-@font-face { font-family: "Bebas Neue"; src: url("fonts/BebasNeue-Regular.ttf") format("truetype"); font-weight: 400; font-display: swap; }
-
-/* Base: the app is a full-height column, no horizontal scroll. */
 * { box-sizing: border-box; }
-html, body { overflow-x: clip; height: 100%; }
-body { margin: 0; background: var(--bg); color: var(--text); font-family: var(--font-body); font-size: 14px; line-height: 1.45; }
-#app { display: flex; flex-direction: column; height: 100vh; min-height: 560px; }
 
-@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
-
-/* Shot mode (?shot=cover): the editor hides, the cover canvas goes full-frame. */
-body.shot-cover { background: #0d0508; }
-body.shot-cover #app { display: none; }
-body.shot-cover #shotCanvas { display: block; width: 100vw; height: 100vh; }
-
-/* Buttons: one style for all of them, gold for the primary action,
-   a small press scale on click, gold border on hover. */
-button {
-  font-family: var(--font-body);
-  font-size: 13px;
-  color: var(--text);
-  background: var(--panel);
-  border: 1px solid var(--panel-line);
-  border-radius: var(--radius-sm);
-  padding: 8px 12px;
-  cursor: pointer;
-  transition: transform 120ms var(--ease-out), background 120ms var(--ease-out), border-color 120ms var(--ease-out);
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+  font-size: 15px;
+  line-height: 1.45;
 }
-button:hover { border-color: var(--accent); }
-button:active { transform: scale(0.97); }
-button:disabled { opacity: 0.4; cursor: default; }
-button:disabled:hover { border-color: var(--panel-line); }
-button.primary {
-  background: var(--accent);
-  color: var(--accent-ink);
-  border-color: var(--accent);
-  font-weight: 700;
-  padding: 10px 16px;
-}
-button.primary:hover { background: #ffc95e; }
-button[aria-pressed="true"], button.active { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
-button:focus-visible, input:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--pink-soft); outline-offset: 2px; }
 
-/* Top bar: brand on the left, numbered steps centre-right, actions right. */
-#topbar {
+body.shot-mode { background: #000; }
+body.shot-mode header,
+body.shot-mode main { display: none; }
+#shot-canvas { display: block; width: 100vw; height: 100vh; }
+
+header {
   display: flex;
   align-items: center;
   gap: 18px;
-  padding: 10px 16px;
-  background: var(--bg-deep);
-  border-bottom: 1px solid var(--panel-line);
-  flex: 0 0 auto;
+  padding: 12px 20px;
+  border-bottom: 1px solid var(--line);
+  background: linear-gradient(90deg, #2a0e1e, #1c0a13);
+  flex-wrap: wrap;
 }
-.brand { display: flex; align-items: baseline; gap: 10px; min-width: 0; }
-.mark {
-  font-family: var(--font-display);
-  font-size: 20px;
-  color: var(--accent-ink);
-  background: var(--accent);
-  border-radius: var(--radius-sm);
-  padding: 2px 8px;
-  line-height: 1.2;
-}
-.brand-name { font-family: var(--font-display); font-size: 20px; letter-spacing: 0.02em; white-space: nowrap; }
-.brand-tag { color: var(--text-muted); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.steps { display: flex; gap: 6px; list-style: none; margin: 0 0 0 auto; padding: 0; color: var(--text-muted); font-size: 13px; white-space: nowrap; }
-.steps li b {
-  display: inline-block;
-  width: 20px;
-  height: 20px;
-  line-height: 20px;
-  text-align: center;
-  border-radius: 50%;
-  background: var(--accent);
-  color: var(--accent-ink);
-  margin-right: 5px;
-  font-family: var(--font-label);
-  font-size: 13px;
-}
-.top-actions { display: flex; gap: 8px; align-items: center; }
 
-/* Workspace: photo rail on the left, stage in the middle, tool rail right. */
-#workspace {
-  display: grid;
-  grid-template-columns: 264px minmax(0, 1fr) 296px;
-  gap: 12px;
-  padding: 12px 16px;
-  flex: 1 1 auto;
-  min-height: 0;
-}
-#railPhotos, #railTools {
-  background: var(--panel);
-  border: 1px solid var(--panel-line);
-  border-radius: var(--radius);
-  padding: 12px;
-  overflow-y: auto;
-  min-height: 0;
-}
-#railPhotos h2, #railTools h2 { font-family: var(--font-label); font-size: 19px; letter-spacing: 0.06em; color: var(--accent); margin: 14px 0 8px; }
-#railPhotos h2:first-child, #railTools h2:first-child { margin-top: 0; }
-#railPhotos > button, #railPhotos .row button { width: 100%; margin-bottom: 8px; }
-#railPhotos .row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-#railPhotos .row button { margin-bottom: 8px; }
-.note { color: var(--text-muted); font-size: 12px; margin: 8px 0 0; }
-
-/* Stage: the live preview canvas, the hint line, the panel controls. */
-#stage {
+.brand {
   display: flex;
-  flex-direction: column;
   align-items: center;
-  gap: 8px;
-  min-width: 0;
-  min-height: 0;
+  gap: 10px;
+  font-family: 'Anton', sans-serif;
+  font-size: 20px;
+  letter-spacing: 0.04em;
 }
-#previewWrap { flex: 1 1 auto; min-height: 0; display: flex; align-items: center; justify-content: center; width: 100%; }
-#previewCanvas {
-  max-width: 100%;
-  max-height: 100%;
-  border-radius: var(--radius-sm);
-  box-shadow: 0 10px 32px rgba(0, 0, 0, 0.5);
+.brand .mark {
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  background: linear-gradient(135deg, var(--gold), var(--pink));
+  color: #1a0b14;
+  display: grid;
+  place-items: center;
+  font-size: 16px;
+}
+.brand small {
+  display: block;
+  font-family: system-ui, sans-serif;
+  font-size: 11px;
+  color: var(--muted);
+  letter-spacing: 0.08em;
+}
+
+.steps {
+  display: flex;
+  gap: 8px;
+  margin-left: 8px;
+  flex-wrap: wrap;
+}
+.step {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-size: 13px;
+  color: var(--muted);
+  background: var(--panel);
+}
+.step b {
+  color: var(--gold);
+  margin-right: 6px;
+}
+
+.header-actions {
+  margin-left: auto;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+button {
+  font: inherit;
+  color: var(--ink);
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px 14px;
+  cursor: pointer;
+}
+button:hover { border-color: var(--gold); }
+button:disabled { opacity: 0.4; cursor: default; }
+button.active { border-color: var(--gold); color: var(--gold); }
+
+#export-all-btn {
+  background: linear-gradient(135deg, var(--pink), #ff7a3d);
+  border: none;
+  color: #fff;
+  font-weight: 700;
+  padding: 10px 20px;
+  font-size: 15px;
+}
+
+main {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 340px;
+  gap: 16px;
+  padding: 16px 20px 28px;
+  max-width: 1440px;
+  margin: 0 auto;
+}
+
+section.panel {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 14px;
+}
+
+section.panel h2 {
+  margin: 0 0 10px;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--muted);
+}
+
+.size-tabs {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+.size-tabs button { padding: 6px 12px; font-size: 13px; }
+
+#preview {
+  width: 100%;
+  height: auto;
+  display: block;
+  border-radius: 8px;
   cursor: grab;
+  background: #000;
   touch-action: none;
 }
-#previewCanvas:active { cursor: grabbing; }
-#hintLine { color: var(--text-muted); font-size: 13px; margin: 0; text-align: center; }
-#panelControls {
+#preview:active { cursor: grabbing; }
+
+.preview-note {
+  color: var(--muted);
+  font-size: 13px;
+  margin: 10px 0 0;
+}
+
+.controls-row {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  margin-top: 12px;
+  flex-wrap: wrap;
+}
+.controls-row label {
   display: flex;
   align-items: center;
-  gap: 14px;
-  flex-wrap: wrap;
-  justify-content: center;
-  background: var(--panel);
-  border: 1px solid var(--panel-line);
-  border-radius: var(--radius);
-  padding: 8px 14px;
-  font-size: 12px;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--muted);
 }
-#panelControls label { display: flex; align-items: center; gap: 6px; color: var(--text-muted); }
-#panelControls input[type="range"] { width: 110px; accent-color: var(--accent); }
-#selectedPanelLabel { color: var(--accent); font-family: var(--font-label); font-size: 16px; letter-spacing: 0.05em; }
+.controls-row input[type="range"] { width: 140px; accent-color: var(--gold); }
+.controls-row input[type="checkbox"] { accent-color: var(--gold); width: 16px; height: 16px; }
 
-/* Photo tray: a 3-column grid of labelled thumbnails. */
-#photoTray { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; margin-top: 4px; }
-#photoTray button { padding: 0; border-radius: var(--radius-sm); overflow: hidden; border: 2px solid transparent; aspect-ratio: 3 / 2; background: var(--bg-deep); }
-#photoTray button img { width: 100%; height: 100%; object-fit: cover; display: block; }
-#photoTray button[aria-pressed="true"] { border-color: var(--pink); }
-#photoTray button span { display: block; font-size: 10px; padding: 2px 4px; background: rgba(13, 5, 8, 0.85); color: var(--text); text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+aside { display: flex; flex-direction: column; gap: 16px; }
 
-/* Right rail: layout tiles, grade chips, ink controls, words, sizes. */
-#layoutTiles { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
-#layoutTiles button { padding: 6px; text-align: left; }
-#layoutTiles button svg { width: 100%; height: auto; display: block; border-radius: 4px; }
-#layoutTiles button span { display: block; font-size: 12px; margin-top: 4px; }
-#gradeChips, #sizeChips, #presetList { display: flex; flex-wrap: wrap; gap: 6px; }
-#gradeChips button, #sizeChips button, #presetList button { flex: 1 1 auto; }
-.ink-row { display: flex; flex-direction: column; gap: 8px; }
-.switch { display: flex; align-items: center; gap: 8px; cursor: pointer; }
-.switch input { accent-color: var(--accent); width: 18px; height: 18px; }
-.ink-strength { display: flex; align-items: center; gap: 8px; color: var(--text-muted); font-size: 13px; }
-.ink-strength input { flex: 1; accent-color: var(--accent); }
-.field { display: flex; flex-direction: column; gap: 4px; color: var(--text-muted); font-size: 12px; margin-bottom: 8px; }
-.field input { font-family: var(--font-body); font-size: 14px; color: var(--text); background: var(--bg-deep); border: 1px solid var(--panel-line); border-radius: var(--radius-sm); padding: 8px 10px; }
-.field input:focus { border-color: var(--accent); outline: none; }
+#layout-rail {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+}
+.layout-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 10px;
+  text-align: left;
+}
+.layout-tile svg {
+  width: 38px;
+  height: 38px;
+  fill: none;
+  stroke: var(--gold);
+  stroke-width: 1.6;
+}
+.layout-tile span { font-weight: 600; font-size: 13px; }
+.layout-tile small { color: var(--muted); font-size: 12px; }
 
-/* Footer: one quiet line about privacy, fonts and samples. */
-#foot { flex: 0 0 auto; padding: 6px 16px; color: var(--text-muted); font-size: 11px; border-top: 1px solid var(--panel-line); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.chip-row { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { padding: 6px 12px; font-size: 13px; border-radius: 999px; }
+
+.field { margin-bottom: 10px; }
+.field label {
+  display: block;
+  font-size: 12px;
+  color: var(--muted);
+  margin-bottom: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+.field input {
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: var(--bg);
+  color: var(--ink);
+  font: inherit;
+}
+
+#tray {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+}
+.tray-item {
+  padding: 0;
+  overflow: hidden;
+  border-radius: 8px;
+  position: relative;
+  aspect-ratio: 3 / 2;
+  display: block;
+}
+.tray-item img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.tray-item span {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 10px 6px 4px;
+  font-size: 11px;
+  text-align: left;
+  background: linear-gradient(transparent, rgba(0, 0, 0, 0.8));
+}
+.tray-upload {
+  display: grid;
+  place-items: center;
+  border: 1px dashed var(--line);
+  background: transparent;
+  aspect-ratio: 3 / 2;
+  cursor: pointer;
+}
+.tray-upload .plus { font-size: 26px; color: var(--gold); position: static; padding: 0; background: none; }
+.tray-upload span:last-child { position: static; padding: 0; background: none; font-size: 12px; color: var(--muted); }
+
+.hint {
+  font-size: 13px;
+  color: var(--muted);
+  margin: 0;
+}
+.hint + .hint { margin-top: 6px; }
+
+@media (max-width: 900px) {
+  main { grid-template-columns: 1fr; }
+  .steps { display: none; }
+}

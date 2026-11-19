@@ -1,6 +1,12 @@
-Copyright 2020 The Anton Project Authors (https://github.com/googlefonts/AntonFont.git)
-Copyright (c) 2011, Pablo Impallari (www.impallari.com) - Kaushan Script
-Copyright 2019 The Bebas Neue Project Authors (https://github.com/dharmatype/Bebas-Neue) - Bebas Neue
+Afterglow Cover Studio — fonts
+==============================
+
+Anton — Copyright 2020 The Anton Project Authors (https://github.com/googlefonts/AntonFont)
+Bebas Neue — Copyright 2019 The Bebas Neue Project Authors (https://github.com/dharmatype/Bebas-Neue)
+Kaushan Script — Copyright (c) 2011, Pablo Impallari (www.impallari.com)
+
+All three fonts are licensed under the SIL Open Font License, Version 1.1.
+The full license text follows.
 
 Copyright 2020 The Anton Project Authors (https://github.com/googlefonts/AntonFont.git)
 
@@ -42,8 +48,8 @@ distributed by the Copyright Holder(s).
 
 "Modified Version" refers to any derivative made by adding to, deleting,
 or substituting -- in part or in whole -- any of the components of the
-Original Version, by changing formats or by porting the Font Software to
-a new environment.
+Original Version, by changing formats or by porting the Font Software to a
+new environment.
 
 "Author" refers to any designer, engineer, programmer, technical
 writer or other person who contributed to the Font Software.
@@ -82,8 +88,8 @@ remain under this license does not apply to any document created
 using the Font Software.
 
 TERMINATION
-This license becomes null and void if any of the above conditions
-are not met.
+This license becomes null and void if any of the above conditions are
+not met.
 
 DISCLAIMER
 THE FONT SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,

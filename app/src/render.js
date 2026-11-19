@@ -1,196 +1,157 @@
-// render.js — the cover renderer.
-//
-// Panels are drawn to an offscreen art canvas, the grade maps it,
-// Poster Ink illustrates it, and the title band (skyline, lettering,
-// pill, badge, sash, tagline) is drawn on top. Framing is relative,
-// so every size renders natively from the same state — nothing is
-// stretched or re-cropped per size.
-//
-// Title-band geometry (fractions of band height, top = 0):
-//   skyline strip ....... 0.00 – 0.30
-//   title caps baseline . 0.64 (caps rise to ~0.35)
-//   star pill / EST badge  0.37 – 0.63, right side
-//   script subtitle ..... baseline 0.78, size 0.16 — its swashes
-//                         bottom out near 0.82, clear of the
-//                         tagline bar, which starts at 0.85
-//   tagline bar ......... 0.85 – 1.00
-// The script used to sit at 0.86, inside the tagline bar, so its tails
-// were clipped. It now has its own clear zone.
+// render.js — the cover renderer: panels to an art canvas, grade, ink,
+// then the title band on top. Every size renders natively from the same
+// relative state (relative zooms, pans and panel rects), so the square,
+// portrait and wide exports are the same cover, re-framed, never
+// stretched.
 
-import { layoutById, TITLE_BAND } from "./layouts.js";
-import { frameWindow } from "./photos.js";
-import { gradeCanvas, levelsCanvas, gradeById } from "./grades.js";
-import { applyPosterInk } from "./ink.js";
-import {
-  drawSkyline,
-  drawStarPill,
-  drawEstBadge,
-  drawCornerRibbon,
-  drawStarburst,
-} from "./keyart.js";
-import {
-  drawCoverTitle,
-  drawScriptSubtitle,
-  drawTaglineBar,
-} from "./lettering.js";
-
-// The three export sizes the app promises.
-export const SIZES = {
-  square: { w: 1080, h: 1080, label: "Square 1080 x 1080" },
-  portrait: { w: 1080, h: 1350, label: "Portrait 1080 x 1350" },
-  wide: { w: 1920, h: 1080, label: "Wide 1920 x 1080" },
-};
-
-// The whole cover onto `canvas` (sized W x H by the caller).
-// cover: { layout, grade, inkOn, inkStrength, title, subtitle, tagline,
-//          badge, frames, photoById, extras: { skyline, starPill,
-//          starburst, ribbon } }
-// opts.fast: while dragging — grade only, ink comes back on pointerup.
-export function renderCover(canvas, W, H, cover, opts = {}) {
-  const ctx = canvas.getContext("2d");
-  const bandH = Math.round(H * TITLE_BAND);
-  const artH = H - bandH;
-  const art = buildArtCanvas(W, artH, cover, opts);
-  ctx.fillStyle = "#0d0508";
-  ctx.fillRect(0, 0, W, H);
-  ctx.drawImage(art, 0, 0);
-  drawTitleBand(ctx, W, H, artH, bandH, cover);
-  // starburst sticker on the art's top-left corner
-  const extras = cover.extras || {};
-  if (extras.starburst !== false) {
-    drawStarburst(ctx, Math.round(W * 0.075), Math.round(artH * 0.09), Math.round(Math.min(W, H) * 0.055), "FRESH INK", "SUMMER 2026");
-  }
-  return canvas;
-}
-
-// Render one size at full resolution and hand back a PNG blob.
-export function exportCoverBlob(cover, sizeId) {
-  const size = SIZES[sizeId];
-  const canvas = makeCanvas(size.w, size.h);
-  renderCover(canvas, size.w, size.h, cover);
-  return new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
-}
+import { panelsFor } from './layouts.js';
+import { gradeById, applyGrade } from './grades.js';
+import { applyInk } from './ink.js';
+import { drawSkyline, drawHeatPill, drawEstBadge, drawRibbon, drawStarburst } from './keyart.js';
+import { drawTitle, drawSubtitle, drawTagline } from './lettering.js';
 
 function makeCanvas(w, h) {
-  const c = document.createElement("canvas");
-  c.width = w;
-  c.height = h;
+  const c = document.createElement('canvas');
+  c.width = Math.max(1, Math.round(w));
+  c.height = Math.max(1, Math.round(h));
   return c;
 }
 
-// Panels + grade + ink on an offscreen art canvas, W x artH.
-// opts.fast: while dragging — grade only, ink comes back on pointerup.
-function buildArtCanvas(W, artH, cover, opts) {
-  const layout = layoutById(cover.layout);
-  const panels = layout.panels(W, artH).map((p) => ({
-    ...p,
-    px: Math.round(p.x * W),
-    py: Math.round(p.y * artH),
-    pxW: Math.round(p.w * W),
-    pxH: Math.round(p.h * artH),
-  }));
-  const art = makeCanvas(W, artH);
-  const ac = art.getContext("2d");
-  ac.fillStyle = "#160708";
-  ac.fillRect(0, 0, W, artH);
-  panels.forEach((panel, i) => {
-    const frame = cover.frames[i];
-    if (!frame) return;
-    const photo = cover.photoById[frame.photoId];
-    if (!photo || !photo.ready) return;
-    paintPanel(ac, panel, photo, frame);
+/**
+ * Cover-fit source window for a photo inside a panel: the window keeps
+ * the panel's aspect, scales by zoom, and centres on (x, y) — fractions
+ * of the photo. y defaults to the upper third, where faces live.
+ */
+export function cropWindow(img, rectW, rectH, crop) {
+  const base = Math.max(rectW / img.naturalWidth, rectH / img.naturalHeight);
+  const scale = base * (crop.zoom || 1);
+  const sw = rectW / scale;
+  const sh = rectH / scale;
+  const cx = (crop.x ?? 0.5) * img.naturalWidth;
+  const cy = (crop.y ?? 0.32) * img.naturalHeight;
+  let sx = cx - sw / 2;
+  let sy = cy - sh / 2;
+  sx = Math.min(Math.max(sx, 0), Math.max(0, img.naturalWidth - sw));
+  sy = Math.min(Math.max(sy, 0), Math.max(0, img.naturalHeight - sh));
+  return { sx, sy, sw, sh };
+}
+
+/** Draw one photo into one panel (offscreen, at panel pixels). */
+function drawPanel(photo, rect, crop, grade, ink) {
+  const w = Math.max(2, Math.round(rect.w));
+  const h = Math.max(2, Math.round(rect.h));
+  const c = makeCanvas(w, h);
+  const ctx = c.getContext('2d');
+  const win = cropWindow(photo.img, w, h, crop);
+  ctx.drawImage(photo.img, win.sx, win.sy, win.sw, win.sh, 0, 0, w, h);
+  const img = ctx.getImageData(0, 0, w, h);
+  applyGrade(img, grade);
+  ctx.putImageData(img, 0, 0);
+  if (ink.on && ink.strength > 0) {
+    const inked = applyInk(c, ink.strength);
+    ctx.clearRect(0, 0, w, h);
+    ctx.drawImage(inked, 0, 0);
+  }
+  return c;
+}
+
+/**
+ * Render the whole cover into ctx at W x H. `state` is the cover state,
+ * `library` the loaded photo records. The art area is the top 74% of
+ * the cover; the title band takes the bottom 26%.
+ */
+export function renderCover(ctx, W, H, state, library) {
+  const bandH = Math.round(H * 0.26);
+  const bandY = H - bandH;
+  const artH = bandY;
+  ctx.fillStyle = '#1a0b14';
+  ctx.fillRect(0, 0, W, H);
+
+  const byId = new Map(library.map((p) => [p.id, p]));
+  const rects = panelsFor(state.layout, W, artH);
+  const grade = gradeById(state.grade);
+
+  rects.forEach((r, i) => {
+    const panel = state.panels[i];
+    if (!panel) return;
+    const photo = byId.get(panel.photoId);
+    if (!photo || !photo.img) return;
+    const px = r.x * W;
+    const py = r.y * artH;
+    const pw = r.w * W;
+    const ph = r.h * artH;
+    const drawn = drawPanel(photo, { w: pw, h: ph }, panel, grade, state.ink);
+    ctx.save();
+    if (r.rot) {
+      ctx.translate(px + pw / 2, py + ph / 2);
+      ctx.rotate(r.rot);
+      ctx.translate(-pw / 2, -ph / 2);
+    } else {
+      ctx.translate(px, py);
+    }
+    if (r.frame) {
+      ctx.shadowColor = 'rgba(0,0,0,0.45)';
+      ctx.shadowBlur = Math.max(6, W * 0.012);
+      ctx.shadowOffsetY = Math.max(3, W * 0.006);
+      ctx.fillStyle = '#f6efe4';
+      const pad = Math.max(4, W * 0.008);
+      ctx.fillRect(-pad, -pad, pw + pad * 2, ph + pad * 2);
+      ctx.shadowColor = 'transparent';
+      ctx.drawImage(drawn, 0, 0);
+    } else {
+      ctx.drawImage(drawn, 0, 0);
+    }
+    ctx.restore();
   });
-  if (gradeById(cover.grade).mix === 0) levelsCanvas(ac, W, artH);
-  else gradeCanvas(ac, W, artH, cover.grade);
-  if (cover.inkOn && !opts.fast) {
-    applyPosterInk(ac, W, artH, cover.inkStrength);
-  }
-  return art;
-}
 
-// Draw one panel: a polaroid print (white frame, tilt) or a plain panel.
-function paintPanel(c, panel, photo, frame) {
-  if (!panel.polaroid) {
-    paintPhoto(c, panel, photo, frame);
-    return;
-  }
-  const cx = panel.px + panel.pxW / 2;
-  const cy = panel.py + panel.pxH / 2;
-  c.save();
-  c.translate(cx, cy);
-  c.rotate(((panel.tilt || 0) * Math.PI) / 180);
-  c.translate(-cx, -cy);
-  // white print frame, thicker at the bottom; the photo is drawn
-  // inside the same rotated space so frame and print tilt together
-  const pad = panel.pxW * 0.045;
-  const foot = panel.pxH * 0.13;
-  c.fillStyle = "#f7f2e8";
-  c.fillRect(panel.px - pad, panel.py - pad, panel.pxW + pad * 2, panel.pxH + pad + foot);
-  paintPhoto(c, panel, photo, frame);
-  c.restore();
-}
+  // Starburst sticker on the art area's top-left corner.
+  const sbR = Math.min(W, artH) * 0.062;
+  drawStarburst(ctx, W * 0.065, artH * 0.09, sbR, 'FRESH INK', 'SUMMER 2026');
 
-// Draw one panel's photo into its rect, honouring its frame.
-function paintPhoto(c, panel, photo, frame) {
-  const win = frameWindow(photo, panel.pxW, panel.pxH, frame);
-  c.save();
-  c.beginPath();
-  c.rect(panel.px, panel.py, panel.pxW, panel.pxH);
-  c.clip();
-  c.drawImage(
-    photo.img, win.sx, win.sy, win.sw, win.sh,
-    panel.px, panel.py, panel.pxW, panel.pxH
+  // Title band: dark gradient, skyline, title, pill, badge, ribbon.
+  const bandGrad = ctx.createLinearGradient(0, bandY, 0, H);
+  bandGrad.addColorStop(0, '#2a0e1e');
+  bandGrad.addColorStop(1, '#12060d');
+  ctx.fillStyle = bandGrad;
+  ctx.fillRect(0, bandY, W, bandH);
+  drawSkyline(ctx, 0, bandY, W, bandH * 0.26, 7);
+
+  const titleSize = drawTitle(
+    ctx, state.title, W * 0.03, bandY + bandH * 0.56, W * 0.58, H * 0.115,
   );
-  c.restore();
+  void titleSize;
+
+  // HEAT pill + EST badge on the band's right side.
+  const badgeR = bandH * 0.17;
+  const badgeCx = W - W * 0.045;
+  const badgeCy = bandY + bandH * 0.56;
+  const pillMaxW = badgeCx - badgeR - W * 0.02 - W * 0.6;
+  drawHeatPill(ctx, W * 0.6, bandY + bandH * 0.47, bandH * 0.17, Math.max(60, pillMaxW));
+  drawEstBadge(ctx, badgeCx, badgeCy, badgeR);
+
+  // Subtitle in its own clear zone, above the tagline bar.
+  drawSubtitle(
+    ctx, state.subtitle, W * 0.035,
+    bandY + bandH * 0.6, bandH * 0.22, W * 0.5, H * 0.045,
+  );
+
+  // The tagline bar caps the bottom of the cover.
+  drawTagline(ctx, state.tagline, 0, H - bandH * 0.16, W, bandH * 0.16);
+
+  // NOW SHOWING ribbon across the band's top-right corner.
+  drawRibbon(ctx, 0, bandY, W, bandH);
 }
 
-// The title band: skyline, title, script, pill, badge, sash, tagline.
-function drawTitleBand(g, W, H, bandY, bandH, cover) {
-  const gradient = g.createLinearGradient(0, bandY, 0, H);
-  gradient.addColorStop(0, "#220a10");
-  gradient.addColorStop(1, "#0d0508");
-  g.fillStyle = gradient;
-  g.fillRect(0, bandY, W, bandH);
-
-  const edge = Math.round(W * 0.035);
-  const flags = cover.extras || {};
-  // skyline strip across the top of the band
-  if (flags.skyline !== false) {
-    drawSkyline(g, 0, bandY, W, bandH * 0.3, cover.title);
-  }
-  // title row: title left, star pill and EST badge right, with a gap
-  // between pill and badge so they never collide
-  const titleBaseline = bandY + bandH * 0.64;
-  const badgeRadius = Math.round(bandH * 0.13);
-  const space = Math.round(W * 0.012);
-  const pillWidth = Math.round(Math.max(W * 0.19, bandH * 1.05)); // wide enough for HEAT + 5 stars
-  const pillHeight = Math.round(bandH * 0.2);
-  const pillLeft = W - edge - badgeRadius * 2 - space - pillWidth;
-  drawCoverTitle(g, cover.title, edge, titleBaseline, pillLeft - edge, bandH * 0.4);
-  // neon script subtitle, tucked under the caps with clear space below
-  if (cover.subtitle) {
-    drawScriptSubtitle(
-      g, cover.subtitle,
-      edge + W * 0.06, bandY + bandH * 0.78,
-      W * 0.6, bandH * 0.16
-    );
-  }
-  // star pill + EST badge on the right of the title row
-  if (flags.starPill !== false) {
-    drawStarPill(g, pillLeft, bandY + bandH * 0.4, pillWidth, pillHeight, 4);
-  }
-  if (flags.badge !== false) {
-    drawEstBadge(g, W - edge - badgeRadius, bandY + bandH * 0.5, badgeRadius);
-  }
-  // corner sash across the band's top-right corner (never over a
-  // photo). The sash sizes itself to its text; when the words
-  // cannot fit it draws nothing, so the band never shows a clipped
-  // wedge.
-  if (flags.ribbon) {
-    drawCornerRibbon(g, 0, bandY, W, bandH, "NOW SHOWING");
-  }
-  // tagline bar along the bottom edge
-  if (cover.tagline) {
-    drawTaglineBar(g, cover.tagline, 0, H - Math.round(bandH * 0.15), W, Math.round(bandH * 0.15));
-  }
+/** Render a cover to a fresh canvas at the given pixel size. */
+export function renderToCanvas(W, H, state, library) {
+  const c = makeCanvas(W, H);
+  renderCover(c.getContext('2d'), W, H, state, library);
+  return c;
 }
+
+/** The three post sizes the app exports, in the order it exports them. */
+export const EXPORT_SIZES = [
+  { id: 'square', label: 'Square', w: 1080, h: 1080 },
+  { id: 'portrait', label: 'Portrait', w: 1080, h: 1350 },
+  { id: 'wide', label: 'Wide', w: 1920, h: 1080 },
+];

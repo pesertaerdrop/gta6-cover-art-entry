@@ -1,36 +1,39 @@
 # Afterglow Cover Studio
 
-![make.fun](https://make.fun/badge/gta6-cover-art-01.svg)
-![rank](https://make.fun/badge/gta6-cover-art-01/pesertaerdrop/gta6-cover-art-entry/rank.svg)
-![reward](https://make.fun/badge/gta6-cover-art-01/pesertaerdrop/gta6-cover-art-entry/reward.svg)
+![GTA 6 cover art](https://make.fun/badge/gta6-cover-art-01.svg)
+![Rank](https://make.fun/badge/gta6-cover-art-01/pesertaerdrop/gta6-cover-art-entry/rank.svg)
+![Reward](https://make.fun/badge/gta6-cover-art-01/pesertaerdrop/gta6-cover-art-entry/reward.svg)
 
-Turn any photo and caption into GTA 6-style cover art: multi-panel posters with bold lettering and a sunset or neon grade, exported as PNGs you can share. Built for the [make.fun GTA 6 cover art bounty](https://make.fun/bounty/gta6-cover-art-01) ([competition page](https://make.fun/c/gta6-cover-art-01)).
+An entry for the [GTA 6 cover art bounty](https://make.fun/bounty/gta6-cover-art-01) on [make.fun](https://make.fun/c/gta6-cover-art-01): an offline web app that turns any photo into a bold multi-panel poster cover — sunset grade, Poster Ink, big gradient lettering — and exports it as a PNG in square 1080&times;1080, portrait 1080&times;1350 and wide 1920&times;1080.
 
 ## How it works
 
-Three steps, one PNG out:
+1. **Add photos** — use the 14 included samples or upload your own. Samples are image-model photos made for this studio; uploads never leave your machine.
+2. **Pick a layout** — eight layouts, led by **Poster Grid**: one large central hero panel (an original duo portrait against a sunset skyline) ringed by seven action panels — police chase, airboat and alligator, boat party, convertible duo, yacht under a blimp, dirt-bike jump, drawbridge and speedboat. Also: nine-panel grid, hero and three, full bleed, tilted snapshots, Strip Five, split duo and comic strip.
+3. **Export** — one big EXPORT PNG button downloads all three sizes at once.
 
-1. **Add photos** — upload your own, or use the 14 image-model samples that ship with the app.
-2. **Pick a layout** — seven layouts, six gradient-map grades, and Poster Ink on a strength dial.
-3. **Export** — a single click writes all three post sizes: 1080×1080, 1080×1350 and 1920×1080.
+## What is inside
 
-Your photos never leave your machine. The app is plain static files, it runs offline, and it makes no network request at all.
+- **Poster Ink** (written from scratch): posterized ink bands, halftone dots in the shadows, Sobel ink edges, seeded grain and a vignette — with a strength slider and an off switch for the Raw Stock photoreal grade.
+- **Six grades**: Vice Sunset, Neon Nights, Golden Hour, Aqua Pop, Noir Vice, Raw Stock.
+- **Title-block furniture**: skyline strip, gradient Anton title, Kaushan Script subtitle in its own clear zone, HEAT star pill, EST. 2026 badge, FRESH INK starburst and a legible NOW SHOWING diagonal ribbon.
+- **Editor craft**: drag-to-reframe with per-photo crops that survive layout changes, smart face framing (upper third by default), 50-step undo/redo, editable title/subtitle/tagline, one-tap presets, shuffle.
 
-## Inside the app
-
-- **Poster Ink** — blur, posterize into bands that keep the hue, lift the darks, halftone dots in the shadows, Sobel ink lines, grain and vignette, all on a strength slider, beside a photoreal Raw Stock grade.
-- **One-photo layouts** — Strip Five slices one photo into five independent crops; Tilted Snapshots tosses three polaroid prints across the cover.
-- **Title block** — a skyline strip, a star pill, an EST. 2026 badge, a diagonal NOW SHOWING sash that sizes itself so its text always fits, and a starburst sticker. All of it is drawn in canvas code, under a gradient Anton title and a neon Kaushan Script subtitle with clear space above the tagline bar.
-- **Editor** — drag a panel to reframe it, scroll to zoom, zoom and pan sliders, smart face framing, undo and redo across 50 steps, presets, auto-fill and shuffle. A crop you set by hand survives a layout change.
-
-Anton, Kaushan Script and Bebas Neue are vendored under `app/fonts/` under the SIL Open Font License. The sample photos were made with an image model.
-
-## Try it
+## Run it
 
 ```sh
-node serve.ts   # http://localhost:8080
+node serve.ts
+# open http://localhost:8080
 ```
 
-## Handing it in
+Build the submission bundle:
 
-`main.ts` (Node 22, standard library only) copies `app/` and `screenshots/` to `/output` and writes `/output/dossier.json` with `buildDossier` from `vendor/makefun-app.ts`.
+```sh
+mkdir -p out && MAKEFUN_OUTPUT_DIR=out node main.ts
+```
+
+## Credits
+
+- All 14 sample photos were made with an image model for this entry — no photo of a real person, no existing game's artwork, logo or wordmark anywhere.
+- Fonts: Anton, Bebas Neue and Kaushan Script, all under the SIL Open Font License (see `app/fonts/OFL.txt`).
+- License: MIT.

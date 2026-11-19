@@ -1,10 +1,11 @@
-// keyart.js — the title band's extras, all drawn in canvas code:
-// a seeded skyline strip, a star pill, the EST. 2026 badge, a corner
-// sash (on the band, never over a photo) and a starburst sticker.
-// The skyline is seeded from the title text, so the same cover always
-// draws the same skyline — the build stays deterministic.
+// keyart.js — the title band's extras, all drawn in canvas code: a seeded
+// skyline strip, the HEAT star pill, the EST. 2026 badge, the diagonal
+// NOW SHOWING ribbon, and the FRESH INK starburst sticker. Each helper
+// takes explicit coordinates, so the renderer places them per size.
 
-export function roundRect(ctx, x, y, w, h, r) {
+import { seededRandom } from './ink.js';
+
+function roundRect(ctx, x, y, w, h, r) {
   ctx.beginPath();
   ctx.moveTo(x + r, y);
   ctx.arcTo(x + w, y, x + w, y + h, r);
@@ -14,240 +15,223 @@ export function roundRect(ctx, x, y, w, h, r) {
   ctx.closePath();
 }
 
-// FNV-1a over the title text: the skyline seed.
-export function hashSeed(text) {
-  let hash = 2166136261;
-  for (let i = 0; i < text.length; i++) {
-    hash ^= text.charCodeAt(i);
-    hash = Math.imul(hash, 16777619);
-  }
-  return hash >>> 0;
-}
-
-function mulberry32(seed) {
-  let state = seed;
-  return function () {
-    state |= 0;
-    state = (state + 0x6d2b79f5) | 0;
-    let mix = Math.imul(state ^ (state >>> 15), 1 | state);
-    mix = (mix + Math.imul(mix ^ (mix >>> 7), 61 | mix)) ^ mix;
-    return ((mix ^ (mix >>> 14)) >>> 0) / 4294967296;
-  };
-}
-
-// Starburst sticker: a spiked disc with two lines of text, stuck on
-// the art area's top-left corner at a slight tilt.
-export function drawStarburst(ctx, cx, cy, r, line1, line2) {
-  ctx.save();
-  ctx.translate(cx, cy);
-  ctx.rotate(-0.12);
-  const points = 14;
-  ctx.beginPath();
-  for (let i = 0; i < points * 2; i++) {
-    const theta = (i * Math.PI) / points;
-    const rr = i % 2 === 0 ? r : r * 0.78;
-    const px = Math.cos(theta) * rr;
-    const py = Math.sin(theta) * rr;
-    if (i === 0) ctx.moveTo(px, py);
-    else ctx.lineTo(px, py);
-  }
-  ctx.closePath();
-  ctx.fillStyle = "#ff5f7e";
-  ctx.fill();
-  ctx.fillStyle = "#fff3e0";
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-  ctx.font = `700 ${Math.round(r * 0.42)}px "Bebas Neue", sans-serif`;
-  ctx.fillText(line1, 0, -r * 0.2);
-  ctx.fillText(line2, 0, r * 0.26);
-  ctx.restore();
-}
-
-function drawStar(ctx, cx, cy, r, color) {
-  ctx.save();
-  ctx.fillStyle = color;
-  ctx.beginPath();
-  for (let i = 0; i < 10; i++) {
-    const theta = -Math.PI / 2 + (i * Math.PI) / 5;
-    const rr = i % 2 === 0 ? r : r * 0.45;
-    const px = cx + Math.cos(theta) * rr;
-    const py = cy + Math.sin(theta) * rr;
-    if (i === 0) ctx.moveTo(px, py);
-    else ctx.lineTo(px, py);
-  }
-  ctx.closePath();
-  ctx.fill();
-  ctx.restore();
-}
-
-// Star pill: a rounded pill holding five stars, four lit — the cover's
-// "heat" meter, drawn on the title band. The stars shrink to fit the
-// pill instead of spilling past its right end on tall covers.
-export function drawStarPill(ctx, x, y, w, h, lit = 4) {
-  ctx.save();
-  ctx.fillStyle = "#f5b942";
-  roundRect(ctx, x, y, w, h, h / 2);
-  ctx.fill();
-  ctx.fillStyle = "#14060a";
-  ctx.font = `700 ${Math.round(h * 0.52)}px "Bebas Neue", sans-serif`;
-  ctx.textBaseline = "middle";
-  ctx.fillText("HEAT", x + h * 0.45, y + h / 2 + h * 0.03);
-  const wordW = ctx.measureText("HEAT").width;
-  const space = w - h * 0.45 - wordW - h * 0.35 - h * 0.25;
-  const radius = Math.max(h * 0.12, Math.min(h * 0.26, space / (5 * 2.3)));
-  const pitch = radius * 2.3;
-  const startX = x + h * 0.45 + wordW + h * 0.35;
-  for (let i = 0; i < 5; i++) {
-    drawStar(ctx, startX + i * pitch + radius, y + h / 2, radius, i < lit ? "#14060a" : "rgba(20,6,10,0.28)");
-  }
-  ctx.restore();
-}
-
-// Round "EST. 2026" badge, drawn on the title band's right end.
-export function drawEstBadge(ctx, cx, cy, r) {
-  ctx.save();
-  ctx.fillStyle = "#f5b942";
-  ctx.beginPath();
-  ctx.arc(cx, cy, r, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.strokeStyle = "#14060a";
-  ctx.lineWidth = Math.max(1, r * 0.08);
-  ctx.beginPath();
-  ctx.arc(cx, cy, r * 0.78, 0, Math.PI * 2);
-  ctx.stroke();
-  ctx.fillStyle = "#14060a";
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-  ctx.font = `700 ${Math.round(r * 0.52)}px "Bebas Neue", sans-serif`;
-  ctx.fillText("EST.", cx, cy - r * 0.22);
-  ctx.fillText("2026", cx, cy + r * 0.28);
-  ctx.restore();
-}
-
-// Corner sash on the title band (never over a photo): a gold band on
-// the diagonal across the band's top-right corner, dark words on it.
-//
-// The sash's centreline is the 45-degree chord from the band's top
-// edge to its right edge, so the words sit inside the band instead of
-// being clipped to a bare triangle (the v4 sash was centred on the
-// corner point itself, and the band's clip ate the whole text). The
-// font shrinks until NOW SHOWING fits the chord; if the words cannot
-// fit even at the smallest readable size, it draws nothing — a stray
-// triangle is worse than no sash.
-export function drawCornerRibbon(ctx, x, y, w, h, text) {
-  const run = h * 0.5; // run along the top + right edges from the corner
-  const diag = run * Math.SQRT2; // the chord the words must fit
-  let size = Math.round(h * 0.09);
-  ctx.font = `700 ${size}px "Bebas Neue", sans-serif`;
-  let textW = ctx.measureText(text).width;
-  while (size > 10 && textW > diag - size) {
-    size -= 1;
-    ctx.font = `700 ${size}px "Bebas Neue", sans-serif`;
-    textW = ctx.measureText(text).width;
-  }
-  if (size <= 10 || textW > diag - size) return false;
-  const thick = size * 1.5;
-
+/**
+ * A city skyline strip: seeded towers with lit windows, a pink rim glow
+ * along the rooftops, and two palm silhouettes. Drawn dark on the band.
+ */
+export function drawSkyline(ctx, x, y, w, h, seed = 7) {
+  const rnd = seededRandom(seed);
   ctx.save();
   ctx.beginPath();
   ctx.rect(x, y, w, h);
   ctx.clip();
-
-  // The chord's midpoint: half a run in from the top-right corner.
-  ctx.translate(x + w - run / 2, y + run / 2);
-  ctx.rotate(Math.PI / 4);
-
-  // Hard offset shadow, then the gold sash (longer than the chord,
-  // so its ends are cut clean by the band's top and right edges),
-  // then the words, then a dark rule along the lower edge.
-  ctx.fillStyle = "rgba(0,0,0,0.35)";
-  ctx.fillRect(-diag, -thick / 2 + 3, diag * 2, thick);
-  ctx.fillStyle = "#f5b942";
-  ctx.fillRect(-diag, -thick / 2, diag * 2, thick);
-
-  ctx.fillStyle = "#14060a";
-  ctx.font = `700 ${size}px "Bebas Neue", sans-serif`;
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-  ctx.fillText(text, 0, 1);
-
-  ctx.fillStyle = "rgba(0,0,0,0.45)";
-  ctx.fillRect(-diag, thick / 2 - 2, diag * 2, 2);
-  ctx.restore();
-  return true;
-}
-
-// Skyline strip: seeded towers with lit windows, a pink rim glow along
-// the rooflines and two palm silhouettes. Drawn at the top edge of the
-// title band, under the title.
-export function drawSkyline(ctx, x, y, w, h, seedText) {
-  const rand = mulberry32(hashSeed(seedText));
-  ctx.save();
-  ctx.beginPath();
-  ctx.rect(x, y, w, h);
-  ctx.clip();
-  // pink rim glow along the top
-  const glow = ctx.createLinearGradient(0, y, 0, y + h * 0.35);
-  glow.addColorStop(0, "rgba(255,110,140,0.55)");
-  glow.addColorStop(1, "rgba(255,110,140,0)");
+  // Pink rim glow along the top of the strip.
+  const glow = ctx.createLinearGradient(x, y, x, y + h * 0.5);
+  glow.addColorStop(0, 'rgba(255, 110, 160, 0.55)');
+  glow.addColorStop(1, 'rgba(255, 110, 160, 0)');
   ctx.fillStyle = glow;
-  ctx.fillRect(x, y, w, h * 0.35);
-  // towers
-  let towerX = x;
-  while (towerX < x + w) {
-    const towerW = w * (0.05 + rand() * 0.07);
-    const towerH = h * (0.35 + rand() * 0.6);
-    const top = y + h - towerH;
-    ctx.fillStyle = "#0d0508";
-    ctx.fillRect(towerX, top, towerW, towerH);
-    // lit windows
-    const columns = Math.max(1, Math.floor(towerW / (w * 0.012)));
-    const rows = Math.max(1, Math.floor(towerH / (h * 0.22)));
-    for (let c = 0; c < columns; c++) {
-      for (let r = 0; r < rows; r++) {
-        if (rand() < 0.42) {
-          ctx.fillStyle = rand() < 0.7 ? "#ffcf7d" : "#ff8fb0";
-          ctx.fillRect(
-            towerX + (c + 0.25) * (towerW / columns),
-            top + (r + 0.25) * (towerH / rows),
-            Math.max(1, towerW / columns / 3),
-            Math.max(1, towerH / rows / 3)
-          );
+  ctx.fillRect(x, y, w, h * 0.5);
+  let cx = x;
+  while (cx < x + w) {
+    const tw = w * (0.05 + rnd() * 0.07);
+    const th = h * (0.35 + rnd() * 0.6);
+    const top = y + h - th;
+    ctx.fillStyle = '#1c0d1a';
+    ctx.fillRect(cx, top, tw, th);
+    ctx.fillStyle = 'rgba(255, 120, 170, 0.9)';
+    ctx.fillRect(cx, top, tw, Math.max(1.5, h * 0.03));
+    // Lit windows: a sparse grid of warm and pink dots.
+    for (let wy = top + h * 0.1; wy < y + h - h * 0.06; wy += h * 0.16) {
+      for (let wx = cx + tw * 0.14; wx < cx + tw * 0.86; wx += tw * 0.26) {
+        if (rnd() < 0.42) {
+          ctx.fillStyle = rnd() < 0.6 ? 'rgba(255, 210, 110, 0.95)' : 'rgba(255, 140, 190, 0.95)';
+          ctx.fillRect(wx, wy, Math.max(1.5, tw * 0.09), Math.max(1.5, h * 0.05));
         }
       }
     }
-    // antenna on the tallest
-    if (towerH > h * 0.8) {
-      ctx.fillStyle = "#0d0508";
-      ctx.fillRect(towerX + towerW / 2 - 1, top - h * 0.16, 2, h * 0.16);
-      ctx.fillStyle = "#ff5f7e";
-      ctx.beginPath();
-      ctx.arc(towerX + towerW / 2, top - h * 0.16, Math.max(1.5, w * 0.002), 0, Math.PI * 2);
-      ctx.fill();
-    }
-    towerX += towerW + w * 0.012;
+    cx += tw + w * 0.012;
   }
-  // palm silhouettes
-  for (const trunkX of [x + w * 0.08, x + w * 0.9]) {
-    ctx.strokeStyle = "#0d0508";
+  // Two palm silhouettes at the strip's ends.
+  for (const px of [x + w * 0.04, x + w * 0.94]) {
+    ctx.strokeStyle = '#1c0d1a';
     ctx.lineWidth = Math.max(2, w * 0.004);
     ctx.beginPath();
-    ctx.moveTo(trunkX, y + h);
-    ctx.quadraticCurveTo(trunkX + w * 0.01, y + h * 0.45, trunkX + w * 0.02, y + h * 0.2);
+    ctx.moveTo(px, y + h);
+    ctx.quadraticCurveTo(px + w * 0.008, y + h * 0.45, px - w * 0.004, y + h * 0.12);
     ctx.stroke();
-    ctx.lineWidth = Math.max(1.5, w * 0.003);
-    for (let f = 0; f < 5; f++) {
-      const a = Math.PI * (0.15 + f * 0.18);
+    ctx.lineWidth = Math.max(1.5, w * 0.0025);
+    for (let a = -0.9; a <= 0.9; a += 0.45) {
       ctx.beginPath();
-      ctx.moveTo(trunkX + w * 0.02, y + h * 0.2);
+      ctx.moveTo(px - w * 0.004, y + h * 0.12);
       ctx.quadraticCurveTo(
-        trunkX + w * 0.02 + Math.cos(a) * w * 0.05,
-        y + h * 0.2 - Math.sin(a) * h * 0.28,
-        trunkX + w * 0.02 + Math.cos(a) * w * 0.075,
-        y + h * 0.2 - Math.sin(a) * h * 0.12
+        px + Math.sin(a) * w * 0.03, y + h * 0.02,
+        px + Math.sin(a) * w * 0.05, y + h * 0.12,
       );
       ctx.stroke();
     }
   }
+  ctx.restore();
+}
+
+/** A five-point star path centred at (cx, cy) with outer radius r. */
+export function starPath(ctx, cx, cy, r) {
+  ctx.beginPath();
+  for (let i = 0; i < 10; i++) {
+    const ang = -Math.PI / 2 + (i * Math.PI) / 5;
+    const rad = i % 2 === 0 ? r : r * 0.42;
+    const px = cx + Math.cos(ang) * rad;
+    const py = cy + Math.sin(ang) * rad;
+    if (i === 0) ctx.moveTo(px, py);
+    else ctx.lineTo(px, py);
+  }
+  ctx.closePath();
+}
+
+/**
+ * The HEAT pill: a gold rounded pill holding the word HEAT and five
+ * stars (four filled, one outline). Returns the pill's drawn width so
+ * the caller can right-align it. The pill widens itself on tall covers
+ * because the caller passes the full width it may use.
+ */
+export function drawHeatPill(ctx, x, y, h, maxW) {
+  const label = 'HEAT';
+  const starR = h * 0.26;
+  const gap = h * 0.16;
+  let fs = h * 0.42;
+  ctx.font = `${fs}px Anton, sans-serif`;
+  const labelW = ctx.measureText(label).width;
+  const starsW = 5 * starR * 2 + 4 * gap;
+  let pillW = labelW + gap * 2 + starsW + gap * 2;
+  pillW = Math.min(pillW, maxW);
+  const px = x + maxW - pillW;
+  const grad = ctx.createLinearGradient(px, y, px + pillW, y);
+  grad.addColorStop(0, '#f7c948');
+  grad.addColorStop(1, '#f0a832');
+  ctx.fillStyle = grad;
+  roundRect(ctx, px, y, pillW, h, h / 2);
+  ctx.fill();
+  ctx.fillStyle = '#241016';
+  ctx.textBaseline = 'middle';
+  ctx.textAlign = 'left';
+  ctx.font = `${fs}px Anton, sans-serif`;
+  ctx.fillText(label, px + gap, y + h / 2 + h * 0.03);
+  let sx = px + gap + labelW + gap;
+  const cy = y + h / 2;
+  for (let i = 0; i < 5; i++) {
+    const cx = sx + starR;
+    starPath(ctx, cx, cy, starR);
+    if (i < 4) {
+      ctx.fillStyle = '#241016';
+      ctx.fill();
+    } else {
+      ctx.strokeStyle = 'rgba(36, 16, 22, 0.75)';
+      ctx.lineWidth = Math.max(1.5, h * 0.05);
+      ctx.stroke();
+    }
+    sx += starR * 2 + gap;
+  }
+  return pillW;
+}
+
+/** The round EST. 2026 badge: gold ring, dark disc, two lines of text. */
+export function drawEstBadge(ctx, cx, cy, r) {
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, 0, Math.PI * 2);
+  ctx.fillStyle = '#241016';
+  ctx.fill();
+  ctx.lineWidth = Math.max(2, r * 0.1);
+  ctx.strokeStyle = '#f7c948';
+  ctx.stroke();
+  ctx.fillStyle = '#f7c948';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.font = `${r * 0.42}px Bebas Neue, sans-serif`;
+  ctx.fillText('EST.', cx, cy - r * 0.22);
+  ctx.font = `${r * 0.52}px Bebas Neue, sans-serif`;
+  ctx.fillText('2026', cx, cy + r * 0.3);
+  ctx.restore();
+}
+
+/**
+ * The NOW SHOWING ribbon: a gold diagonal sash across the band's
+ * top-right corner, on the 45-degree chord from the band's top edge to
+ * its right edge, with the words set in dark Bebas along the sash.
+ * The sash is a band of constant width (not a triangle), so the words
+ * have the full chord to sit on and never straddle an edge: the font
+ * shrinks until the words fit the chord, and caps at a size that
+ * leaves a margin inside the band's width. If they cannot fit at the
+ * smallest readable size, the ribbon draws nothing instead of a bare
+ * triangle.
+ */
+export function drawRibbon(ctx, bandX, bandY, bandW, bandH) {
+  const run = bandH * 0.5;
+  const x0 = bandX + bandW - run;
+  const y0 = bandY;
+  const x1 = bandX + bandW;
+  const y1 = bandY + run;
+  const chord = Math.hypot(x1 - x0, y1 - y0);
+  const sashW = run * 0.55;
+  const words = 'NOW SHOWING';
+  let fs = Math.min(bandH * 0.26, sashW * 0.6);
+  const minFs = 10;
+  ctx.font = `${fs}px Bebas Neue, sans-serif`;
+  while (fs > minFs && ctx.measureText(words).width > chord * 0.85) {
+    fs -= 1;
+    ctx.font = `${fs}px Bebas Neue, sans-serif`;
+  }
+  if (ctx.measureText(words).width > chord * 0.85) return;
+  // The sash is a band of constant width along the chord, but
+  // asymmetric: it reaches far toward the corner and only just past
+  // the words on the badge side, so it never covers the EST. badge
+  // sitting below it. The words sit on the chord itself.
+  const towardCorner = (sashW * 0.6) / Math.SQRT2;
+  const towardBadge = fs * 0.65 + 2;
+  const bx = towardBadge / Math.SQRT2;
+  ctx.save();
+  ctx.fillStyle = '#f7c948';
+  ctx.beginPath();
+  ctx.moveTo(x0 + towardCorner, y0 - towardCorner);
+  ctx.lineTo(x1 + towardCorner, y1 - towardCorner);
+  ctx.lineTo(x1 - bx, y1 + bx);
+  ctx.lineTo(x0 - bx, y0 + bx);
+  ctx.closePath();
+  ctx.fill();
+  ctx.translate((x0 + x1) / 2, (y0 + y1) / 2);
+  ctx.rotate(Math.PI / 4);
+  ctx.fillStyle = '#241016';
+  ctx.font = `${fs}px Bebas Neue, sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(words, 0, 0);
+  ctx.restore();
+}
+
+/**
+ * The FRESH INK starburst sticker: a pink spiked disc with two lines of
+ * white text, drawn at the top-left of the art area.
+ */
+export function drawStarburst(ctx, cx, cy, r, top, bottom) {
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.beginPath();
+  const spikes = 14;
+  for (let i = 0; i < spikes * 2; i++) {
+    const ang = (i * Math.PI) / spikes - Math.PI / 2;
+    const rad = i % 2 === 0 ? r : r * 0.72;
+    const px = Math.cos(ang) * rad;
+    const py = Math.sin(ang) * rad;
+    if (i === 0) ctx.moveTo(px, py);
+    else ctx.lineTo(px, py);
+  }
+  ctx.closePath();
+  ctx.fillStyle = '#ff5d8f';
+  ctx.fill();
+  ctx.fillStyle = '#ffffff';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.font = `${r * 0.34}px Anton, sans-serif`;
+  ctx.fillText(top, 0, -r * 0.2);
+  ctx.fillText(bottom, 0, r * 0.22);
   ctx.restore();
 }

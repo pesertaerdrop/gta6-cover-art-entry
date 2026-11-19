@@ -1,73 +1,34 @@
-// shots.js — the ?shot= scene driver.
-//
-// The screenshots the dossier carries are taken by the app itself: a
-// scene sets the layout, grade, ink and words, the app draws it, and
-// the driver screenshots the page. shot=cover draws one exported
-// cover full-frame; shot=editor shows the editor with a photo loaded.
-// The page sets window.__afterglowReady once the scene has drawn, so
-// the driver knows when to take the picture.
+// shots.js — the ?shot= scenes the screenshots are taken from. A scene
+// names a preset and a mode: 'canvas' draws one cover full-bleed at the
+// viewport size (the exported covers), 'editor' shows the full editor
+// with samples loaded (the app at work). Scenes never edit the files;
+// they only set the state the page opens with.
 
-// Read the scene out of the page's query string. Anything the URL
-// does not say stays null, and the cover keeps its own value.
-export function readShotScene() {
-  const q = new URLSearchParams(location.search);
-  const scene = {
-    mode: "editor",
-    layout: null,
-    grade: null,
-    ink: null,
-    title: null,
-    subtitle: null,
-    tagline: null,
-    size: null,
-  };
-  if (q.get("shot") === "cover") {
-    scene.mode = "cover";
-  }
-  if (q.get("layout")) {
-    scene.layout = q.get("layout");
-  }
-  if (q.get("grade")) {
-    scene.grade = q.get("grade");
-  }
-  if (q.get("ink") !== null) {
-    scene.ink = Number(q.get("ink"));
-  }
-  if (q.get("title")) {
-    scene.title = q.get("title");
-  }
-  if (q.get("subtitle")) {
-    scene.subtitle = q.get("subtitle");
-  }
-  if (q.get("tagline")) {
-    scene.tagline = q.get("tagline");
-  }
-  if (q.get("size")) {
-    scene.size = q.get("size");
-  }
+import { applyPreset, presetById } from './presets.js';
+
+export const SHOT_SCENES = {
+  cover: { preset: 'afterglow', mode: 'canvas', note: 'Wide exported cover' },
+  editor: { preset: 'afterglow', mode: 'editor', note: 'Editor with a photo loaded' },
+  portrait: { preset: 'nightmarket', mode: 'canvas', note: 'Portrait exported cover', leadPhotoId: 'hero-duo' },
+  grid: { preset: 'motormile', mode: 'canvas', note: 'Nine-panel exported cover' },
+};
+
+/** The scene name from the page URL (?shot=cover), or null. */
+export function shotFromUrl() {
+  const q = new URLSearchParams(window.location.search);
+  const name = q.get('shot');
+  return name && SHOT_SCENES[name] ? name : null;
+}
+
+/**
+ * Set a state up for a shot scene and return the scene. Photos are
+ * assigned by the caller afterwards, in library order.
+ */
+export function applyShotScene(state, shotName) {
+  const scene = SHOT_SCENES[shotName];
+  if (!scene) return null;
+  applyPreset(state, presetById(scene.preset));
+  if (scene.leadPhotoId) state.leadPhotoId = scene.leadPhotoId;
+  state.ink.on = true;
   return scene;
-}
-
-// Apply a scene's words, layout, grade and ink onto a cover object.
-// An ink value of 0 turns the ink off; anything else turns it on at
-// that strength, clamped to 0..1.
-export function applySceneToCover(cover, scene) {
-  const next = { ...cover };
-  if (scene.layout) next.layout = scene.layout;
-  if (scene.grade) next.grade = scene.grade;
-  if (scene.ink !== null && !Number.isNaN(scene.ink)) {
-    next.inkOn = scene.ink > 0;
-    next.inkStrength = Math.max(0, Math.min(1, scene.ink));
-  }
-  if (scene.title) next.title = scene.title;
-  if (scene.subtitle) next.subtitle = scene.subtitle;
-  if (scene.tagline) next.tagline = scene.tagline;
-  if (scene.size) next.size = scene.size;
-  return next;
-}
-
-// Tell the screenshot driver the scene has drawn.
-export function markShotReady() {
-  window.__afterglowReady = true;
-  document.documentElement.setAttribute("data-shot-ready", "true");
 }

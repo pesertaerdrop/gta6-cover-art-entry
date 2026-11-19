@@ -1,170 +1,72 @@
-// photos.js — the photo library for Afterglow Cover Studio.
-//
-// The 14 sample photos are image-model scenes that ship with the app.
-// A photo the user picks (upload, drop, paste) joins the same library.
-// Nothing is ever sent anywhere: every photo lives on this machine.
-//
-// Framing is relative (zoom + pan in -1..1), so one framing renders
-// correctly at every export size, and smart framing keeps faces in
-// view when a square or portrait photo lands in a wide panel.
+// photos.js — the photo library: the 14 image-model sample photos, plus
+// uploads from the user's own machine. Every photo is an object with a
+// stable id, a label for the tray, and a loaded Image. Nothing here is a
+// photo of a real person: all 14 samples were made with an image model
+// for this entry, and uploads stay on the machine (object URLs only).
 
-// The 14 samples, in tray order. The files are the ones that ship
-// with the app; the labels are what the tray shows.
 export const SAMPLE_PHOTOS = [
-  {
-    id: "supercar-boulevard", label: "Supercar",
-    file: "samples/supercar-boulevard.jpg",
-  },
-  {
-    id: "motel-rain", label: "Motel Rain",
-    file: "samples/motel-rain.jpg",
-  },
-  {
-    id: "marina-skyline", label: "Marina",
-    file: "samples/marina-skyline.jpg",
-  },
-  {
-    id: "night-market", label: "Night Market",
-    file: "samples/night-market.jpg",
-  },
-  {
-    id: "boardwalk-flamingo", label: "Flamingo",
-    file: "samples/boardwalk-flamingo.jpg",
-  },
-  {
-    id: "woman-convertible", label: "Convertible",
-    file: "samples/woman-convertible.jpg",
-  },
-  {
-    id: "man-rooftop", label: "Rooftop",
-    file: "samples/man-rooftop.jpg",
-  },
-  {
-    id: "friends-neon", label: "Neon Night",
-    file: "samples/friends-neon.jpg",
-  },
-  {
-    id: "speedboat", label: "Speedboat",
-    file: "samples/speedboat.jpg",
-  },
-  {
-    id: "man-motorcycle", label: "Motorcycle",
-    file: "samples/man-motorcycle.jpg",
-  },
-  {
-    id: "beach-bar", label: "Beach Bar",
-    file: "samples/beach-bar.jpg",
-  },
-  {
-    id: "palm-street", label: "Palm Street",
-    file: "samples/palm-street.jpg",
-  },
-  {
-    id: "woman-boardwalk", label: "Boardwalk",
-    file: "samples/woman-boardwalk.jpg",
-  },
-  {
-    id: "pier-fisher", label: "Pier Fisher",
-    file: "samples/pier-fisher.jpg",
-  },
+  { id: 'police-chase', file: 'samples/police-chase.jpg', label: 'Police chase' },
+  { id: 'airboat-gator', file: 'samples/airboat-gator.jpg', label: 'Airboat + gator' },
+  { id: 'boat-party', file: 'samples/boat-party.jpg', label: 'Boat party' },
+  { id: 'hero-duo', file: 'samples/hero-duo.jpg', label: 'Hero duo' },
+  { id: 'convertible-duo', file: 'samples/convertible-duo.jpg', label: 'Convertible duo' },
+  { id: 'yacht-blimp', file: 'samples/yacht-blimp.jpg', label: 'Yacht + blimp' },
+  { id: 'dirtbike-jump', file: 'samples/dirtbike-jump.jpg', label: 'Dirt-bike jump' },
+  { id: 'drawbridge-boat', file: 'samples/drawbridge-boat.jpg', label: 'Drawbridge' },
+  { id: 'dj-neon', file: 'samples/dj-neon.jpg', label: 'Neon DJ' },
+  { id: 'skater-boy', file: 'samples/skater-boy.jpg', label: 'Skate park' },
+  { id: 'chef-grill', file: 'samples/chef-grill.jpg', label: 'Street grill' },
+  { id: 'cowboy-gas', file: 'samples/cowboy-gas.jpg', label: 'Desert gas stop' },
+  { id: 'sax-corner', file: 'samples/sax-corner.jpg', label: 'Sax at midnight' },
+  { id: 'surfer-dawn', file: 'samples/surfer-dawn.jpg', label: 'Surfer at dawn' },
 ];
 
-// A photo record shared by the editor and the renderer: the loaded
-// image, its pixel size once known, and whether it is ready to draw.
-function makePhoto(id, label, src) {
-  const img = new Image();
-  img.decoding = "async";
-  img.src = src;
-  return { id, label, src, img, w: 0, h: 0, ready: false };
-}
-
-function finishLoad(entry, resolve) {
-  entry.w = entry.img.naturalWidth || 0;
-  entry.h = entry.img.naturalHeight || 0;
-  entry.ready = entry.w > 0 && entry.h > 0;
-  resolve(entry);
-}
-
-function loadPhoto(entry) {
-  if (entry.ready) return Promise.resolve(entry);
-  return new Promise((resolve) => {
-    const done = () => finishLoad(entry, resolve);
-    if (entry.img.complete) done();
-    else {
-      entry.img.onload = done;
-      entry.img.onerror = () => resolve(entry);
-    }
+/** Load one image from a URL; resolves with the HTMLImageElement. */
+export function loadImage(src) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = () => reject(new Error(`cannot load ${src}`));
+    img.src = src;
   });
 }
 
-export async function loadSampleLibrary() {
-  const lib = SAMPLE_PHOTOS.map((s) => makePhoto(s.id, s.label, s.file));
-  await Promise.all(lib.map(loadPhoto));
-  return lib.filter((p) => p.ready);
-}
-
-// Read image files the user picked (input, drop, paste) into records.
-export async function readUserFiles(files) {
-  const found = [];
-  for (const file of files) {
-    if (!file.type || !file.type.startsWith("image/")) continue;
-    const url = URL.createObjectURL(file);
-    const label = file.name.replace(/\.[^.]+$/, "").slice(0, 18) || "Photo";
-    const entry = makePhoto("up-" + Date.now() + "-" + found.length, label, url);
-    await loadPhoto(entry);
-    if (entry.ready) found.push(entry);
-  }
-  return found;
-}
-
-// One panel's framing: zoom 1 means "cover the panel", pan moves the
-// window inside the slack the zoom leaves.
-export function freshFrame(photoId) {
-  return { photoId, zoom: 1, panX: 0, panY: 0 };
-}
-
-// Smart face framing: a square or portrait photo in a wide panel, or
-// a landscape photo in a tall panel, starts on its upper third, where
-// faces live. The framing is relative, so it holds at every size.
-export function smartFrame(photo, panelAspect) {
-  const frame = freshFrame(photo.id);
-  if (!photo.ready) return frame;
-  const photoAspect = photo.w / photo.h;
-  const panelWide = panelAspect > 1.25;
-  const panelTall = panelAspect < 0.8;
-  if (panelWide && photoAspect < 1.15) frame.panY = -0.35;
-  else if (panelTall && photoAspect > 1.2) frame.panY = -0.25;
-  return frame;
-}
-
-// The source window a frame shows, in photo pixels: the cover scale
-// times the zoom, centred on the pan offsets, clamped to the photo.
-export function frameWindow(photo, panelW, panelH, frame) {
-  const coverScale = Math.max(panelW / photo.w, panelH / photo.h);
-  const scale = coverScale * frame.zoom;
-  const sw = Math.min(photo.w, panelW / scale);
-  const sh = Math.min(photo.h, panelH / scale);
-  const slackX = photo.w - sw;
-  const slackY = photo.h - sh;
-  const sx = Math.max(0, Math.min(slackX, slackX / 2 + (frame.panX * slackX) / 2));
-  const sy = Math.max(0, Math.min(slackY, slackY / 2 + (frame.panY * slackY) / 2));
-  return { sx, sy, sw, sh };
-}
-
-// Deal photos into panel slots, round-robin from `startAt`, never the
-// same photo twice in one cover while the library is big enough.
-export function dealPhotos(library, slotCount, startAt = 0) {
-  const dealt = [];
-  const used = new Set();
-  for (let i = 0; i < slotCount; i++) {
-    let pick = null;
-    for (let k = 0; k < library.length && !pick; k++) {
-      const cand = library[(startAt + i + k) % library.length];
-      if (!used.has(cand.id)) pick = cand;
+/**
+ * Load every sample photo. Returns an array of photo records
+ * { id, label, src, img, uploaded: false } in SAMPLE_PHOTOS order.
+ * A sample that fails to load is skipped, never fatal.
+ */
+export async function loadSamples() {
+  const out = [];
+  for (const s of SAMPLE_PHOTOS) {
+    try {
+      const img = await loadImage(s.file);
+      out.push({ id: s.id, label: s.label, src: s.file, img, uploaded: false });
+    } catch {
+      // A missing sample never blocks the editor; the tray just shows fewer.
     }
-    pick = pick || library[(startAt + i) % library.length];
-    used.add(pick.id);
-    dealt.push(pick);
   }
-  return dealt;
+  return out;
+}
+
+/**
+ * Turn user-chosen File objects into photo records with the same shape
+ * as samples, backed by object URLs (the bytes never leave the machine).
+ */
+export function filesToPhotos(files) {
+  const out = [];
+  for (const f of files) {
+    if (!f.type.startsWith('image/')) continue;
+    const url = URL.createObjectURL(f);
+    const label = f.name.replace(/\.[^.]+$/, '').replace(/[-_]+/g, ' ').slice(0, 24) || 'Your photo';
+    out.push({ id: `up-${Date.now()}-${out.length}`, label, src: url, img: null, uploaded: true, file: f });
+  }
+  return out;
+}
+
+/** Finish loading the image of an uploaded photo record, in place. */
+export async function hydrateUpload(photo) {
+  if (photo.img) return photo;
+  photo.img = await loadImage(photo.src);
+  return photo;
 }

@@ -1,86 +1,98 @@
-// lettering.js — the cover's words.
-//
-// Anton title, auto-fit to the band with a sunset gradient, a dark
-// outline and a hard offset shadow; Kaushan Script neon subtitle
-// tucked under the caps; Bebas Neue tagline on a black bar. One voice
-// per line, no mixed emphasis.
+// lettering.js — the cover's words: a gradient Anton title with outline
+// and hard shadow, a neon Kaushan Script subtitle that keeps its own
+// clear zone above the tagline bar (never clipped by it), and a Bebas
+// Neue tagline bar with hand-spaced capitals.
 
-// Shrink the title in Anton until it fits maxW, starting at startSize.
-export function fitTitleFont(ctx, title, maxW, startSize) {
-  let size = startSize;
-  ctx.font = `${size}px Anton, sans-serif`;
-  while (size > 12 && ctx.measureText(title).width > maxW) {
-    size = Math.floor(size * 0.92);
-    ctx.font = `${size}px Anton, sans-serif`;
+/** Shrink an Anton title until it fits maxW; returns the fitted size. */
+export function fitAnton(ctx, text, maxW, start) {
+  let fs = start;
+  ctx.font = `${fs}px Anton, sans-serif`;
+  while (fs > 12 && ctx.measureText(text).width > maxW) {
+    fs -= 2;
+    ctx.font = `${fs}px Anton, sans-serif`;
   }
-  return size;
+  return fs;
 }
 
-// The big title: a sunset gradient over a dark outline, with a hard
-// offset shadow behind it. The gradient runs top to bottom of the caps.
-export function drawCoverTitle(ctx, title, x, baselineY, maxW, capH) {
-  const fontSize = fitTitleFont(ctx, title, maxW, capH);
-  const gradient = ctx.createLinearGradient(0, baselineY - fontSize * 0.72, 0, baselineY + fontSize * 0.28);
-  gradient.addColorStop(0, "#ffd76a");
-  gradient.addColorStop(0.45, "#ff9e3d");
-  gradient.addColorStop(0.75, "#ff5f7e");
-  gradient.addColorStop(1, "#ff3d7e");
+/**
+ * The big title: a sunset gradient (gold to orange to pink, one hue
+ * ramp), a dark outline and a hard offset shadow. Drawn left-aligned
+ * at the given baseline.
+ */
+export function drawTitle(ctx, text, x, baselineY, maxW, startSize) {
+  const fs = fitAnton(ctx, text, maxW, startSize);
+  const grad = ctx.createLinearGradient(x, baselineY - fs, x, baselineY);
+  grad.addColorStop(0, '#ffd76a');
+  grad.addColorStop(0.55, '#ff9e4f');
+  grad.addColorStop(1, '#ff6b9d');
   ctx.save();
-  ctx.textBaseline = "alphabetic";
-  ctx.font = `${fontSize}px Anton, sans-serif`;
-  // hard offset shadow, then outline, then the gradient fill
-  ctx.fillStyle = "rgba(10,3,5,0.85)";
-  ctx.fillText(title, x + fontSize * 0.06, baselineY + fontSize * 0.06);
-  ctx.lineWidth = Math.max(2, fontSize * 0.06);
-  ctx.strokeStyle = "#14060a";
-  ctx.lineJoin = "round";
-  ctx.strokeText(title, x, baselineY);
-  ctx.fillStyle = gradient;
-  ctx.fillText(title, x, baselineY);
-  ctx.restore();
-  return fontSize;
-}
-
-// Neon script subtitle: Kaushan Script in pink with a soft glow, drawn
-// to sit just under the title caps. Drawn twice — a pale pass with
-// the glow, then a pink pass without it — so the glow never muddies
-// the letterforms.
-export function drawScriptSubtitle(ctx, subtitle, x, baselineY, maxW, size) {
-  ctx.save();
-  let s = size;
-  ctx.font = `${s}px "Kaushan Script", cursive`;
-  while (s > 10 && ctx.measureText(subtitle).width > maxW) {
-    s = Math.floor(s * 0.92);
-    ctx.font = `${s}px "Kaushan Script", cursive`;
-  }
-  ctx.shadowColor = "#ff5f9e";
-  ctx.shadowBlur = s * 0.45;
-  ctx.fillStyle = "#ffd7e8";
-  ctx.textBaseline = "alphabetic";
-  ctx.fillText(subtitle, x, baselineY);
+  ctx.font = `${fs}px Anton, sans-serif`;
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'alphabetic';
+  ctx.shadowColor = 'rgba(20, 6, 14, 0.9)';
   ctx.shadowBlur = 0;
-  ctx.fillStyle = "#ff9ec4";
-  ctx.fillText(subtitle, x, baselineY);
+  ctx.shadowOffsetX = fs * 0.05;
+  ctx.shadowOffsetY = fs * 0.05;
+  ctx.lineWidth = Math.max(2, fs * 0.06);
+  ctx.strokeStyle = '#2a0e1e';
+  ctx.strokeText(text, x, baselineY);
+  ctx.fillStyle = grad;
+  ctx.fillText(text, x, baselineY);
   ctx.restore();
-  return s;
+  return fs;
 }
 
-// Tagline bar: a black strip with Bebas Neue caps, letter-spaced so
-// the words spread evenly across the cover width.
-export function drawTaglineBar(ctx, tagline, x, y, w, h) {
-  ctx.save();
-  ctx.fillStyle = "rgba(8,3,5,0.92)";
-  ctx.fillRect(x, y, w, h);
-  ctx.fillStyle = "#ffe9c4";
-  ctx.font = `700 ${Math.round(h * 0.58)}px "Bebas Neue", sans-serif`;
-  ctx.textBaseline = "middle";
-  const words = tagline.toUpperCase();
-  const plainWidth = ctx.measureText(words).width;
-  const spacing = Math.max(0, (w - plainWidth) / Math.max(1, words.length));
-  let cursorX = x + spacing / 2;
-  for (const ch of words) {
-    ctx.fillText(ch, cursorX, y + h / 2 + h * 0.03);
-    cursorX += ctx.measureText(ch).width + spacing;
+/**
+ * The script subtitle in neon pink with a soft glow, fitted to maxW.
+ * The caller gives it its own clear zone (top and height) above the
+ * tagline bar, so the script is never overlapped or clipped.
+ */
+export function drawSubtitle(ctx, text, x, zoneTop, zoneH, maxW, startSize) {
+  let fs = startSize;
+  ctx.font = `${fs}px "Kaushan Script", cursive`;
+  while (fs > 12 && ctx.measureText(text).width > maxW) {
+    fs -= 2;
+    ctx.font = `${fs}px "Kaushan Script", cursive`;
   }
+  ctx.save();
+  ctx.font = `${fs}px "Kaushan Script", cursive`;
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'middle';
+  ctx.shadowColor = 'rgba(255, 93, 143, 0.85)';
+  ctx.shadowBlur = fs * 0.35;
+  ctx.fillStyle = '#ff8fb8';
+  ctx.fillText(text, x, zoneTop + zoneH / 2);
+  ctx.restore();
+  return fs;
+}
+
+/**
+ * The tagline bar: a black strip with Bebas capitals spaced by hand
+ * (canvas has no letter-spacing here, so each glyph is placed). The
+ * spacing spreads the text across the full width.
+ */
+export function drawTagline(ctx, text, x, y, w, h) {
+  ctx.save();
+  ctx.fillStyle = '#12060d';
+  ctx.fillRect(x, y, w, h);
+  const letters = text.replace(/\s+/g, ' ').split('');
+  let fs = h * 0.62;
+  ctx.font = `${fs}px Bebas Neue, sans-serif`;
+  const widths = letters.map((ch) => ctx.measureText(ch === ' ' ? '  ' : ch).width);
+  const total = widths.reduce((a, b) => a + b, 0);
+  let gap = (w - total) / Math.max(1, letters.length);
+  if (gap < 0) {
+    fs = Math.max(10, fs * (w / total));
+    ctx.font = `${fs}px Bebas Neue, sans-serif`;
+    gap = 0;
+  }
+  ctx.fillStyle = '#f3e6d8';
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'middle';
+  let cx = x + gap / 2;
+  letters.forEach((ch, i) => {
+    if (ch !== ' ') ctx.fillText(ch, cx, y + h / 2 + h * 0.02);
+    cx += widths[i] + gap;
+  });
   ctx.restore();
 }

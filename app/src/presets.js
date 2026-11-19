@@ -1,66 +1,80 @@
-// presets.js — four one-tap cover scenes.
-//
-// A preset sets layout, grade, ink and words in one tap. The photos
-// stay whatever the cover already has, so a preset never throws away
-// a hand-set crop. The four scenes are the four screenshots' looks:
-// Sunset Heist is the hero cover, Motor Mile the editor and the grid,
-// Night Market the portrait strip cover, Marina Lights the polaroids.
+// presets.js — one-tap cover presets: a title, subtitle, tagline, layout
+// and grade that belong together, so a new cover is one click away.
+// Applying a preset never touches the photos or their crops.
 
 export const PRESETS = [
   {
-    id: "sunset-heist",
-    name: "Sunset Heist",
-    cover: {
-      layout: "heroThree",
-      grade: "vice",
-      inkOn: true,
-      inkStrength: 0.7,
-      title: "AFTERGLOW",
-      subtitle: "one last sunset",
-      tagline: "ONE NIGHT ON THE COAST",
-    },
+    id: 'afterglow',
+    name: 'Afterglow',
+    title: 'AFTERGLOW',
+    subtitle: 'one last sunset',
+    tagline: 'EIGHT SCENES, ONE CITY',
+    layout: 'poster',
+    grade: 'sunset',
+    inkStrength: 0.8,
   },
   {
-    id: "motor-mile",
-    name: "Motor Mile",
-    cover: {
-      layout: "nine",
-      grade: "vice",
-      inkOn: true,
-      inkStrength: 0.7,
-      title: "MOTOR MILE",
-      subtitle: "fast lane nights",
-      tagline: "NINE FRAMES, ONE RIDE",
-    },
+    id: 'nightmarket',
+    name: 'Night Market',
+    title: 'NIGHT MARKET',
+    subtitle: 'neon and noise',
+    tagline: 'FIVE CROPS, ONE SNAPSHOT',
+    layout: 'strip',
+    grade: 'neon',
+    inkStrength: 0.85,
   },
   {
-    id: "night-market",
-    name: "Night Market",
-    cover: {
-      layout: "stripFive",
-      grade: "golden",
-      inkOn: true,
-      inkStrength: 0.6,
-      title: "NIGHT MARKET",
-      subtitle: "neon and noise",
-      tagline: "FIVE CROPS, ONE SNAPSHOT",
-    },
+    id: 'motormile',
+    name: 'Motor Mile',
+    title: 'MOTOR MILE',
+    subtitle: 'fast lane nights',
+    tagline: 'NINE FRAMES, ONE RIDE',
+    layout: 'nine',
+    grade: 'neon',
+    inkStrength: 0.8,
   },
   {
-    id: "marina-lights",
-    name: "Marina Lights",
-    cover: {
-      layout: "snapshots",
-      grade: "neon",
-      inkOn: true,
-      inkStrength: 0.8,
-      title: "MARINA LIGHTS",
-      subtitle: "where the boats sleep",
-      tagline: "THREE PRINTS, ONE HARBOUR",
-    },
+    id: 'goldenhour',
+    name: 'Golden Hour',
+    title: 'GOLDEN HOUR',
+    subtitle: 'chasing the light',
+    tagline: 'ONE PHOTO, FIVE SHOTS',
+    layout: 'strip',
+    grade: 'golden',
+    inkStrength: 0.7,
+  },
+  {
+    id: 'highway',
+    name: 'Highway Riders',
+    title: 'HIGHWAY',
+    subtitle: 'riders at dusk',
+    tagline: 'TWO BIKES, ONE ROAD',
+    layout: 'duo',
+    grade: 'golden',
+    inkStrength: 0.75,
+  },
+  {
+    id: 'snapshots',
+    name: 'Snapshots',
+    title: 'SUMMER 2026',
+    subtitle: 'prints from the coast',
+    tagline: 'THREE PRINTS, ONE DAY',
+    layout: 'tilted',
+    grade: 'sunset',
+    inkStrength: 0.8,
   },
 ];
 
 export function presetById(id) {
   return PRESETS.find((p) => p.id === id) || PRESETS[0];
+}
+
+/** Apply a preset's words, layout and grade to a state (photos untouched). */
+export function applyPreset(state, preset) {
+  state.title = preset.title;
+  state.subtitle = preset.subtitle;
+  state.tagline = preset.tagline;
+  state.layout = preset.layout;
+  state.grade = preset.grade;
+  state.ink.strength = preset.inkStrength;
 }
