@@ -1,114 +1,85 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Neon Coast Cover Studio — GTA 6-style cover art maker</title>
+<title>Afterglow Cover Studio — turn any photo into GTA-style cover art</title>
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
-<header class="app-header">
-  <div class="brand">
-    <span class="brand-mark" aria-hidden="true">NC</span>
-    <span class="brand-name">Neon Coast Cover Studio</span>
-    <span class="brand-tag">Turn any photo into GTA-style cover art — offline, on your machine.</span>
-  </div>
-  <div class="header-spacer"></div>
-  <div class="size-switch" role="group" aria-label="Export size">
-    <button type="button" data-size="1080x1080" aria-pressed="true">Square</button>
-    <button type="button" data-size="1080x1350" aria-pressed="false">Portrait</button>
-    <button type="button" data-size="1920x1080" aria-pressed="false">Wide</button>
-  </div>
-  <button type="button" id="undoBtn" disabled>Undo</button>
-  <button type="button" id="redoBtn" disabled>Redo</button>
-  <button type="button" id="exportAllBtn" class="btn-primary">Export all 3 sizes</button>
-</header>
-
-<div class="workspace">
-  <div class="rail rail-left">
-    <section class="card" aria-label="Photos">
-      <h2 class="card-title">Photos</h2>
-      <div class="btn-row">
-        <button type="button" id="uploadBtn">Upload your photos</button>
-        <input type="file" id="uploadInput" accept="image/*" multiple hidden>
-      </div>
-      <div class="photo-grid" id="photoGrid" style="margin-top: 10px;"></div>
-      <div class="btn-row" style="margin-top: 10px;">
-        <button type="button" id="autoFillBtn">Auto-fill panels</button>
-        <button type="button" id="shuffleBtn">Shuffle</button>
-      </div>
-      <p class="card-note">Click a photo to put it in the selected panel. Photos never leave this machine.</p>
-    </section>
-
-    <section class="card" aria-label="Layout">
-      <h2 class="card-title">Layout</h2>
-      <div class="layout-list" id="layoutList"></div>
-    </section>
-
-    <section class="card" aria-label="Colour grade">
-      <h2 class="card-title">Grade</h2>
-      <div class="grade-list" id="gradeList"></div>
-    </section>
-  </div>
-
-  <main class="stage">
-    <div class="preview-wrap">
-      <canvas id="preview" width="1080" height="1080"></canvas>
+<div id="app">
+  <header id="topbar">
+    <div class="brand">
+      <span class="mark">AG</span>
+      <span class="brand-name">Afterglow Cover Studio</span>
+      <span class="brand-tag">Turn any photo into GTA-style cover art — offline, on your machine.</span>
     </div>
-    <p class="stage-hint">Click a panel to select it, then drag on it to reframe the photo. Scroll over a panel to zoom.</p>
+    <ol class="steps" aria-label="Three steps">
+      <li><b>1</b> Add photos</li>
+      <li><b>2</b> Pick a layout</li>
+      <li><b>3</b> Export</li>
+    </ol>
+    <div class="top-actions">
+      <button id="btnUndo" type="button" disabled>Undo</button>
+      <button id="btnRedo" type="button" disabled>Redo</button>
+      <button id="btnExportAll" type="button" class="primary">Export all 3 sizes</button>
+    </div>
+  </header>
+
+  <main id="workspace">
+    <aside id="railPhotos" aria-label="Photos">
+      <h2>Photos</h2>
+      <button id="btnUpload" type="button">Upload your photos</button>
+      <input id="fileInput" type="file" accept="image/*" multiple hidden>
+      <div class="row">
+        <button id="btnSamples" type="button">Load samples</button>
+        <button id="btnAutofill" type="button">Auto-fill panels</button>
+      </div>
+      <button id="btnShuffle" type="button">Shuffle</button>
+      <div id="photoTray" role="listbox" aria-label="Photo tray"></div>
+      <p class="note">Click a photo to put it in the selected panel. Photos never leave this machine.</p>
+    </aside>
+
+    <section id="stage" aria-label="Cover preview">
+      <div id="previewWrap">
+        <canvas id="previewCanvas" width="1080" height="1080"></canvas>
+      </div>
+      <p id="hintLine">14 photos ready. Drag a panel to reframe it, then Export.</p>
+      <div id="panelControls">
+        <span id="selectedPanelLabel">Panel 1 of 9</span>
+        <label>Zoom <input id="zoomSlider" type="range" min="1" max="3" step="0.01" value="1"></label>
+        <label>Move sideways <input id="panXSlider" type="range" min="-1" max="1" step="0.01" value="0"></label>
+        <label>Move up / down <input id="panYSlider" type="range" min="-1" max="1" step="0.01" value="0"></label>
+        <button id="btnResetCrop" type="button">Reset crop</button>
+      </div>
+    </section>
+
+    <aside id="railTools" aria-label="Layout, grade and words">
+      <h2>Layout</h2>
+      <div id="layoutTiles"></div>
+      <h2>Grade</h2>
+      <div id="gradeChips"></div>
+      <h2>Poster Ink</h2>
+      <div class="ink-row">
+        <label class="switch"><input id="inkToggle" type="checkbox" checked> <span>Illustrate the photos</span></label>
+        <label class="ink-strength">Strength <input id="inkSlider" type="range" min="0" max="1" step="0.05" value="0.7"></label>
+      </div>
+      <h2>Words</h2>
+      <label class="field">Title <input id="inputTitle" type="text" value="AFTERGLOW" maxlength="24"></label>
+      <label class="field">Subtitle <input id="inputSubtitle" type="text" value="one last sunset" maxlength="40"></label>
+      <label class="field">Tagline <input id="inputTagline" type="text" value="ONE NIGHT ON THE COAST" maxlength="48"></label>
+      <h2>Size</h2>
+      <div id="sizeChips"></div>
+      <h2>Presets</h2>
+      <div id="presetList"></div>
+    </aside>
   </main>
 
-  <div class="rail rail-right">
-    <section class="card" aria-label="Words">
-      <h2 class="card-title">Words</h2>
-      <div class="field">
-        <label for="titleInput">Title</label>
-        <input type="text" id="titleInput" value="NEON COAST" maxlength="24" autocomplete="off">
-      </div>
-      <div class="field">
-        <label for="subtitleInput">Subtitle</label>
-        <input type="text" id="subtitleInput" value="Vice City nights" maxlength="40" autocomplete="off">
-      </div>
-      <div class="field">
-        <label for="badgeInput">Badge</label>
-        <input type="text" id="badgeInput" value="EST. 2026" maxlength="16" autocomplete="off">
-      </div>
-    </section>
-
-    <section class="card" aria-label="Selected panel">
-      <h2 class="card-title">Selected panel</h2>
-      <div class="field">
-        <label for="panelPhotoSelect">Photo</label>
-        <select id="panelPhotoSelect"></select>
-      </div>
-      <div class="field">
-        <label for="zoomRange">Zoom</label>
-        <input type="range" id="zoomRange" min="1" max="3" step="0.05" value="1">
-      </div>
-      <div class="field">
-        <label for="panXRange">Move sideways</label>
-        <input type="range" id="panXRange" min="-1" max="1" step="0.05" value="0">
-      </div>
-      <div class="field">
-        <label for="panYRange">Move up / down</label>
-        <input type="range" id="panYRange" min="-1" max="1" step="0.05" value="0">
-      </div>
-      <p class="card-note" id="panelReadout">Panel 1 of 9</p>
-    </section>
-
-    <section class="card" aria-label="Presets">
-      <h2 class="card-title">Presets</h2>
-      <div class="preset-list" id="presetList"></div>
-      <p class="card-note">A preset sets the layout, grade, words and photos in one tap. Undo brings the old cover back.</p>
-    </section>
-  </div>
+  <footer id="foot">
+    <span>Afterglow Cover Studio — your photos stay on your machine. Fonts: Anton, Kaushan Script and Bebas Neue under the SIL Open Font License. Sample photos made with an image model.</span>
+  </footer>
 </div>
-
-<footer class="status-bar">
-  <span id="statusText">Loading sample photos…</span>
-  <span id="sizeText"><b>1080 × 1080</b> · 9-panel grid · Neon Nights</span>
-</footer>
-
+<canvas id="shotCanvas" hidden></canvas>
 <script type="module" src="src/main.js"></script>
 </body>
 </html>

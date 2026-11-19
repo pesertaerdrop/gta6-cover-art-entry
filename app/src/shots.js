@@ -1,69 +1,43 @@
-// Fixed scenes for screenshots. ?shot=editor shows the editor with a photo
-// loaded; ?shot=cover, ?shot=cover2 and ?shot=grid show the exported cover
-// alone, at the size the query names. window.__shotReady is set once the
-// cover has painted, and window.__coverApp exposes the export the test
-// driver calls.
+// shots.js — the ?shot= scene driver. The screenshots the dossier
+// carries are taken by the app itself: a scene sets the layout, grade,
+// ink and words, the app draws it, and the driver screenshots the
+// page. shot=cover draws one exported cover full-frame; shot=editor
+// shows the editor with a photo loaded. The page sets
+// window.__afterglowReady when the scene has drawn.
 
-import { SIZES } from './state.js';
-import { layoutById } from './layouts.js';
-import { drawCover, exportPNGDataURL } from './cover.js';
-import { panelsForPhotos } from './presets.js';
-
-function readShotQuery() {
-  const q = new URLSearchParams(window.location.search);
-  return {
-    shot: q.get('shot') ?? 'editor',
-    sizeId: q.get('size') ?? '1080x1080',
-    layoutId: q.get('layout'),
-    gradeId: q.get('grade'),
-    title: q.get('title'),
-    subtitle: q.get('subtitle'),
-    badge: q.get('badge'),
-    photos: q.get('photos') ? q.get('photos').split(',').map((s) => s.trim()).filter(Boolean) : null,
+export function readShotScene() {
+  const q = new URLSearchParams(location.search);
+  const shot = q.get("shot") || "editor";
+  const scene = {
+    mode: shot === "cover" ? "cover" : "editor",
+    layout: q.get("layout") || null,
+    grade: q.get("grade") || null,
+    ink: q.get("ink") === null ? null : Number(q.get("ink")),
+    title: q.get("title") || null,
+    subtitle: q.get("subtitle") || null,
+    tagline: q.get("tagline") || null,
+    size: q.get("size") || null,
   };
+  return scene;
 }
 
-function applyShotToState(state, shot, images) {
-  if (shot.layoutId) state.layoutId = shot.layoutId;
-  if (shot.gradeId) state.gradeId = shot.gradeId;
-  if (shot.title) state.title = shot.title;
-  if (shot.subtitle) state.subtitle = shot.subtitle;
-  if (shot.badge) state.badge = shot.badge;
-  if (shot.sizeId && SIZES[shot.sizeId]) state.sizeId = shot.sizeId;
-  const layout = layoutById(state.layoutId);
-  const size = SIZES[state.sizeId];
-  const photoH = layout.titleOverlay ? size.h : size.h * 0.8;
-  const rects = layout.panels().map((p) => ({
-    w: p.w * size.w,
-    h: p.h * photoH,
-  }));
-  const wanted = shot.photos ?? state.photos.map((p) => p.id);
-  state.panels = panelsForPhotos(wanted, layout.panelCount, images, rects);
-  state.selected = 0;
-}
-
-export async function runShotScene(state, images, renderPreview) {
-  const shot = readShotQuery();
-  applyShotToState(state, shot, images);
-  await document.fonts.ready;
-
-  if (shot.shot === 'cover' || shot.shot === 'cover2' || shot.shot === 'grid') {
-    document.body.classList.add('shot-cover');
-    const size = SIZES[state.sizeId];
-    const canvas = document.getElementById('preview');
-    canvas.width = size.w;
-    canvas.height = size.h;
-    drawCover(canvas, state, images);
-  } else {
-    await renderPreview();
+// Apply a scene's words/layout/grade/ink onto a cover object.
+export function applySceneToCover(cover, scene) {
+  const next = { ...cover };
+  if (scene.layout) next.layout = scene.layout;
+  if (scene.grade) next.grade = scene.grade;
+  if (scene.ink !== null && !Number.isNaN(scene.ink)) {
+    next.inkOn = scene.ink > 0;
+    next.inkStrength = Math.max(0, Math.min(1, scene.ink));
   }
+  if (scene.title) next.title = scene.title;
+  if (scene.subtitle) next.subtitle = scene.subtitle;
+  if (scene.tagline) next.tagline = scene.tagline;
+  if (scene.size) next.size = scene.size;
+  return next;
+}
 
-  window.__coverApp = {
-    state,
-    exportPNGDataURL: (sizeId) => exportPNGDataURL(sizeId, state, images),
-    renderPreview,
-  };
-
-  await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
-  window.__shotReady = true;
+export function markShotReady() {
+  window.__afterglowReady = true;
+  document.documentElement.setAttribute("data-shot-ready", "true");
 }
