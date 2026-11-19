@@ -1,8 +1,18 @@
 // keyart.js — the title band's extras, all drawn in canvas code:
 // a seeded skyline strip, a star pill, the EST. 2026 badge, a corner
 // ribbon (on the band, never over a photo) and a starburst sticker.
-// Seeded from the title text so the same cover always draws the same
-// skyline — the build stays deterministic.
+// The skyline is seeded from the title text, so the same cover always
+// draws the same skyline — the build stays deterministic.
+
+export function roundRect(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r);
+  ctx.arcTo(x, y, x + w, y, r);
+  ctx.closePath();
+}
 
 export function hashSeed(text) {
   let h = 2166136261;
@@ -22,6 +32,117 @@ function mulberry32(seed) {
     t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
   };
+}
+
+// Starburst sticker: a spiked disc with two lines of text, placed on
+// the art area's top-left corner like a stuck-on sticker.
+export function drawStarburst(ctx, cx, cy, r, line1, line2) {
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.rotate(-0.12);
+  ctx.fillStyle = "#ff5f7e";
+  ctx.beginPath();
+  const spikes = 14;
+  for (let i = 0; i < spikes * 2; i++) {
+    const ang = (i * Math.PI) / spikes;
+    const rad = i % 2 === 0 ? r : r * 0.78;
+    const px = Math.cos(ang) * rad;
+    const py = Math.sin(ang) * rad;
+    if (i === 0) ctx.moveTo(px, py);
+    else ctx.lineTo(px, py);
+  }
+  ctx.closePath();
+  ctx.fill();
+  ctx.fillStyle = "#fff3e0";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.font = `700 ${Math.round(r * 0.42)}px "Bebas Neue", sans-serif`;
+  ctx.fillText(line1, 0, -r * 0.2);
+  ctx.fillText(line2, 0, r * 0.26);
+  ctx.restore();
+}
+
+function drawStar(ctx, cx, cy, r, color) {
+  ctx.save();
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  for (let i = 0; i < 10; i++) {
+    const ang = -Math.PI / 2 + (i * Math.PI) / 5;
+    const rad = i % 2 === 0 ? r : r * 0.45;
+    const px = cx + Math.cos(ang) * rad;
+    const py = cy + Math.sin(ang) * rad;
+    if (i === 0) ctx.moveTo(px, py);
+    else ctx.lineTo(px, py);
+  }
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+}
+
+// Star pill: a rounded pill holding five stars, four lit — the cover's
+// "heat" meter, drawn on the title band.
+export function drawStarPill(ctx, x, y, w, h, lit = 4) {
+  ctx.save();
+  ctx.fillStyle = "#f5b942";
+  roundRect(ctx, x, y, w, h, h / 2);
+  ctx.fill();
+  ctx.fillStyle = "#14060a";
+  ctx.font = `700 ${Math.round(h * 0.52)}px "Bebas Neue", sans-serif`;
+  ctx.textBaseline = "middle";
+  ctx.fillText("HEAT", x + h * 0.45, y + h / 2 + h * 0.03);
+  const labelW = ctx.measureText("HEAT").width;
+  // Fit the five stars inside the pill: on tall narrow covers the pill
+  // is short in width but tall, so the stars shrink instead of spilling
+  // past the pill's right end.
+  const room = w - h * 0.45 - labelW - h * 0.35 - h * 0.25;
+  const starR = Math.max(h * 0.12, Math.min(h * 0.26, room / (5 * 2.3)));
+  const step = starR * 2.3;
+  const firstX = x + h * 0.45 + labelW + h * 0.35;
+  for (let i = 0; i < 5; i++) {
+    drawStar(ctx, firstX + i * step + starR, y + h / 2, starR, i < lit ? "#14060a" : "rgba(20,6,10,0.28)");
+  }
+  ctx.restore();
+}
+
+// Round "EST. 2026" badge, drawn on the title band's right end.
+export function drawEstBadge(ctx, cx, cy, r) {
+  ctx.save();
+  ctx.fillStyle = "#f5b942";
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = "#14060a";
+  ctx.lineWidth = Math.max(1, r * 0.08);
+  ctx.beginPath();
+  ctx.arc(cx, cy, r * 0.78, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.fillStyle = "#14060a";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.font = `700 ${Math.round(r * 0.52)}px "Bebas Neue", sans-serif`;
+  ctx.fillText("EST.", cx, cy - r * 0.22);
+  ctx.fillText("2026", cx, cy + r * 0.28);
+  ctx.restore();
+}
+
+// Corner ribbon on the title band (never over a photo): a diagonal
+// gold ribbon across the band's top-right corner.
+export function drawCornerRibbon(ctx, x, y, w, h, text) {
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(x, y, w, h);
+  ctx.clip();
+  ctx.translate(x + w, y);
+  ctx.rotate(Math.PI / 4);
+  const rw = Math.max(w, h) * 0.9;
+  ctx.fillStyle = "#f5b942";
+  ctx.fillRect(-rw / 2, -h * 0.28, rw, h * 0.56);
+  ctx.fillStyle = "#14060a";
+  ctx.font = `700 ${Math.round(h * 0.34)}px "Bebas Neue", sans-serif`;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText(text, 0, h * 0.02);
+  ctx.restore();
 }
 
 // Skyline strip: seeded towers with lit windows, a pink rim glow along
@@ -97,121 +218,4 @@ export function drawSkyline(ctx, x, y, w, h, seedText) {
     }
   }
   ctx.restore();
-}
-
-// Star pill: a rounded pill holding five stars, four lit — the cover's
-// "heat" meter, drawn on the title band.
-export function drawStarPill(ctx, x, y, w, h, lit = 4) {
-  ctx.save();
-  ctx.fillStyle = "#f5b942";
-  roundRect(ctx, x, y, w, h, h / 2);
-  ctx.fill();
-  ctx.fillStyle = "#14060a";
-  ctx.font = `700 ${Math.round(h * 0.52)}px "Bebas Neue", sans-serif`;
-  ctx.textBaseline = "middle";
-  ctx.fillText("HEAT", x + h * 0.45, y + h / 2 + h * 0.03);
-  const textW = ctx.measureText("HEAT").width;
-  const starR = h * 0.26;
-  const gap = starR * 2.3;
-  const startX = x + h * 0.45 + textW + h * 0.35;
-  for (let i = 0; i < 5; i++) {
-    drawStar(ctx, startX + i * gap + starR, y + h / 2, starR, i < lit ? "#14060a" : "rgba(20,6,10,0.28)");
-  }
-  ctx.restore();
-}
-
-function drawStar(ctx, cx, cy, r, color) {
-  ctx.save();
-  ctx.fillStyle = color;
-  ctx.beginPath();
-  for (let i = 0; i < 10; i++) {
-    const ang = -Math.PI / 2 + (i * Math.PI) / 5;
-    const rad = i % 2 === 0 ? r : r * 0.45;
-    const px = cx + Math.cos(ang) * rad;
-    const py = cy + Math.sin(ang) * rad;
-    if (i === 0) ctx.moveTo(px, py);
-    else ctx.lineTo(px, py);
-  }
-  ctx.closePath();
-  ctx.fill();
-  ctx.restore();
-}
-
-// Round "EST. 2026" badge, drawn on the title band's right end.
-export function drawEstBadge(ctx, cx, cy, r) {
-  ctx.save();
-  ctx.fillStyle = "#f5b942";
-  ctx.beginPath();
-  ctx.arc(cx, cy, r, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.strokeStyle = "#14060a";
-  ctx.lineWidth = Math.max(1, r * 0.08);
-  ctx.beginPath();
-  ctx.arc(cx, cy, r * 0.78, 0, Math.PI * 2);
-  ctx.stroke();
-  ctx.fillStyle = "#14060a";
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-  ctx.font = `700 ${Math.round(r * 0.52)}px "Bebas Neue", sans-serif`;
-  ctx.fillText("EST.", cx, cy - r * 0.22);
-  ctx.fillText("2026", cx, cy + r * 0.28);
-  ctx.restore();
-}
-
-// Corner ribbon on the title band (never over a photo): a diagonal
-// gold ribbon across the band's top-right corner.
-export function drawCornerRibbon(ctx, x, y, w, h, text) {
-  ctx.save();
-  ctx.beginPath();
-  ctx.rect(x, y, w, h);
-  ctx.clip();
-  ctx.translate(x + w, y);
-  ctx.rotate(Math.PI / 4);
-  const rw = Math.max(w, h) * 0.9;
-  ctx.fillStyle = "#f5b942";
-  ctx.fillRect(-rw / 2, -h * 0.28, rw, h * 0.56);
-  ctx.fillStyle = "#14060a";
-  ctx.font = `700 ${Math.round(h * 0.34)}px "Bebas Neue", sans-serif`;
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-  ctx.fillText(text, 0, h * 0.02);
-  ctx.restore();
-}
-
-// Starburst sticker: a spiked disc with two lines of text, placed on
-// the art area's top-left corner like a stuck-on sticker.
-export function drawStarburst(ctx, cx, cy, r, line1, line2) {
-  ctx.save();
-  ctx.translate(cx, cy);
-  ctx.rotate(-0.12);
-  ctx.fillStyle = "#ff5f7e";
-  ctx.beginPath();
-  const spikes = 14;
-  for (let i = 0; i < spikes * 2; i++) {
-    const ang = (i * Math.PI) / spikes;
-    const rad = i % 2 === 0 ? r : r * 0.78;
-    const px = Math.cos(ang) * rad;
-    const py = Math.sin(ang) * rad;
-    if (i === 0) ctx.moveTo(px, py);
-    else ctx.lineTo(px, py);
-  }
-  ctx.closePath();
-  ctx.fill();
-  ctx.fillStyle = "#fff3e0";
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-  ctx.font = `700 ${Math.round(r * 0.42)}px "Bebas Neue", sans-serif`;
-  ctx.fillText(line1, 0, -r * 0.2);
-  ctx.fillText(line2, 0, r * 0.26);
-  ctx.restore();
-}
-
-export function roundRect(ctx, x, y, w, h, r) {
-  ctx.beginPath();
-  ctx.moveTo(x + r, y);
-  ctx.arcTo(x + w, y, x + w, y + h, r);
-  ctx.arcTo(x + w, y + h, x, y + h, r);
-  ctx.arcTo(x, y + h, x, y, r);
-  ctx.arcTo(x, y, x + w, y, r);
-  ctx.closePath();
 }

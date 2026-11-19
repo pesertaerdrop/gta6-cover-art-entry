@@ -1,27 +1,35 @@
-// shots.js — the ?shot= scene driver. The screenshots the dossier
-// carries are taken by the app itself: a scene sets the layout, grade,
-// ink and words, the app draws it, and the driver screenshots the
-// page. shot=cover draws one exported cover full-frame; shot=editor
-// shows the editor with a photo loaded. The page sets
-// window.__afterglowReady when the scene has drawn.
+// shots.js — the ?shot= scene driver.
+//
+// The screenshots the dossier carries are taken by the app itself: a
+// scene sets the layout, grade, ink and words, the app draws it, and
+// the driver screenshots the page. shot=cover draws one exported
+// cover full-frame; shot=editor shows the editor with a photo loaded.
+// The page sets window.__afterglowReady once the scene has drawn.
 
 export function readShotScene() {
   const q = new URLSearchParams(location.search);
-  const shot = q.get("shot") || "editor";
   const scene = {
-    mode: shot === "cover" ? "cover" : "editor",
-    layout: q.get("layout") || null,
-    grade: q.get("grade") || null,
-    ink: q.get("ink") === null ? null : Number(q.get("ink")),
-    title: q.get("title") || null,
-    subtitle: q.get("subtitle") || null,
-    tagline: q.get("tagline") || null,
-    size: q.get("size") || null,
+    mode: "editor",
+    layout: null,
+    grade: null,
+    ink: null,
+    title: null,
+    subtitle: null,
+    tagline: null,
+    size: null,
   };
+  if (q.get("shot") === "cover") scene.mode = "cover";
+  if (q.get("layout")) scene.layout = q.get("layout");
+  if (q.get("grade")) scene.grade = q.get("grade");
+  if (q.get("ink") !== null) scene.ink = Number(q.get("ink"));
+  if (q.get("title")) scene.title = q.get("title");
+  if (q.get("subtitle")) scene.subtitle = q.get("subtitle");
+  if (q.get("tagline")) scene.tagline = q.get("tagline");
+  if (q.get("size")) scene.size = q.get("size");
   return scene;
 }
 
-// Apply a scene's words/layout/grade/ink onto a cover object.
+// Apply a scene's words, layout, grade and ink onto a cover object.
 export function applySceneToCover(cover, scene) {
   const next = { ...cover };
   if (scene.layout) next.layout = scene.layout;

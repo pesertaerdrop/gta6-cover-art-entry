@@ -1,85 +1,88 @@
 <!doctype html>
 <html lang="en">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Afterglow Cover Studio — turn any photo into GTA-style cover art</title>
-<link rel="stylesheet" href="style.css">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Afterglow Cover Studio — turn any photo into GTA-style cover art</title>
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
-<div id="app">
-  <header id="topbar">
-    <div class="brand">
-      <span class="mark">AG</span>
-      <span class="brand-name">Afterglow Cover Studio</span>
-      <span class="brand-tag">Turn any photo into GTA-style cover art — offline, on your machine.</span>
-    </div>
-    <ol class="steps" aria-label="Three steps">
-      <li><b>1</b> Add photos</li>
-      <li><b>2</b> Pick a layout</li>
-      <li><b>3</b> Export</li>
-    </ol>
-    <div class="top-actions">
-      <button id="btnUndo" type="button" disabled>Undo</button>
-      <button id="btnRedo" type="button" disabled>Redo</button>
-      <button id="btnExportAll" type="button" class="primary">Export all 3 sizes</button>
-    </div>
-  </header>
-
-  <main id="workspace">
-    <aside id="railPhotos" aria-label="Photos">
-      <h2>Photos</h2>
-      <button id="btnUpload" type="button">Upload your photos</button>
-      <input id="fileInput" type="file" accept="image/*" multiple hidden>
-      <div class="row">
-        <button id="btnSamples" type="button">Load samples</button>
-        <button id="btnAutofill" type="button">Auto-fill panels</button>
+  <!-- Editor shell: top bar, photo rail, stage, tool rail, footer.
+       The full-frame cover canvas lives outside #app and is only
+       shown in ?shot=cover mode. -->
+  <div id="app">
+    <header id="topbar">
+      <div class="brand">
+        <span class="mark">AG</span>
+        <span class="brand-name">Afterglow Cover Studio</span>
+        <span class="brand-tag">Turn any photo into GTA-style cover art — offline, on your machine.</span>
       </div>
-      <button id="btnShuffle" type="button">Shuffle</button>
-      <div id="photoTray" role="listbox" aria-label="Photo tray"></div>
-      <p class="note">Click a photo to put it in the selected panel. Photos never leave this machine.</p>
-    </aside>
-
-    <section id="stage" aria-label="Cover preview">
-      <div id="previewWrap">
-        <canvas id="previewCanvas" width="1080" height="1080"></canvas>
+      <ol class="steps" aria-label="Three steps">
+        <li><b>1</b> Add photos</li>
+        <li><b>2</b> Pick a layout</li>
+        <li><b>3</b> Export</li>
+      </ol>
+      <div class="top-actions">
+        <button type="button" id="btnUndo" disabled>Undo</button>
+        <button type="button" id="btnRedo" disabled>Redo</button>
+        <button type="button" id="btnExportAll" class="primary">Export all 3 sizes</button>
       </div>
-      <p id="hintLine">14 photos ready. Drag a panel to reframe it, then Export.</p>
-      <div id="panelControls">
-        <span id="selectedPanelLabel">Panel 1 of 9</span>
-        <label>Zoom <input id="zoomSlider" type="range" min="1" max="3" step="0.01" value="1"></label>
-        <label>Move sideways <input id="panXSlider" type="range" min="-1" max="1" step="0.01" value="0"></label>
-        <label>Move up / down <input id="panYSlider" type="range" min="-1" max="1" step="0.01" value="0"></label>
-        <button id="btnResetCrop" type="button">Reset crop</button>
-      </div>
-    </section>
+    </header>
 
-    <aside id="railTools" aria-label="Layout, grade and words">
-      <h2>Layout</h2>
-      <div id="layoutTiles"></div>
-      <h2>Grade</h2>
-      <div id="gradeChips"></div>
-      <h2>Poster Ink</h2>
-      <div class="ink-row">
-        <label class="switch"><input id="inkToggle" type="checkbox" checked> <span>Illustrate the photos</span></label>
-        <label class="ink-strength">Strength <input id="inkSlider" type="range" min="0" max="1" step="0.05" value="0.7"></label>
-      </div>
-      <h2>Words</h2>
-      <label class="field">Title <input id="inputTitle" type="text" value="AFTERGLOW" maxlength="24"></label>
-      <label class="field">Subtitle <input id="inputSubtitle" type="text" value="one last sunset" maxlength="40"></label>
-      <label class="field">Tagline <input id="inputTagline" type="text" value="ONE NIGHT ON THE COAST" maxlength="48"></label>
-      <h2>Size</h2>
-      <div id="sizeChips"></div>
-      <h2>Presets</h2>
-      <div id="presetList"></div>
-    </aside>
-  </main>
+    <main id="workspace">
+      <aside id="railPhotos" aria-label="Photos">
+        <h2>Photos</h2>
+        <button type="button" id="btnUpload">Upload your photos</button>
+        <input type="file" id="fileInput" accept="image/*" multiple hidden>
+        <div class="row">
+          <button type="button" id="btnSamples">Load samples</button>
+          <button type="button" id="btnAutofill">Auto-fill panels</button>
+        </div>
+        <button type="button" id="btnShuffle">Shuffle</button>
+        <div id="photoTray" role="listbox" aria-label="Photo tray"></div>
+        <p class="note">Click a photo to put it in the selected panel. Photos never leave this machine.</p>
+      </aside>
 
-  <footer id="foot">
-    <span>Afterglow Cover Studio — your photos stay on your machine. Fonts: Anton, Kaushan Script and Bebas Neue under the SIL Open Font License. Sample photos made with an image model.</span>
-  </footer>
-</div>
-<canvas id="shotCanvas" hidden></canvas>
-<script type="module" src="src/main.js"></script>
+      <section id="stage" aria-label="Cover preview">
+        <div id="previewWrap">
+          <canvas id="previewCanvas" width="1080" height="1080"></canvas>
+        </div>
+        <p id="hintLine">14 photos ready. Drag a panel to reframe it, then Export.</p>
+        <div id="panelControls">
+          <span id="selectedPanelLabel">Panel 1 of 9</span>
+          <label>Zoom <input type="range" id="zoomSlider" min="1" max="3" step="0.01" value="1"></label>
+          <label>Move sideways <input type="range" id="panXSlider" min="-1" max="1" step="0.01" value="0"></label>
+          <label>Move up / down <input type="range" id="panYSlider" min="-1" max="1" step="0.01" value="0"></label>
+          <button type="button" id="btnResetCrop">Reset crop</button>
+        </div>
+      </section>
+
+      <aside id="railTools" aria-label="Layout, grade and words">
+        <h2>Layout</h2>
+        <div id="layoutTiles"></div>
+        <h2>Grade</h2>
+        <div id="gradeChips"></div>
+        <h2>Poster Ink</h2>
+        <div class="ink-row">
+          <label class="switch"><input type="checkbox" id="inkToggle" checked> <span>Illustrate the photos</span></label>
+          <label class="ink-strength">Strength <input type="range" id="inkSlider" min="0" max="1" step="0.05" value="0.7"></label>
+        </div>
+        <h2>Words</h2>
+        <label class="field">Title <input type="text" id="inputTitle" value="AFTERGLOW" maxlength="24"></label>
+        <label class="field">Subtitle <input type="text" id="inputSubtitle" value="one last sunset" maxlength="40"></label>
+        <label class="field">Tagline <input type="text" id="inputTagline" value="ONE NIGHT ON THE COAST" maxlength="48"></label>
+        <h2>Size</h2>
+        <div id="sizeChips"></div>
+        <h2>Presets</h2>
+        <div id="presetList"></div>
+      </aside>
+    </main>
+
+    <footer id="foot">
+      <span>Afterglow Cover Studio — your photos stay on your machine. Fonts: Anton, Kaushan Script and Bebas Neue under the SIL Open Font License. Sample photos made with an image model.</span>
+    </footer>
+  </div>
+  <canvas id="shotCanvas" hidden></canvas>
+  <script type="module" src="src/main.js"></script>
 </body>
 </html>

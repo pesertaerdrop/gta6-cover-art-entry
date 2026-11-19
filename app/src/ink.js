@@ -1,33 +1,47 @@
-// ink.js — Poster Ink: the signature illustrated-photo pipeline.
+// ink.js — Poster Ink, the signature illustrated-photo pipeline.
+//
 // Blur -> posterize luminance into bands keeping hue -> lift darks ->
 // halftone dots in the shadows -> Sobel ink lines -> grain + vignette.
-// Works on the art canvas in place, blended back at `strength` so the
-// editor can offer a real dial, not just on/off.
+// The pipeline runs on the art canvas in place, then blends back at
+// `strength`, so the editor can offer a real dial, not just on/off.
 
-function makeCanvas(w, h) {
+function newCanvas(w, h) {
   const c = document.createElement("canvas");
   c.width = Math.max(1, w);
   c.height = Math.max(1, h);
   return c;
 }
 
-// Two-pass box blur (via the canvas blur filter) of the art canvas.
-function blurredCopy(src, w, h) {
-  const a = makeCanvas(w, h);
-  const actx = a.getContext("2d");
-  actx.filter = "blur(2px)";
-  actx.drawImage(src, 0, 0);
-  const b = makeCanvas(w, h);
-  const bctx = b.getContext("2d");
-  bctx.filter = "blur(2px)";
-  bctx.drawImage(a, 0, 0);
-  return b;
+// Two-pass box blur (canvas blur filter) of the art canvas.
+function softBlur(src, w, h) {
+  const first = newCanvas(w, h);
+  const fctx = first.getContext("2d");
+  fctx.filter = "blur(2px)";
+  fctx.drawImage(src, 0, 0);
+  const second = newCanvas(w, h);
+  const sctx = second.getContext("2d");
+  sctx.filter = "blur(2px)";
+  sctx.drawImage(first, 0, 0);
+  return second;
 }
 
-// Posterize into 5 luminance bands, keeping hue by scaling the channels,
-// and lift the darkest band toward a mean luminance of 0.47 so shadow
-// detail survives the flattening.
-function posterizeInPlace(ctx, w, h) {
+// Posterize lookup: input luminance 0..255 -> output luminance after
+// banding into 5 steps and lifting the darkest band toward 0.47 mean,
+// so shadow detail survives the flattening.
+const POSTER_LUT = (() => {
+  const lut = new Uint8Array(256);
+  for (let l = 0; l < 256; l++) {
+    let q = Math.round((l / 255) * 4) / 4;
+    let out = q * 255;
+    if (out < 120) out = out + (120 - out) * 0.45;
+    lut[l] = Math.round(out);
+  }
+  return lut;
+})();
+
+// Posterize into 5 luminance bands, keeping hue by scaling the
+// channels with the banded luminance.
+function posterize(ctx, w, h) {
   const img = ctx.getImageData(0, 0, w, h);
   const d = img.data;
   for (let i = 0; i < d.length; i += 4) {
@@ -35,10 +49,7 @@ function posterizeInPlace(ctx, w, h) {
     const g = d[i + 1];
     const b = d[i + 2];
     const l = (r * 299 + g * 587 + b * 114) >> 10;
-    let q = Math.round((l / 255) * 4) / 4;
-    let lq = q * 255;
-    if (lq < 120) lq = lq + (120 - lq) * 0.45;
-    const s = (lq + 1) / (l + 1);
+    const s = (POSTER_LUT[l] + 1) / (l + 1);
     d[i] = Math.min(255, r * s);
     d[i + 1] = Math.min(255, g * s);
     d[i + 2] = Math.min(255, b * s);
@@ -48,7 +59,7 @@ function posterizeInPlace(ctx, w, h) {
 }
 
 // Halftone dots where the (posterized) luminance is under 0.28.
-function halftoneDots(ctx, w, h, img) {
+function halftone(ctx, w, h, img) {
   const d = img.data;
   const step = Math.max(5, Math.round(w / 280));
   ctx.save();
@@ -71,38 +82,33 @@ function halftoneDots(ctx, w, h, img) {
 
 // Sobel ink lines from a half-size smoothed copy; edges come back as
 // dark lines drawn over the art at full size.
-function sobelInk(ctx, w, h, smooth) {
+function sobelEdges(ctx, w, h, smooth) {
   const hw = Math.max(2, w >> 1);
   const hh = Math.max(2, h >> 1);
-  const half = makeCanvas(hw, hh);
-  const hctx = half.getContext("2d");
-  hctx.drawImage(smooth, 0, 0, hw, hh);
-  const img = hctx.getImageData(0, 0, hw, hh);
-  const d = img.data;
-  const lum = new Uint8Array(hw * hh);
+  const half = newCanvas(hw, hh);
+  half.getContext("2d").drawImage(smooth, 0, 0, hw, hh);
+  const src = half.getContext("2d").getImageData(0, 0, hw, hh).data;
+  const gray = new Uint8Array(hw * hh);
   for (let i = 0; i < hw * hh; i++) {
-    lum[i] = (d[i * 4] * 299 + d[i * 4 + 1] * 587 + d[i * 4 + 2] * 114) >> 10;
+    gray[i] = (src[i * 4] * 299 + src[i * 4 + 1] * 587 + src[i * 4 + 2] * 114) >> 10;
   }
-  const edge = makeCanvas(hw, hh);
+  const edge = newCanvas(hw, hh);
   const ectx = edge.getContext("2d");
   const out = ectx.createImageData(hw, hh);
   const od = out.data;
   for (let y = 1; y < hh - 1; y++) {
     for (let x = 1; x < hw - 1; x++) {
       const i = y * hw + x;
-      const gx =
-        -lum[i - hw - 1] - 2 * lum[i - 1] - lum[i + hw - 1] +
-        lum[i - hw + 1] + 2 * lum[i + 1] + lum[i + hw + 1];
-      const gy =
-        -lum[i - hw - 1] - 2 * lum[i - hw] - lum[i - hw + 1] +
-        lum[i + hw - 1] + 2 * lum[i + hw] + lum[i + hw + 1];
+      const gx = -gray[i - hw - 1] - 2 * gray[i - 1] - gray[i + hw - 1]
+        + gray[i - hw + 1] + 2 * gray[i + 1] + gray[i + hw + 1];
+      const gy = -gray[i - hw - 1] - 2 * gray[i - hw] - gray[i - hw + 1]
+        + gray[i + hw - 1] + 2 * gray[i + hw] + gray[i + hw + 1];
       const mag = Math.abs(gx) + Math.abs(gy);
       if (mag > 110) {
-        const a = Math.min(255, (mag - 110) * 1.4);
         od[i * 4] = 24;
         od[i * 4 + 1] = 8;
         od[i * 4 + 2] = 10;
-        od[i * 4 + 3] = a;
+        od[i * 4 + 3] = Math.min(255, (mag - 110) * 1.4);
       }
     }
   }
@@ -117,7 +123,7 @@ function sobelInk(ctx, w, h, smooth) {
 let noiseTile = null;
 function grain(ctx, w, h) {
   if (!noiseTile) {
-    noiseTile = makeCanvas(128, 128);
+    noiseTile = newCanvas(128, 128);
     const nctx = noiseTile.getContext("2d");
     const img = nctx.createImageData(128, 128);
     const d = img.data;
@@ -151,17 +157,17 @@ function vignette(ctx, w, h) {
   ctx.restore();
 }
 
-// Full pipeline: grade the art first (grades.js), then ink it. `strength`
-// 0..1 blends the inked art back over the graded art.
+// Full pipeline: grade the art first (grades.js), then ink it.
+// `strength` 0..1 blends the inked art back over the graded art.
 export function applyPosterInk(ctx, w, h, strength) {
   if (strength <= 0.01) return;
-  const smooth = blurredCopy(ctx.canvas, w, h);
-  const inked = makeCanvas(w, h);
+  const smooth = softBlur(ctx.canvas, w, h);
+  const inked = newCanvas(w, h);
   const ictx = inked.getContext("2d");
   ictx.drawImage(ctx.canvas, 0, 0);
-  const img = posterizeInPlace(ictx, w, h);
-  halftoneDots(ictx, w, h, img);
-  sobelInk(ictx, w, h, smooth);
+  const img = posterize(ictx, w, h);
+  halftone(ictx, w, h, img);
+  sobelEdges(ictx, w, h, smooth);
   grain(ictx, w, h);
   vignette(ictx, w, h);
   ctx.save();

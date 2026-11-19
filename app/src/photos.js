@@ -1,7 +1,12 @@
-// photos.js — the photo library: 14 image-model samples, uploads, and
-// the per-panel framing model (relative zoom / pan, smart face framing).
-// Every photo is a file under app/samples/ or a file the user picked on
-// their own machine; nothing is ever uploaded anywhere.
+// photos.js — the photo library for Afterglow Cover Studio.
+//
+// The 14 sample photos are image-model scenes that ship with the app.
+// A photo the user picks (upload, drop, paste) joins the same library.
+// Nothing is ever sent anywhere: every photo lives on this machine.
+//
+// Framing is relative (zoom + pan in -1..1), so one framing renders
+// correctly at every export size, and smart framing keeps faces in
+// view when a square or portrait photo lands in a wide panel.
 
 export const SAMPLE_PHOTOS = [
   { id: "supercar-boulevard", label: "Supercar", file: "samples/supercar-boulevard.jpg" },
@@ -20,15 +25,66 @@ export const SAMPLE_PHOTOS = [
   { id: "pier-fisher", label: "Pier Fisher", file: "samples/pier-fisher.jpg" },
 ];
 
-// A photo record the editor and the renderer share.
-export function makePhotoRecord(id, label, src) {
+// One panel's framing: zoom 1 means "cover the panel", pan moves the
+// window inside the slack the zoom leaves.
+export function freshFrame(photoId) {
+  return { photoId, zoom: 1, panX: 0, panY: 0 };
+}
+
+// Smart face framing: a square or portrait photo in a wide panel, or
+// a landscape photo in a tall panel, starts on its upper third, where
+// faces live. The framing is relative, so it holds at every size.
+export function smartFrame(photo, panelAspect) {
+  const frame = freshFrame(photo.id);
+  if (!photo.ready) return frame;
+  const aspect = photo.w / photo.h;
+  const wide = panelAspect > 1.25;
+  const tall = panelAspect < 0.8;
+  if (wide && aspect < 1.15) frame.panY = -0.35;
+  else if (tall && aspect > 1.2) frame.panY = -0.25;
+  return frame;
+}
+
+// The source window a frame shows, in photo pixels.
+export function frameWindow(photo, panelW, panelH, frame) {
+  const coverScale = Math.max(panelW / photo.w, panelH / photo.h);
+  const scale = coverScale * frame.zoom;
+  const sw = Math.min(photo.w, panelW / scale);
+  const sh = Math.min(photo.h, panelH / scale);
+  const slackX = photo.w - sw;
+  const slackY = photo.h - sh;
+  const sx = Math.max(0, Math.min(slackX, slackX / 2 + (frame.panX * slackX) / 2));
+  const sy = Math.max(0, Math.min(slackY, slackY / 2 + (frame.panY * slackY) / 2));
+  return { sx, sy, sw, sh };
+}
+
+// Deal photos into panel slots, round-robin from `startAt`, never the
+// same photo twice in one cover while the library is big enough.
+export function dealPhotos(library, slotCount, startAt = 0) {
+  const dealt = [];
+  const used = new Set();
+  for (let i = 0; i < slotCount; i++) {
+    let pick = null;
+    for (let k = 0; k < library.length && !pick; k++) {
+      const cand = library[(startAt + i + k) % library.length];
+      if (!used.has(cand.id)) pick = cand;
+    }
+    pick = pick || library[(startAt + i) % library.length];
+    used.add(pick.id);
+    dealt.push(pick);
+  }
+  return dealt;
+}
+
+// A photo record shared by the editor and the renderer.
+function newPhoto(id, label, src) {
   const img = new Image();
   img.decoding = "async";
   img.src = src;
   return { id, label, src, img, w: 0, h: 0, ready: false };
 }
 
-export function loadPhotoRecord(rec) {
+function loadPhoto(rec) {
   if (rec.ready) return Promise.resolve(rec);
   return new Promise((resolve) => {
     const done = () => {
@@ -46,63 +102,9 @@ export function loadPhotoRecord(rec) {
 }
 
 export async function loadSampleLibrary() {
-  const lib = SAMPLE_PHOTOS.map((s) => makePhotoRecord(s.id, s.label, s.file));
-  await Promise.all(lib.map(loadPhotoRecord));
+  const lib = SAMPLE_PHOTOS.map((s) => newPhoto(s.id, s.label, s.file));
+  await Promise.all(lib.map(loadPhoto));
   return lib.filter((p) => p.ready);
-}
-
-// One panel's framing: relative values, so the same framing renders
-// correctly at every export size.
-export function freshFrame(photoId) {
-  return { photoId, zoom: 1, panX: 0, panY: 0 };
-}
-
-// Smart face framing: a square or portrait photo dropped into a wide
-// panel starts on its upper third, where faces live; a landscape photo
-// in a tall panel does the same. Faces stay framed at every size.
-export function smartFrame(photo, panelAspect) {
-  const frame = freshFrame(photo.id);
-  if (!photo.ready) return frame;
-  const photoAspect = photo.w / photo.h;
-  const widePanel = panelAspect > 1.25;
-  const tallPanel = panelAspect < 0.8;
-  if (widePanel && photoAspect < 1.15) frame.panY = -0.35;
-  else if (tallPanel && photoAspect > 1.2) frame.panY = -0.25;
-  return frame;
-}
-
-// The source window a frame shows, in photo pixels. Zoom multiplies the
-// cover scale; pan moves the window inside the slack the zoom leaves.
-export function frameWindow(photo, panelW, panelH, frame) {
-  const iw = photo.w;
-  const ih = photo.h;
-  const cover = Math.max(panelW / iw, panelH / ih);
-  const scale = cover * frame.zoom;
-  const sw = Math.min(iw, panelW / scale);
-  const sh = Math.min(ih, panelH / scale);
-  const slackX = iw - sw;
-  const slackY = ih - sh;
-  const sx = Math.max(0, Math.min(slackX, slackX / 2 + (frame.panX * slackX) / 2));
-  const sy = Math.max(0, Math.min(slackY, slackY / 2 + (frame.panY * slackY) / 2));
-  return { sx, sy, sw, sh };
-}
-
-// Fill panel slots with photos: round-robin over the library, never the
-// same photo twice in one cover when the library is big enough.
-export function dealPhotos(library, slotCount, startAt = 0) {
-  const out = [];
-  const used = new Set();
-  for (let i = 0; i < slotCount; i++) {
-    let pick = null;
-    for (let k = 0; k < library.length; k++) {
-      const cand = library[(startAt + i + k) % library.length];
-      if (!used.has(cand.id)) { pick = cand; break; }
-    }
-    if (!pick) pick = library[(startAt + i) % library.length];
-    used.add(pick.id);
-    out.push(pick);
-  }
-  return out;
 }
 
 // Read image files the user picked (input, drop, paste) into records.
@@ -112,8 +114,8 @@ export async function readUserFiles(files) {
     if (!file.type || !file.type.startsWith("image/")) continue;
     const url = URL.createObjectURL(file);
     const label = file.name.replace(/\.[^.]+$/, "").slice(0, 18) || "Photo";
-    const rec = makePhotoRecord("up-" + Date.now() + "-" + recs.length, label, url);
-    await loadPhotoRecord(rec);
+    const rec = newPhoto("up-" + Date.now() + "-" + recs.length, label, url);
+    await loadPhoto(rec);
     if (rec.ready) recs.push(rec);
   }
   return recs;
