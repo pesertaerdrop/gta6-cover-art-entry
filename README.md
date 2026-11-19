@@ -1,59 +1,38 @@
 # Neon Coast Cover Studio
 
-[![Make GTA 6 Cover Art](https://make.fun/badge/gta6-cover-art-01.svg)](https://make.fun/c/gta6-cover-art-01)
-[![Rank](https://make.fun/badge/gta6-cover-art-01/pesertaerdrop/gta6-cover-art-entry/rank.svg)](https://make.fun/c/gta6-cover-art-01)
-[![Reward](https://make.fun/badge/gta6-cover-art-01/pesertaerdrop/gta6-cover-art-entry/reward.svg)](https://make.fun/c/gta6-cover-art-01)
+[![gta6-cover-art-01](https://make.fun/badge/gta6-cover-art-01.svg)](https://make.fun/c/gta6-cover-art-01)
+[![rank](https://make.fun/badge/gta6-cover-art-01/pesertaerdrop/gta6-cover-art-entry/rank.svg)](https://make.fun/c/gta6-cover-art-01)
+[![reward](https://make.fun/badge/gta6-cover-art-01/pesertaerdrop/gta6-cover-art-entry/reward.svg)](https://make.fun/c/gta6-cover-art-01)
 
-An offline web app that turns any photo and a caption into GTA-style cover
-art — the multi-panel poster look with bold lettering and a Vice City sunset
-or neon grade — and exports it as a PNG to share. Made for the
-[Make GTA 6 Cover Art](https://make.fun/c/gta6-cover-art-01) competition on
-[make.fun](https://make.fun).
+An offline web app that turns any photo and a caption into GTA 6-style cover art — the multi-panel Vice City poster look with bold sunset lettering — and exports it as a PNG to share. Built for the [Make GTA 6 Cover Art](https://make.fun/c/gta6-cover-art-01) competition on make.fun.
 
 ## What it does
 
-- **7 layouts** — Nine-Panel Grid, Hero and Three, Full Bleed, Tilted
-  Snapshots, Split Duo, Comic Strip, and Portrait Trio.
-- **6 colour grades** — Vice Sunset, Neon Nights, Golden Hour, Aqua Pop,
-  Noir Vice, and Palm Dusk, each a gradient-map wash over your photos.
-- **Any photo** — upload your own, or use the bundled samples. Click a
-  panel to select it, drag on the preview to reframe the photo, and tune
-  zoom and position per panel. Several panels can hold several photos.
-- **Lettering** — a halftone title block with a gradient Anton title, a
-  Pacifico script subtitle, and a gold badge ribbon. Title, subtitle and
-  badge text are all editable.
-- **Fast and easy** — presets, auto-fill and shuffle get you from a photo
-  to a PNG in a few clicks, with undo and redo throughout.
-- **Export** — PNG in all three post sizes: 1080 × 1080, 1080 × 1350 and
-  1920 × 1080, one at a time or all three at once.
+- **7 layouts**: nine-panel grid, hero-and-three, full bleed, tilted snapshot, split duo, comic strip, portrait trio.
+- **6 colour grades**: gradient-map washes (Vice Sunset, Neon Nights, Golden Hour, Aqua Pop, Noir Vice, Palm Dusk) plus grain and vignette.
+- **Lettering**: Anton display type with a sunset-gradient title block, Pacifico script subtitle, and a gold badge ribbon — all fonts vendored under the SIL Open Font License.
+- **Any photo**: upload your own photos or use the 9 bundled samples (7 made with an image model for this entry, 2 from the competition kit). Crop and position each panel by dragging, zoom and pan with sliders or the scroll wheel, fill several panels with one photo or several — auto-fill never repeats a photo inside one cover.
+- **Fast and easy**: pick a preset, tweak the words, and export all three post sizes (1080×1080, 1080×1350, 1920×1080) in one tap. Undo and redo cover every change.
+- **Offline**: static files under `app/`, no network request, photos never leave the machine.
 
-Everything runs offline in the browser from static files. Photos are read
-on your own machine and never uploaded anywhere.
-
-## Run it
+## Try it
 
 ```sh
 node serve.ts
+# open http://localhost:8080
 ```
 
-Then open <http://localhost:8080> in desktop Chrome. No build step, no
-network requests: every script, font and sample photo is a file under
-`app/`.
-
-## Fonts and photos
-
-- Display type is **Anton** and script type is **Pacifico**, both under the
-  SIL Open Font License (see `app/fonts/OFL.txt`).
-- The four new sample photos were made with an image model for this entry;
-  `boulevard.jpg` and `pier.jpg` are the kit starter's samples, free to use.
-  No Rockstar Games logo, artwork, wordmark or font is used anywhere.
-
-## Entry program
-
-`main.ts` (Node 22, standard library only) copies `app/` and `screenshots/`
-to `/output` and writes `dossier.json` with the kit's vendored
-`vendor/makefun-app.ts`:
+## Hand it in
 
 ```sh
 mkdir -p out && MAKEFUN_OUTPUT_DIR=out node main.ts
+node <kit>/cli/makefun.mjs check --kit <kit> --repo .
 ```
+
+## Credits
+
+- Display type: [Anton](https://github.com/google/fonts/tree/main/ofl/anton) (SIL OFL 1.1).
+- Script type: [Pacifico](https://github.com/google/fonts/tree/main/ofl/pacifico) (SIL OFL 1.1).
+- Sample photos: 7 made with an image model for this entry; 2 (`boulevard`, `pier`) from the competition kit, made for make.fun and free to use. No real person, no Rockstar artwork, no Rockstar fonts.
+
+Licensed under the MIT License — see [LICENSE](LICENSE).

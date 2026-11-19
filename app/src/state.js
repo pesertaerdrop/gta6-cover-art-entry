@@ -1,152 +1,82 @@
-// Neon Coast Cover Studio — the cover state and its history.
-//
-// The state is plain data, so undo and redo are snapshots: every change
-// pushes the previous state onto the undo stack. Panels hold one crop each
-// (photo, zoom, pan), and changing the layout remaps the panels without
-// losing the photos already placed.
+// Cover state and its undo history. The state is plain data: every field is
+// a value the renderer can draw from, and every change goes through commit()
+// so Undo and Redo always see a clean snapshot.
 
-import { LAYOUTS, PRESETS, SAMPLES } from './presets.js';
-import { panelCount } from './cover.js';
+export const SIZES = {
+  '1080x1080': { w: 1080, h: 1080, label: 'Square' },
+  '1080x1350': { w: 1080, h: 1350, label: 'Portrait' },
+  '1920x1080': { w: 1920, h: 1080, label: 'Wide' },
+};
 
-export function defaultPanels(layoutId, photoIds) {
-  const n = panelCount(layoutId);
-  const panels = [];
-  for (let i = 0; i < n; i += 1) {
-    panels.push({
-      photoId: photoIds.length ? photoIds[i % photoIds.length] : null,
-      zoom: 1,
-      dx: 0,
-      dy: 0,
-    });
-  }
-  return panels;
+export const SIZE_IDS = ['1080x1080', '1080x1350', '1920x1080'];
+
+export function blankPanel(photoId) {
+  return { photoId, zoom: 1, panX: 0, panY: 0 };
 }
 
 export function createCoverState() {
-  const photoIds = SAMPLES.map((s) => s.id);
   return {
-    layout: 'grid9',
-    grade: 'neon-nights',
-    size: '1080x1080',
+    sizeId: '1080x1080',
+    layoutId: 'grid9',
+    gradeId: 'neon-nights',
     title: 'NEON COAST',
     subtitle: 'Vice City nights',
     badge: 'EST. 2026',
-    panels: defaultPanels('grid9', photoIds),
+    photos: [],
+    panels: [],
     selected: 0,
-    grain: true,
-    vignette: true,
-    halftone: true,
   };
 }
 
-// Only the serializable fields: the history never holds image elements.
-export function snapshotCover(state) {
+export function snapshotState(state) {
   return JSON.parse(JSON.stringify({
-    layout: state.layout,
-    grade: state.grade,
-    size: state.size,
+    sizeId: state.sizeId,
+    layoutId: state.layoutId,
+    gradeId: state.gradeId,
     title: state.title,
     subtitle: state.subtitle,
     badge: state.badge,
     panels: state.panels,
     selected: state.selected,
-    grain: state.grain,
-    vignette: state.vignette,
-    halftone: state.halftone,
   }));
 }
 
-export function restoreCover(state, snap) {
-  Object.assign(state, JSON.parse(JSON.stringify(snap)));
+export function restoreSnapshot(state, snap) {
+  state.sizeId = snap.sizeId;
+  state.layoutId = snap.layoutId;
+  state.gradeId = snap.gradeId;
+  state.title = snap.title;
+  state.subtitle = snap.subtitle;
+  state.badge = snap.badge;
+  state.panels = snap.panels;
+  state.selected = snap.selected;
 }
 
-// Keep the photos when the layout changes: panels are remapped by index,
-// extra panels are dropped, missing ones are filled from the library.
-export function remapPanelsForLayout(state, photoIds) {
-  const n = panelCount(state.layout);
-  const next = [];
-  for (let i = 0; i < n; i += 1) {
-    if (state.panels[i]) next.push({ ...state.panels[i] });
-    else next.push({ photoId: photoIds[i % photoIds.length] ?? null, zoom: 1, dx: 0, dy: 0 });
-  }
-  state.panels = next;
-  if (state.selected >= n) state.selected = 0;
+// A 50-step undo stack. push() records the state before a change; undo()
+// and redo() swap whole snapshots, so no edit can leave a half-applied cover.
+export function createHistory(limit = 50) {
+  return { past: [], future: [], limit };
 }
 
-// Deal the library across the panels in order, so every panel shows a
-// different photo where the library has enough of them. The slight downward
-// pan keeps faces in frame when a wide panel crops a photo top and bottom.
-export function autoFillPanels(state, photoIds) {
-  state.panels = state.panels.map((panel, i) => ({
-    ...panel,
-    photoId: photoIds[i % photoIds.length] ?? panel.photoId,
-    zoom: 1,
-    dx: 0,
-    dy: 0.08,
-  }));
+export function historyPush(history, state) {
+  history.past.push(snapshotState(state));
+  if (history.past.length > history.limit) history.past.shift();
+  history.future.length = 0;
 }
 
-// A fresh look from the same photos: a random layout, grade and crop.
-export function shuffleCover(state, photoIds) {
-  const layoutIds = Object.keys(LAYOUTS);
-  const gradeIds = ['vice-sunset', 'neon-nights', 'golden-hour', 'aqua-pop', 'noir-vice', 'palm-dusk'];
-  state.layout = layoutIds[Math.floor(Math.random() * layoutIds.length)];
-  state.grade = gradeIds[Math.floor(Math.random() * gradeIds.length)];
-  remapPanelsForLayout(state, photoIds);
-  state.panels = state.panels.map((panel) => ({
-    photoId: photoIds[Math.floor(Math.random() * photoIds.length)] ?? panel.photoId,
-    zoom: 1 + Math.random() * 0.6,
-    dx: (Math.random() - 0.5) * 0.3,
-    dy: (Math.random() - 0.5) * 0.3,
-  }));
-}
-
-export function applyCoverPreset(state, presetId, photoIds) {
-  const preset = PRESETS.find((p) => p.id === presetId);
-  if (!preset) return false;
-  state.layout = preset.layout;
-  state.grade = preset.grade;
-  state.title = preset.title;
-  state.subtitle = preset.subtitle;
-  state.badge = preset.badge;
-  remapPanelsForLayout(state, photoIds);
-  autoFillPanels(state, photoIds);
+export function historyUndo(history, state) {
+  if (!history.past.length) return false;
+  history.future.push(snapshotState(state));
+  restoreSnapshot(state, history.past.pop());
   return true;
 }
 
-// Undo and redo over whole-state snapshots, capped at fifty steps.
-export class CoverHistory {
-  constructor(state) {
-    this.state = state;
-    this.undoStack = [];
-    this.redoStack = [];
-  }
-
-  commit() {
-    this.undoStack.push(snapshotCover(this.state));
-    if (this.undoStack.length > 50) this.undoStack.shift();
-    this.redoStack = [];
-  }
-
-  undo() {
-    if (!this.undoStack.length) return false;
-    this.redoStack.push(snapshotCover(this.state));
-    restoreCover(this.state, this.undoStack.pop());
-    return true;
-  }
-
-  redo() {
-    if (!this.redoStack.length) return false;
-    this.undoStack.push(snapshotCover(this.state));
-    restoreCover(this.state, this.redoStack.pop());
-    return true;
-  }
-
-  get canUndo() {
-    return this.undoStack.length > 0;
-  }
-
-  get canRedo() {
-    return this.redoStack.length > 0;
-  }
+export function historyRedo(history, state) {
+  if (!history.future.length) return false;
+  history.past.push(snapshotState(state));
+  restoreSnapshot(state, history.future.pop());
+  return true;
 }
+
+export function historyCanUndo(history) { return history.past.length > 0; }
+export function historyCanRedo(history) { return history.future.length > 0; }
