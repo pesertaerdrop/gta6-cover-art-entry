@@ -1,5 +1,1 @@
-[
-  { "name": "1-cover.jpg", "query": "?shot=cover&photo=pier&caption=Sunset%20Heist", "w": 1080, "h": 1080 },
-  { "name": "2-editor.jpg", "query": "?shot=editor&photo=boulevard&caption=Boulevard%20Queen", "w": 1280, "h": 720 },
-  { "name": "3-cover.jpg", "query": "?shot=cover&photo=boulevard&caption=Boulevard%20Queen", "w": 1080, "h": 1080 }
-]
+[{"h":1080,"name":"1-cover.jpg","query":"?shot=cover&size=1920x1080&layout=hero-three&grade=vice-sunset&title=SUNSET%20HEIST&subtitle=one%20last%20job&badge=VICE%20CITY&photos=woman-convertible,man-rooftop,friends-neon,man-pier","w":1920},{"h":720,"name":"2-editor.jpg","query":"?shot=editor&layout=grid9&grade=neon-nights&title=NEON%20COAST&subtitle=Vice%20City%20nights&badge=EST.%202026","w":1280},{"h":1350,"name":"3-cover.jpg","query":"?shot=cover2&size=1080x1350&layout=grid9&grade=golden-hour&title=PIER%20PRESSURE&subtitle=gone%20fishing&badge=EST.%202026&photos=man-pier,woman-convertible,man-rooftop,friends-neon,boulevard,pier","w":1080},{"h":1080,"name":"4-grid.jpg","query":"?shot=grid&size=1080x1080&layout=grid9&grade=neon-nights&title=NEON%20COAST&subtitle=Vice%20City%20nights&badge=EST.%202026","w":1080}]
