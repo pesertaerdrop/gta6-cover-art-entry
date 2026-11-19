@@ -1,32 +1,77 @@
-// shots.js — the ?shot= scenes the screenshots are taken from. A scene
-// names a preset and a mode: 'canvas' draws one cover full-bleed at the
-// viewport size (the exported covers), 'editor' shows the full editor
-// with samples loaded (the app at work). Scenes never edit the files;
-// they only set the state the page opens with.
+// shots.js — the four deterministic screenshots, defined as data so the
+// screenshot runner and the app agree on exactly what each shot shows.
+// `?shot=<id>` renders one scene directly: cover (the Afterglow preset
+// on the wide size), editor (the app chrome itself), portrait (the
+// Night Market preset on the portrait size — Strip Five of the hero
+// duo, the shot that carries the whole-face guarantee), grid (the
+// Motor Mile preset, square). `window.__shotReady` is set once the
+// scene is painted, so the runner never has to guess when to capture.
 
+import { loadSamples } from './photos.js';
+import { createState, assignPhotos } from './state.js';
+import { renderToCanvas, EXPORT_SIZES } from './render.js';
 import { applyPreset, presetById } from './presets.js';
 
-export const SHOT_SCENES = {
-  cover: { preset: 'afterglow', mode: 'canvas', note: 'Wide exported cover' },
-  editor: { preset: 'afterglow', mode: 'editor', note: 'Editor with a photo loaded' },
-  portrait: { preset: 'nightmarket', mode: 'canvas', note: 'Portrait exported cover', leadPhotoId: 'hero-duo' },
-  grid: { preset: 'motormile', mode: 'canvas', note: 'Nine-panel exported cover' },
-};
+export const SHOTS = [
+  {
+    id: 'cover',
+    preset: 'afterglow',
+    size: 'wide',
+    width: 1280,
+    height: 720,
+    title: 'Afterglow cover, wide',
+  },
+  {
+    id: 'editor',
+    preset: 'afterglow',
+    size: 'wide',
+    width: 1280,
+    height: 720,
+    title: 'Editor with a photo loaded',
+  },
+  {
+    id: 'portrait',
+    preset: 'nightmarket',
+    size: 'portrait',
+    width: 1024,
+    height: 1280,
+    title: 'Night Market cover, portrait',
+  },
+  {
+    id: 'grid',
+    preset: 'motormile',
+    size: 'square',
+    width: 1080,
+    height: 1080,
+    title: 'Motor Mile grid, square',
+  },
+];
 
-// The scene name from the page URL (?shot=cover), or null.
-export function shotFromUrl() {
-  const q = new URLSearchParams(window.location.search);
-  const name = q.get('shot');
-  return name && SHOT_SCENES[name] ? name : null;
+// Build the state for one shot: the preset's layout, grade, ink and
+// copy, with the library's photos assigned round-robin. For the
+// portrait shot the lead photo is the hero duo, so Strip Five slices
+// the two faces.
+export async function buildShotState(shot) {
+  const library = await loadSamples();
+  const state = createState();
+  const preset = presetById(shot.preset);
+  applyPreset(state, preset.id, library);
+  if (shot.id === 'portrait') {
+    state.leadPhotoId = 'hero-duo';
+  }
+  assignPhotos(state, library);
+  return { state, library };
 }
 
-// Set a state up for a shot scene and return the scene. Photos are
-// assigned by the caller afterwards, in library order.
-export function applyShotScene(state, shotName) {
-  const scene = SHOT_SCENES[shotName];
-  if (!scene) return null;
-  applyPreset(state, presetById(scene.preset));
-  if (scene.leadPhotoId) state.leadPhotoId = scene.leadPhotoId;
-  state.ink.on = true;
-  return scene;
+// Render one shot's cover to a canvas at the shot's pixel size.
+export async function renderShot(shot) {
+  const { state, library } = await buildShotState(shot);
+  const size = EXPORT_SIZES.find((s) => s.id === shot.size);
+  const canvas = renderToCanvas(size.w, size.h, state, library);
+  const out = document.createElement('canvas');
+  out.width = shot.width;
+  out.height = shot.height;
+  const ctx = out.getContext('2d');
+  ctx.drawImage(canvas, 0, 0, shot.width, shot.height);
+  return out;
 }

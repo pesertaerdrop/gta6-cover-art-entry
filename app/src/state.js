@@ -4,14 +4,26 @@
 // kept per photo id, so changing the layout never loses a careful crop.
 //
 // Strip Five panels are different: a panel is { photoId, slice, y,
-// zoom } where slice is { x0, x1, fx } — the span of the lead photo the
-// strip shows and the focus point inside it. The spans come from
-// faces.js (see stripDividers): the dividers never cross a face, and
-// the state also keeps the divider set itself (stripDividers) so the
-// layout, the renderer and the drag handler all draw the same gutters.
+// zoom } where slice is { x0, x1, fx, face } — the span of the lead
+// photo the strip shows, the focus point inside it, and the span of the
+// faces in that slice (null when it holds no face). The spans come from
+// faces.js: the dividers never cross a face, and — where the photo's
+// faces allow it — each face-bearing slice is wide enough that its
+// narrowest window shows its face whole, with air around it. The state
+// also keeps the divider set itself (stripDividers) so the layout, the
+// renderer and the drag handler all draw the same gutters, and a flag
+// (stripWholeFace) saying whether the whole-face rule held for this
+// photo, so the editor never claims a guarantee it could not keep.
 
 import { layoutById, panelsFor } from './layouts.js';
-import { stripDividers, sliceFocus, NARROW_VIEW } from './faces.js';
+import {
+  stripDividers,
+  wholeFaceDividers,
+  sliceFocus,
+  faceSpanInSlice,
+  narrowWindowRatio,
+} from './faces.js';
+import { EXPORT_SIZES } from './render.js';
 
 // The cover a fresh editor opens with.
 export function createState() {
@@ -29,6 +41,12 @@ export function createState() {
     // The face-aware divider set for the current strip (null unless the
     // layout is Strip Five). Photo fractions, [d1..d4].
     stripDividers: null,
+    // True when the divider set also satisfies the whole-face width
+    // rule for this photo (every face whole in its strip's narrowest
+    // window). False means the v7 fallback is in force: dividers never
+    // cross a face, but a face wider than its strip's window may still
+    // touch the strip's edges.
+    stripWholeFace: false,
   };
 }
 
@@ -45,8 +63,12 @@ export function defaultCrop() {
 // The slices come from the lead photo's faces, so each face falls
 // wholly inside one strip with a margin around it, and the focus point
 // of each strip sits on its face (or the middle of the slice when it
-// holds no face). The focus is computed for the narrowest strip view
-// any export size shows, so one stored focus stays valid at every size.
+// holds no face). The divider search first tries for the whole-face
+// guarantee — slices wide enough that the narrowest window any export
+// size shows still contains the whole face plus air — and falls back to
+// the v7 divider rule when the photo's faces cannot all fit that way.
+// The focus is computed for the slice's own narrowest window, so one
+// stored focus stays valid at every size.
 export function assignPhotos(state, photos) {
   const count = panelsFor(state.layout, 100, 100).length;
   const kept = new Map(state.panels.map((p) => [p.photoId, p]));
@@ -56,23 +78,32 @@ export function assignPhotos(state, photos) {
     if (!lead) {
       state.panels = [];
       state.stripDividers = null;
+      state.stripWholeFace = false;
       return;
     }
     const faces = lead.faces || [];
-    const dividers = stripDividers(faces, count);
+    const imgW = lead.img ? lead.img.naturalWidth : 1920;
+    const imgH = lead.img ? lead.img.naturalHeight : 1280;
+    const ratio = narrowWindowRatio(imgW, imgH, EXPORT_SIZES);
+    const whole = faces.length > 0 ? wholeFaceDividers(faces, count, ratio) : null;
+    const dividers = whole ?? stripDividers(faces, count);
     state.stripDividers = dividers;
+    state.stripWholeFace = whole !== null;
     const edges = [0, ...dividers, 1];
     for (let i = 0; i < count; i++) {
       const x0 = edges[i];
       const x1 = edges[i + 1];
-      const fx = sliceFocus(faces, x0, x1, NARROW_VIEW);
-      panels.push({ photoId: lead.id, slice: { x0, x1, fx }, y: 0.35, zoom: 1 });
+      const viewW = (x1 - x0) * ratio;
+      const fx = sliceFocus(faces, x0, x1, viewW);
+      const face = faceSpanInSlice(faces, x0, x1);
+      panels.push({ photoId: lead.id, slice: { x0, x1, fx, face }, y: 0.35, zoom: 1 });
     }
     state.panels = panels;
     state.selected = Math.min(state.selected, Math.max(0, panels.length - 1));
     return;
   }
   state.stripDividers = null;
+  state.stripWholeFace = false;
   for (let i = 0; i < count; i++) {
     const photo = photos[i % photos.length];
     if (!photo) break;

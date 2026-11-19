@@ -5,15 +5,19 @@
 // stretched.
 //
 // Strip Five panels are slices, not crops: a panel carries
-// slice { x0, x1, fx } — the horizontal span of the lead photo it shows
-// and the focus point inside it. sliceWindow keeps the visible window
+// slice { x0, x1, fx, face } — the horizontal span of the lead photo it
+// shows, the focus point inside it, and the span of the faces in that
+// slice (null when it holds none). sliceWindow keeps the visible window
 // inside the slice, so a face that sits wholly inside a slice can never
-// be cut by a gutter. A normal panel carries { zoom, x, y } and uses the
+// be cut by a gutter — and it clamps the window onto the face span, so
+// even a dragged focus point cannot push a face's cheek or ear out of
+// the window. A normal panel carries { zoom, x, y } and uses the
 // cover-fit cropWindow instead.
 
 import { panelsFor } from './layouts.js';
 import { gradeById, applyGrade } from './grades.js';
 import { applyInk } from './ink.js';
+import { WHOLE_MARGIN } from './faces.js';
 import { drawSkyline, drawHeatPill, drawEstBadge, drawRibbon, drawStarburst } from './keyart.js';
 import { drawTitle, drawSubtitle, drawTagline } from './lettering.js';
 
@@ -48,6 +52,13 @@ export function cropWindow(img, rectW, rectH, crop) {
 // show half a face. Zoom below 1 is a no-op here — a slice is already
 // the widest view of its own span; zooming out would bleed into the
 // neighbouring strip.
+//
+// When the slice holds a face, the window is also clamped onto the face
+// span: the window's left edge must sit at or left of the face's left
+// edge minus WHOLE_MARGIN, and its right edge at or right of the face's
+// right edge plus WHOLE_MARGIN. The whole-face divider rule guarantees
+// a window that wide exists inside the slice; this clamp is what makes
+// the guarantee hold even after the user drags the focus point.
 export function sliceWindow(img, rectW, rectH, slice, y, zoom) {
   const imgW = img.naturalWidth;
   const imgH = img.naturalHeight;
@@ -63,6 +74,18 @@ export function sliceWindow(img, rectW, rectH, slice, y, zoom) {
   const minSx = slice.x0 * imgW;
   const maxSx = Math.max(minSx, slice.x1 * imgW - sw);
   sx = Math.min(Math.max(sx, minSx), maxSx);
+  if (slice.face) {
+    const mPx = WHOLE_MARGIN * imgW;
+    const f0 = slice.face[0] * imgW;
+    const f1 = slice.face[1] * imgW;
+    // Window positions that keep the whole face (plus air) visible.
+    const lo = Math.max(minSx, f1 + mPx - sw);
+    const hi = Math.min(maxSx, f0 - mPx);
+    if (lo <= hi) sx = Math.min(Math.max(sx, lo), hi);
+    // When lo > hi the window is narrower than the face span plus air
+    // (the whole-face rule did not hold for this photo): keep the
+    // focus-centred window instead of forcing a worse one.
+  }
   sy = Math.min(Math.max(sy, 0), Math.max(0, imgH - sh));
   return { sx, sy, sw, sh, scale };
 }

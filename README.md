@@ -1,40 +1,39 @@
 # Afterglow Cover Studio
 
-![GTA 6 cover art](https://make.fun/badge/gta6-cover-art-01.svg)
-![Rank](https://make.fun/badge/gta6-cover-art-01/pesertaerdrop/gta6-cover-art-entry/rank.svg)
-![Reward](https://make.fun/badge/gta6-cover-art-01/pesertaerdrop/gta6-cover-art-entry/reward.svg)
+![make.fun bounty](https://make.fun/badge/gta6-cover-art-01.svg)
+![make.fun rank](https://make.fun/badge/gta6-cover-art-01/pesertaerdrop/gta6-cover-art-entry/rank.svg)
+![make.fun reward](https://make.fun/badge/gta6-cover-art-01/pesertaerdrop/gta6-cover-art-entry/reward.svg)
 
-An entry for the [GTA 6 cover art bounty](https://make.fun/bounty/gta6-cover-art-01) on [make.fun](https://make.fun/c/gta6-cover-art-01): an offline web app that turns any photo into a bold multi-panel poster cover — sunset grade, Poster Ink, big gradient lettering — and exports it as a PNG in square 1080&times;1080, portrait 1080&times;1350 and wide 1920&times;1080.
+[Enter the GTA 6 cover art bounty on make.fun](https://make.fun/bounty/gta6-cover-art-01)
+
+An offline web app that turns a photo and a caption into a GTA 6-style cover: a multi-panel poster with bold lettering and a Vice City sunset grade, exported as a PNG in square, portrait and wide.
 
 ## How it works
 
-1. **Add photos** — use the 14 included samples or upload your own. Samples are image-model photos made for this studio; uploads never leave your machine.
-2. **Pick a layout** — eight layouts, led by **Poster Grid**: one large central hero panel (an original duo portrait against a sunset skyline) ringed by seven action panels — police chase, airboat and alligator, boat party, convertible duo, yacht under a blimp, dirt-bike jump, drawbridge and speedboat. Also: nine-panel grid, hero and three, full bleed, tilted snapshots, Strip Five, split duo and comic strip.
-3. **Export** — one big EXPORT PNG button downloads all three sizes at once.
+1. **Add photos** — pick one of the 14 image-model samples, or add your own. Everything stays on your machine.
+2. **Pick a layout** — eight layouts, from the Poster Grid (hero duo + seven action panels) to Strip Five (one photo, five crops).
+3. **Export** — write your title, pick a grade, hit the big pink EXPORT PNG button. Three sizes, exact dimensions.
 
-## What is inside
+## What makes it a cover, not a collage
 
-- **Poster Ink** (written from scratch): posterized ink bands, halftone dots in the shadows, Sobel ink edges, seeded grain and a vignette — with a strength slider and an off switch for the Raw Stock photoreal grade.
-- **Six grades**: Vice Sunset, Neon Nights, Golden Hour, Aqua Pop, Noir Vice, Raw Stock.
-- **Face-aware Strip Five**: the five strips of one photo are cut where the faces aren't. Each sample photo carries the horizontal span of its faces, and the divider positions are computed from that data — every face falls wholly inside one strip, with a margin around it, and each strip focuses on its face. Pick any photo from the tray and the dividers move with it. Uploads have no face data and fall back to equal strips.
-- **Title-block furniture**: skyline strip, gradient Anton title, Kaushan Script subtitle in its own clear zone, HEAT star pill, EST. 2026 badge, FRESH INK starburst and a legible NOW SHOWING diagonal ribbon.
-- **Editor craft**: drag-to-reframe with per-photo crops that survive layout changes, smart face framing (upper third by default), 50-step undo/redo, editable title/subtitle/tagline, one-tap presets, shuffle.
+- **Poster Ink** — the signature print effect: posterised colour, halftone dots in the shadows, ink lines along the edges. It keeps the cover legible at 300 px.
+- **Whole faces, always** — Strip Five measures each face ear to ear and places its dividers so no strip edge ever crosses a face, and each face-bearing strip is wide enough to show its face whole — eyes, nose, mouth, chin, ears, hairline — at every export size, portrait included. Dragging a strip's focus point can't push a face out either: the window is clamped onto the face span at render time.
+- **Six grades** — Vice Sunset, Neon Nights, Golden Hour, Aqua Pop, Noir Vice, and Raw Stock (no grade at all), plus a Poster Ink strength slider.
+- **Title band extras** — a skyline strip, a HEAT star pill, an EST. 2026 badge, a legible NOW SHOWING diagonal ribbon, and a FRESH INK starburst sticker.
+- **Real editing** — drag to reframe any panel, scroll to zoom, per-photo crops that survive a layout change, undo/redo (50 steps), shuffle, auto-fill, and four one-click presets.
 
 ## Run it
 
-```sh
-node serve.ts
-# open http://localhost:8080
-```
+Open `app/index.html` in desktop Chrome. No server, no network, no account.
 
-Build the submission bundle:
+## Build
 
 ```sh
-mkdir -p out && MAKEFUN_OUTPUT_DIR=out node main.ts
+node main.ts
 ```
 
-## Credits
+`main.ts` copies `app/` and `screenshots/` into the output directory and writes `dossier.json` via the kit's `buildDossier`.
 
-- All 14 sample photos were made with an image model for this entry — no photo of a real person, no existing game's artwork, logo or wordmark anywhere.
-- Fonts: Anton, Bebas Neue and Kaushan Script, all under the SIL Open Font License (see `app/fonts/OFL.txt`).
-- License: MIT.
+## Original work
+
+Everything in this entry is original: the title is AFTERGLOW, the fonts are OFL files under `app/fonts`, and the 14 sample photos are image-model originals of an invented duo. No logo, wordmark, artwork or font of any existing game appears anywhere.

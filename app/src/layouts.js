@@ -16,7 +16,9 @@
 // Strip Five is the face-aware one: it takes optional divider positions
 // (photo fractions, from faces.js via the state) and places its gutters
 // on those dividers instead of the equal split, so no gutter ever lands
-// on a face. Without dividers it falls back to five equal strips.
+// on a face — and, where the faces allow it, each face-bearing strip is
+// wide enough to show its face whole. Without dividers it falls back to
+// five equal strips.
 
 const GUT = 0.012; // gutter, relative to the art area's width
 

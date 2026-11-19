@@ -1,13 +1,3 @@
-Afterglow Cover Studio — fonts
-==============================
-
-Anton — Copyright 2020 The Anton Project Authors (https://github.com/googlefonts/AntonFont)
-Bebas Neue — Copyright 2019 The Bebas Neue Project Authors (https://github.com/dharmatype/Bebas-Neue)
-Kaushan Script — Copyright (c) 2011, Pablo Impallari (www.impallari.com)
-
-All three fonts are licensed under the SIL Open Font License, Version 1.1.
-The full license text follows.
-
 Copyright 2020 The Anton Project Authors (https://github.com/googlefonts/AntonFont.git)
 
 This Font Software is licensed under the SIL Open Font License, Version 1.1.

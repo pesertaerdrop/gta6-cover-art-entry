@@ -5,11 +5,14 @@
 // for this entry, and uploads stay on the machine (object URLs only).
 //
 // Each sample also carries `faces`: the horizontal span of each prominent
-// face, in photo fractions, measured by eye from the photo itself. Strip
-// Five reads this data (see faces.js) and places its dividers so no
-// divider ever crosses a face. Photos whose people are tiny or distant
-// list no faces: at that size a divider crossing a figure is invisible,
-// and claiming a box would be guessing.
+// face, in photo fractions, measured by eye from the photo itself — ear
+// to ear, so the whole face (eyes, nose, mouth, chin, ears, hairline)
+// is inside the box, not just the skin. Strip Five reads this data (see
+// faces.js) and places its dividers so no divider ever crosses a face
+// and each face-bearing strip is wide enough to show its face whole.
+// Photos whose people are tiny or distant list no faces: at that size a
+// divider crossing a figure is invisible, and claiming a box would be
+// guessing.
 
 export const SAMPLE_PHOTOS = [
   { id: 'police-chase', file: 'samples/police-chase.jpg', label: 'Police chase', faces: [] },
@@ -34,12 +37,18 @@ export const SAMPLE_PHOTOS = [
     id: 'hero-duo',
     file: 'samples/hero-duo.jpg',
     label: 'Hero duo',
-    // The cover's lead pair. Her head (braids included) runs 0.27–0.46,
-    // his 0.55–0.76; the old equal dividers at 0.40 and 0.60 cut straight
-    // through both faces.
+    // The cover's lead pair, re-measured twice from the photo at full
+    // size, including a second pass after the first render: her left
+    // ear (hoop earring) starts at 0.215 — the outer helix, not the
+    // cheek — and her jawline ends at 0.46; his beard starts at 0.54
+    // and the rightmost edge of his head (beard, with the small ear
+    // tucked under the beanie at ~0.75) ends at 0.78. The v7 boxes
+    // ([0.27, 0.46] and [0.55, 0.76]) missed both outer ears, which is
+    // why the v7 strips cut them. These boxes hold the whole head at
+    // face height, ear to ear, with a little air to spare.
     faces: [
-      [0.27, 0.46],
-      [0.55, 0.76],
+      [0.215, 0.46],
+      [0.54, 0.78],
     ],
   },
   {
