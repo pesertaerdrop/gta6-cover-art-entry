@@ -8,71 +8,92 @@
 
 export const TITLE_BAND = 0.21; // fraction of the cover height
 
-// One rect, relative: x/y/w/h in 0..1 of the art area.
-function rect(x, y, w, h, extra) {
+// One panel, relative: x/y/w/h in 0..1 of the art area.
+function cell(x, y, w, h, extra) {
   return { x, y, w, h, ...(extra || {}) };
 }
 
-function gridPanels(W, H, cols, rows, gutter) {
-  const cw = (W - gutter * (cols - 1)) / cols;
-  const ch = (H - gutter * (rows - 1)) / rows;
+function gapSize(W, H, frac) {
+  return Math.round(Math.min(W, H) * frac);
+}
+
+function grid(W, H, cols, rows, gap) {
+  const cw = (W - gap * (cols - 1)) / cols;
+  const ch = (H - gap * (rows - 1)) / rows;
   const out = [];
   for (let i = 0; i < cols * rows; i++) {
     const r = Math.floor(i / cols);
     const c = i % cols;
-    out.push(rect((c * (cw + gutter)) / W, (r * (ch + gutter)) / H, cw / W, ch / H));
+    out.push(cell((c * (cw + gap)) / W, (r * (ch + gap)) / H, cw / W, ch / H));
   }
   return out;
 }
 
-function gutter(W, H, frac) {
-  return Math.round(Math.min(W, H) * frac);
-}
-
 export const LAYOUTS = [
-  { id: "nine", name: "Nine-Panel Grid", blurb: "The classic poster wall",
-    panels(W, H) { return gridPanels(W, H, 3, 3, gutter(W, H, 0.014)); } },
-  { id: "heroThree", name: "Hero and Three", blurb: "One big moment, three more",
+  {
+    id: "nine", name: "Nine-Panel Grid",
+    blurb: "The classic poster wall",
+    panels(W, H) { return grid(W, H, 3, 3, gapSize(W, H, 0.014)); },
+  },
+  {
+    id: "heroThree", name: "Hero and Three",
+    blurb: "One big moment, three more",
     panels(W, H) {
-      const g = gutter(W, H, 0.014);
-      const heroW = (W - g) * 0.62;
-      const sideW = W - heroW - g;
-      const sideH = (H - 2 * g) / 3;
-      const out = [rect(0, 0, heroW / W, 1)];
+      const gap = gapSize(W, H, 0.014);
+      const heroWidth = (W - gap) * 0.62;
+      const sideWidth = W - heroWidth - gap;
+      const sideHeight = (H - 2 * gap) / 3;
+      const out = [cell(0, 0, heroWidth / W, 1)];
       for (let i = 0; i < 3; i++) {
-        out.push(rect((heroW + g) / W, (i * (sideH + g)) / H, sideW / W, sideH / H));
+        out.push(cell((heroWidth + gap) / W, (i * (sideHeight + gap)) / H, sideWidth / W, sideHeight / H));
       }
       return out;
-    } },
-  { id: "fullBleed", name: "Full Bleed", blurb: "One photo edge to edge",
-    panels() { return [rect(0, 0, 1, 1)]; } },
-  { id: "snapshots", name: "Tilted Snapshots", blurb: "Polaroid prints, tossed down",
+    },
+  },
+  {
+    id: "fullBleed", name: "Full Bleed",
+    blurb: "One photo edge to edge",
+    panels() { return [cell(0, 0, 1, 1)]; },
+  },
+  {
+    id: "snapshots", name: "Tilted Snapshots",
+    blurb: "Polaroid prints, tossed down",
     panels(W, H) {
-      const g = gutter(W, H, 0.02);
-      const pw = (W - 2 * g) / 3;
-      const ph = H * 0.82;
+      const gap = gapSize(W, H, 0.02);
+      const printW = (W - 2 * gap) / 3;
+      const printH = H * 0.82;
       const tilts = [-4, 2.5, -2];
       return [0, 1, 2].map((i) =>
-        rect((i * (pw + g)) / W, 0.06, pw / W, ph / H, { tilt: tilts[i], polaroid: true }));
-    } },
-  { id: "stripFive", name: "Strip Five", blurb: "One photo, five shots",
+        cell((i * (printW + gap)) / W, 0.06, printW / W, printH / H, { tilt: tilts[i], polaroid: true }));
+    },
+  },
+  {
+    id: "stripFive", name: "Strip Five",
+    blurb: "One photo, five shots",
     panels(W, H) {
-      const g = gutter(W, H, 0.012);
-      const sw = (W - 4 * g) / 5;
-      return [0, 1, 2, 3, 4].map((i) => rect((i * (sw + g)) / W, 0, sw / W, 1));
-    } },
-  { id: "splitDuo", name: "Split Duo", blurb: "Two moments, side by side",
+      const gap = gapSize(W, H, 0.012);
+      const stripW = (W - 4 * gap) / 5;
+      return [0, 1, 2, 3, 4].map((i) => cell((i * (stripW + gap)) / W, 0, stripW / W, 1));
+    },
+  },
+  {
+    id: "splitDuo", name: "Split Duo",
+    blurb: "Two moments, side by side",
     panels(W, H) {
-      const g = gutter(W, H, 0.014);
-      const w = (W - g) / 2;
-      return [rect(0, 0, w / W, 1), rect((w + g) / W, 0, w / W, 1)];
-    } },
-  { id: "comicStrip", name: "Comic Strip", blurb: "Three frames, one story",
+      const gap = gapSize(W, H, 0.014);
+      const halfW = (W - gap) / 2;
+      return [cell(0, 0, halfW / W, 1), cell((halfW + gap) / W, 0, halfW / W, 1)];
+    },
+  },
+  {
+    id: "comicStrip", name: "Comic Strip",
+    blurb: "Three frames, one story",
     panels(W, H) {
-      const g = gutter(W, H, 0.014);
-      const h = (H - 2 * g) / 3;
-      return [0, 1, 2].map((i) => rect(0, (i * (h + g)) / H, 1, h / H));
-    } },
+      const gap = gapSize(W, H, 0.014);
+      const stripH = (H - 2 * gap) / 3;
+      return [0, 1, 2].map((i) => cell(0, (i * (stripH + gap)) / H, 1, stripH / H));
+    },
+  },
 ];
 
 export function layoutById(id) {
@@ -102,7 +123,7 @@ export function framesForLayout(layoutId, library, deal, smartFrame) {
 export function layoutTileSVG(layoutId) {
   const W = 100;
   const H = 62;
-  const rects = layoutById(layoutId).panels(W, H).map((p) => {
+  const boxes = layoutById(layoutId).panels(W, H).map((p) => {
     const x = p.x * W;
     const y = p.y * H;
     const w = p.w * W;
@@ -111,5 +132,5 @@ export function layoutTileSVG(layoutId) {
     const cy = (y + h / 2).toFixed(1);
     return `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${w.toFixed(1)}" height="${h.toFixed(1)}" rx="2" fill="#f5b942" fill-opacity="0.85" transform="rotate(${p.tilt || 0} ${cx} ${cy})"/>`;
   });
-  return `<svg viewBox="0 0 100 62" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><rect x="0" y="0" width="100" height="62" rx="4" fill="#241016"/>${rects.join("")}</svg>`;
+  return `<svg viewBox="0 0 100 62" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><rect x="0" y="0" width="100" height="62" rx="4" fill="#241016"/>${boxes.join("")}</svg>`;
 }

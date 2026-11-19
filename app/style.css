@@ -1,13 +1,22 @@
 /* Afterglow Cover Studio — editor chrome.
-   Colours and fonts come only from the :root tokens below; no literal
+   Every colour and font comes from the :root tokens below; no literal
    colour or font-family appears anywhere else. Dark warm chrome, gold
    accent, no purple-blue gradient. */
 
 :root {
-  --bg: #150a0e; --bg-deep: #0d0508; --panel: #241016; --panel-line: #3a1c22;
-  --text: #ffe9c4; --text-muted: #c9a89a; --accent: #f5b942; --accent-ink: #14060a;
-  --pink: #ff5f7e; --pink-soft: #ff9ec4; --danger: #ff6b5e;
-  --radius: 10px; --radius-sm: 6px;
+  --bg: #150a0e;
+  --bg-deep: #0d0508;
+  --panel: #241016;
+  --panel-line: #3a1c22;
+  --text: #ffe9c4;
+  --text-muted: #c9a89a;
+  --accent: #f5b942;
+  --accent-ink: #14060a;
+  --pink: #ff5f7e;
+  --pink-soft: #ff9ec4;
+  --danger: #ff6b5e;
+  --radius: 10px;
+  --radius-sm: 6px;
   --font-display: "Anton", "Arial Narrow", sans-serif;
   --font-script: "Kaushan Script", cursive;
   --font-label: "Bebas Neue", "Arial Narrow", sans-serif;
@@ -19,43 +28,102 @@
 @font-face { font-family: "Kaushan Script"; src: url("fonts/KaushanScript-Regular.ttf") format("truetype"); font-weight: 400; font-display: swap; }
 @font-face { font-family: "Bebas Neue"; src: url("fonts/BebasNeue-Regular.ttf") format("truetype"); font-weight: 400; font-display: swap; }
 
-/* Base: full-height app column, no horizontal scroll. */
+/* Base: the app is a full-height column, no horizontal scroll. */
 * { box-sizing: border-box; }
 html, body { overflow-x: clip; height: 100%; }
 body { margin: 0; background: var(--bg); color: var(--text); font-family: var(--font-body); font-size: 14px; line-height: 1.45; }
 #app { display: flex; flex-direction: column; height: 100vh; min-height: 560px; }
 
-/* Shot mode (?shot=cover): hide the editor, show the cover canvas full-frame. */
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+
+/* Shot mode (?shot=cover): the editor hides, the cover canvas goes full-frame. */
 body.shot-cover { background: #0d0508; }
 body.shot-cover #app { display: none; }
 body.shot-cover #shotCanvas { display: block; width: 100vw; height: 100vh; }
 
-@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
-
-/* Top bar: brand left, numbered steps centre-right, actions right. */
-#topbar { display: flex; align-items: center; gap: 18px; padding: 10px 16px; background: var(--bg-deep); border-bottom: 1px solid var(--panel-line); flex: 0 0 auto; }
-.brand { display: flex; align-items: baseline; gap: 10px; min-width: 0; }
-.mark { font-family: var(--font-display); font-size: 20px; color: var(--accent-ink); background: var(--accent); border-radius: var(--radius-sm); padding: 2px 8px; line-height: 1.2; }
-.brand-name { font-family: var(--font-display); font-size: 20px; letter-spacing: 0.02em; white-space: nowrap; }
-.brand-tag { color: var(--text-muted); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.steps { display: flex; gap: 6px; list-style: none; margin: 0 0 0 auto; padding: 0; color: var(--text-muted); font-size: 13px; white-space: nowrap; }
-.steps li b { display: inline-block; width: 20px; height: 20px; line-height: 20px; text-align: center; border-radius: 50%; background: var(--accent); color: var(--accent-ink); margin-right: 5px; font-family: var(--font-label); font-size: 13px; }
-.top-actions { display: flex; gap: 8px; align-items: center; }
-
-/* Buttons: one style, gold for the primary action, press scale 0.97. */
-button { font-family: var(--font-body); font-size: 13px; color: var(--text); background: var(--panel); border: 1px solid var(--panel-line); border-radius: var(--radius-sm); padding: 8px 12px; cursor: pointer; transition: transform 120ms var(--ease-out), background 120ms var(--ease-out), border-color 120ms var(--ease-out); }
+/* Buttons: one style for all of them, gold for the primary action,
+   a small press scale on click, gold border on hover. */
+button {
+  font-family: var(--font-body);
+  font-size: 13px;
+  color: var(--text);
+  background: var(--panel);
+  border: 1px solid var(--panel-line);
+  border-radius: var(--radius-sm);
+  padding: 8px 12px;
+  cursor: pointer;
+  transition: transform 120ms var(--ease-out), background 120ms var(--ease-out), border-color 120ms var(--ease-out);
+}
 button:hover { border-color: var(--accent); }
 button:active { transform: scale(0.97); }
 button:disabled { opacity: 0.4; cursor: default; }
 button:disabled:hover { border-color: var(--panel-line); }
-button.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 700; padding: 10px 16px; }
+button.primary {
+  background: var(--accent);
+  color: var(--accent-ink);
+  border-color: var(--accent);
+  font-weight: 700;
+  padding: 10px 16px;
+}
 button.primary:hover { background: #ffc95e; }
 button[aria-pressed="true"], button.active { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
 button:focus-visible, input:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--pink-soft); outline-offset: 2px; }
 
-/* Workspace: photo rail, stage, tool rail. */
-#workspace { display: grid; grid-template-columns: 264px minmax(0, 1fr) 296px; gap: 12px; padding: 12px 16px; flex: 1 1 auto; min-height: 0; }
-#railPhotos, #railTools { background: var(--panel); border: 1px solid var(--panel-line); border-radius: var(--radius); padding: 12px; overflow-y: auto; min-height: 0; }
+/* Top bar: brand on the left, numbered steps centre-right, actions right. */
+#topbar {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 10px 16px;
+  background: var(--bg-deep);
+  border-bottom: 1px solid var(--panel-line);
+  flex: 0 0 auto;
+}
+.brand { display: flex; align-items: baseline; gap: 10px; min-width: 0; }
+.mark {
+  font-family: var(--font-display);
+  font-size: 20px;
+  color: var(--accent-ink);
+  background: var(--accent);
+  border-radius: var(--radius-sm);
+  padding: 2px 8px;
+  line-height: 1.2;
+}
+.brand-name { font-family: var(--font-display); font-size: 20px; letter-spacing: 0.02em; white-space: nowrap; }
+.brand-tag { color: var(--text-muted); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.steps { display: flex; gap: 6px; list-style: none; margin: 0 0 0 auto; padding: 0; color: var(--text-muted); font-size: 13px; white-space: nowrap; }
+.steps li b {
+  display: inline-block;
+  width: 20px;
+  height: 20px;
+  line-height: 20px;
+  text-align: center;
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--accent-ink);
+  margin-right: 5px;
+  font-family: var(--font-label);
+  font-size: 13px;
+}
+.top-actions { display: flex; gap: 8px; align-items: center; }
+
+/* Workspace: photo rail on the left, stage in the middle, tool rail right. */
+#workspace {
+  display: grid;
+  grid-template-columns: 264px minmax(0, 1fr) 296px;
+  gap: 12px;
+  padding: 12px 16px;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+#railPhotos, #railTools {
+  background: var(--panel);
+  border: 1px solid var(--panel-line);
+  border-radius: var(--radius);
+  padding: 12px;
+  overflow-y: auto;
+  min-height: 0;
+}
 #railPhotos h2, #railTools h2 { font-family: var(--font-label); font-size: 19px; letter-spacing: 0.06em; color: var(--accent); margin: 14px 0 8px; }
 #railPhotos h2:first-child, #railTools h2:first-child { margin-top: 0; }
 #railPhotos > button, #railPhotos .row button { width: 100%; margin-bottom: 8px; }
@@ -63,23 +131,48 @@ button:focus-visible, input:focus-visible, [tabindex]:focus-visible { outline: 2
 #railPhotos .row button { margin-bottom: 8px; }
 .note { color: var(--text-muted); font-size: 12px; margin: 8px 0 0; }
 
-/* Photo tray: 3-column grid of labelled thumbnails. */
+/* Stage: the live preview canvas, the hint line, the panel controls. */
+#stage {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  min-height: 0;
+}
+#previewWrap { flex: 1 1 auto; min-height: 0; display: flex; align-items: center; justify-content: center; width: 100%; }
+#previewCanvas {
+  max-width: 100%;
+  max-height: 100%;
+  border-radius: var(--radius-sm);
+  box-shadow: 0 10px 32px rgba(0, 0, 0, 0.5);
+  cursor: grab;
+  touch-action: none;
+}
+#previewCanvas:active { cursor: grabbing; }
+#hintLine { color: var(--text-muted); font-size: 13px; margin: 0; text-align: center; }
+#panelControls {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  justify-content: center;
+  background: var(--panel);
+  border: 1px solid var(--panel-line);
+  border-radius: var(--radius);
+  padding: 8px 14px;
+  font-size: 12px;
+}
+#panelControls label { display: flex; align-items: center; gap: 6px; color: var(--text-muted); }
+#panelControls input[type="range"] { width: 110px; accent-color: var(--accent); }
+#selectedPanelLabel { color: var(--accent); font-family: var(--font-label); font-size: 16px; letter-spacing: 0.05em; }
+
+/* Photo tray: a 3-column grid of labelled thumbnails. */
 #photoTray { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; margin-top: 4px; }
 #photoTray button { padding: 0; border-radius: var(--radius-sm); overflow: hidden; border: 2px solid transparent; aspect-ratio: 3 / 2; background: var(--bg-deep); }
 #photoTray button img { width: 100%; height: 100%; object-fit: cover; display: block; }
 #photoTray button[aria-pressed="true"] { border-color: var(--pink); }
 #photoTray button span { display: block; font-size: 10px; padding: 2px 4px; background: rgba(13, 5, 8, 0.85); color: var(--text); text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-
-/* Stage: live preview canvas, hint line, panel controls. */
-#stage { display: flex; flex-direction: column; align-items: center; gap: 8px; min-width: 0; min-height: 0; }
-#previewWrap { flex: 1 1 auto; min-height: 0; display: flex; align-items: center; justify-content: center; width: 100%; }
-#previewCanvas { max-width: 100%; max-height: 100%; border-radius: var(--radius-sm); box-shadow: 0 10px 32px rgba(0, 0, 0, 0.5); cursor: grab; touch-action: none; }
-#previewCanvas:active { cursor: grabbing; }
-#hintLine { color: var(--text-muted); font-size: 13px; margin: 0; text-align: center; }
-#panelControls { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; justify-content: center; background: var(--panel); border: 1px solid var(--panel-line); border-radius: var(--radius); padding: 8px 14px; font-size: 12px; }
-#panelControls label { display: flex; align-items: center; gap: 6px; color: var(--text-muted); }
-#panelControls input[type="range"] { width: 110px; accent-color: var(--accent); }
-#selectedPanelLabel { color: var(--accent); font-family: var(--font-label); font-size: 16px; letter-spacing: 0.05em; }
 
 /* Right rail: layout tiles, grade chips, ink controls, words, sizes. */
 #layoutTiles { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }

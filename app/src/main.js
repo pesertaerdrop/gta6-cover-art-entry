@@ -1,8 +1,10 @@
 // main.js — the Afterglow editor.
 //
-// State, history, preview, panels, uploads, presets and export. The
-// cover renders natively at every size from one relative state; the
-// preview is the same render at a smaller backing store.
+// One relative cover state drives everything: the live preview, the
+// panel reframe controls and the PNG export all render from it, so
+// what you see is what the export writes. History is a 50-deep stack
+// of cover snapshots; a hand-set crop is remembered per photo, so it
+// survives a layout change.
 
 import { loadSampleLibrary, smartFrame, readUserFiles } from "./photos.js";
 import { GRADES } from "./grades.js";
@@ -12,29 +14,30 @@ import { freshCover, dealCover, changeLayout, makeHistory } from "./state.js";
 import { PRESETS } from "./presets.js";
 import { readShotScene, applySceneToCover, markShotReady } from "./shots.js";
 
-// Small DOM helpers.
+// ---------- tiny DOM helpers ----------
+
 const $ = (id) => document.getElementById(id);
-function on(id, event, fn, opts) {
-  $(id).addEventListener(event, fn, opts);
-}
-const canvas = $("previewCanvas");
+const listen = (id, event, fn, opts) => $(id).addEventListener(event, fn, opts);
+const previewCanvas = $("previewCanvas");
+
+// ---------- editor state ----------
 
 let library = [];
 let cover = freshCover();
 let history = makeHistory(cover);
 let selected = 0;
-let drag = null;
-const keptFrames = new Map(); // photoId -> last hand-set frame
+let pointerDrag = null;
+const savedCrops = new Map(); // photoId -> last hand-set frame
 
-const scene = readShotScene();
-const ART_SHARE = 1 - TITLE_BAND; // fraction of the cover that is art
+const shotScene = readShotScene();
+const ART_FRACTION = 1 - TITLE_BAND; // share of the cover that is art
 
-// ---------- boot ----------
+// ---------- startup ----------
 
 async function boot() {
-  buildTiles();
-  buildChips();
-  wireControls();
+  buildLayoutTiles();
+  buildChoiceChips();
+  wireAllControls();
   try {
     await Promise.all([
       document.fonts.load('40px Anton'),
@@ -44,299 +47,301 @@ async function boot() {
     ]);
   } catch (_) { /* fonts fall back; the render still draws */ }
   library = await loadSampleLibrary();
-  buildTray();
-  cover = applySceneToCover(cover, scene);
-  if (scene.size && SIZES[scene.size]) cover.size = scene.size;
+  buildPhotoTray();
+  cover = applySceneToCover(cover, shotScene);
+  if (shotScene.size && SIZES[shotScene.size]) cover.size = shotScene.size;
   cover = dealCover(library, cover);
   history = makeHistory(cover);
   $("inputTitle").value = cover.title;
   $("inputSubtitle").value = cover.subtitle;
   $("inputTagline").value = cover.tagline;
 
-  if (scene.mode === "cover") {
+  if (shotScene.mode === "cover") {
     document.body.classList.add("shot-cover");
     const shot = $("shotCanvas");
     shot.width = window.innerWidth;
     shot.height = window.innerHeight;
-    renderCover(shot, shot.width, shot.height, { ...cover, photoById: photoById() });
+    renderCover(shot, shot.width, shot.height, { ...cover, photoById: photoIndex() });
     markShotReady();
     return;
   }
-  renderPreview();
+  drawPreview();
   markShotReady();
 }
 
-// ---------- render ----------
+// ---------- preview + control sync ----------
 
-function photoById() {
-  const map = {};
-  for (const p of library) map[p.id] = p;
-  return map;
+function photoIndex() {
+  const index = {};
+  for (const p of library) index[p.id] = p;
+  return index;
 }
 
-function renderPreview() {
-  const size = SIZES[cover.size];
-  const scale = Math.min(1, 860 / Math.max(size.w, size.h));
-  const bw = Math.round(size.w * scale);
-  const bh = Math.round(size.h * scale);
-  if (canvas.width !== bw || canvas.height !== bh) {
-    canvas.width = bw;
-    canvas.height = bh;
+function drawPreview() {
+  const dims = SIZES[cover.size];
+  const fit = Math.min(1, 860 / Math.max(dims.w, dims.h));
+  const w = Math.round(dims.w * fit);
+  const h = Math.round(dims.h * fit);
+  if (previewCanvas.width !== w || previewCanvas.height !== h) {
+    previewCanvas.width = w;
+    previewCanvas.height = h;
   }
-  renderCover(canvas, bw, bh, { ...cover, photoById: photoById() }, { fast: !!drag });
+  renderCover(previewCanvas, w, h, { ...cover, photoById: photoIndex() }, { fast: !!pointerDrag });
   syncControls();
 }
 
-function markActive(selector, attr, value) {
-  document.querySelectorAll(selector).forEach((b) => {
-    const active = b.dataset[attr] === value;
-    b.classList.toggle("active", active);
-    b.setAttribute("aria-pressed", active ? "true" : "false");
+function syncToggleGroup(selector, attr, value) {
+  document.querySelectorAll(selector).forEach((btn) => {
+    const on = btn.dataset[attr] === value;
+    btn.classList.toggle("active", on);
+    btn.setAttribute("aria-pressed", on ? "true" : "false");
   });
 }
 
 function syncControls() {
   $("btnUndo").disabled = !history.canUndo;
   $("btnRedo").disabled = !history.canRedo;
-  const frame = cover.frames[selected];
-  const panelCount = layoutById(cover.layout).panels(1000, 1000).length;
-  $("selectedPanelLabel").textContent = `Panel ${selected + 1} of ${panelCount}`;
-  if (frame) {
-    $("zoomSlider").value = frame.zoom;
-    $("panXSlider").value = frame.panX;
-    $("panYSlider").value = frame.panY;
+  const panelFrame = cover.frames[selected];
+  const count = layoutById(cover.layout).panels(1000, 1000).length;
+  $("selectedPanelLabel").textContent = `Panel ${selected + 1} of ${count}`;
+  if (panelFrame) {
+    $("zoomSlider").value = panelFrame.zoom;
+    $("panXSlider").value = panelFrame.panX;
+    $("panYSlider").value = panelFrame.panY;
   }
   $("hintLine").textContent =
     `${library.length} photos ready. Drag a panel to reframe it, then Export.`;
-  markActive("#layoutTiles button", "layout", cover.layout);
-  markActive("#gradeChips button", "grade", cover.grade);
-  markActive("#sizeChips button", "size", cover.size);
+  syncToggleGroup("#layoutTiles button", "layout", cover.layout);
+  syncToggleGroup("#gradeChips button", "grade", cover.grade);
+  syncToggleGroup("#sizeChips button", "size", cover.size);
   $("inkToggle").checked = cover.inkOn;
   $("inkSlider").value = cover.inkStrength;
   $("inkSlider").disabled = !cover.inkOn;
 }
 
-function commit(next) {
-  cover = next;
+// Save a new cover state to history and redraw; preview a change
+// without touching history.
+function saveChange(updated) {
+  cover = updated;
   history.push(cover);
-  renderPreview();
+  drawPreview();
 }
 
-function applyCover(next) {
-  cover = next;
-  renderPreview();
+function previewChange(updated) {
+  cover = updated;
+  drawPreview();
 }
 
 // ---------- photo tray ----------
 
-function buildTray() {
-  const tray = $("photoTray");
-  tray.innerHTML = "";
+function buildPhotoTray() {
+  const rail = $("photoTray");
+  rail.innerHTML = "";
   for (const photo of library) {
-    const b = document.createElement("button");
-    b.type = "button";
-    b.dataset.photo = photo.id;
-    b.setAttribute("aria-pressed", "false");
-    const img = document.createElement("img");
-    img.src = photo.src;
-    img.alt = photo.label;
-    img.draggable = false;
-    const label = document.createElement("span");
-    label.textContent = photo.label;
-    b.append(img, label);
-    b.addEventListener("click", () => assignPhotoToSelected(photo.id));
-    tray.appendChild(b);
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.dataset.photo = photo.id;
+    btn.setAttribute("aria-pressed", "false");
+    const thumb = document.createElement("img");
+    thumb.src = photo.src;
+    thumb.alt = photo.label;
+    thumb.draggable = false;
+    const caption = document.createElement("span");
+    caption.textContent = photo.label;
+    btn.append(thumb, caption);
+    btn.addEventListener("click", () => putPhotoInSelected(photo.id));
+    rail.appendChild(btn);
   }
 }
 
-function assignPhotoToSelected(photoId) {
-  const photo = library.find((p) => p.id === photoId);
-  if (!photo || !cover.frames[selected]) return;
-  const panels = layoutById(cover.layout).panels(1000, 1000);
-  const aspect = panels[selected].w / panels[selected].h;
-  const frame = keptFrames.has(photoId)
-    ? { ...keptFrames.get(photoId), photoId }
-    : { ...smartFrame(photo, aspect), photoId };
-  const frames = cover.frames.slice();
-  frames[selected] = frame;
-  commit({ ...cover, frames });
+function putPhotoInSelected(photoId) {
+  const pick = library.find((p) => p.id === photoId);
+  if (!pick || !cover.frames[selected]) return;
+  const slots = layoutById(cover.layout).panels(1000, 1000);
+  const ratio = slots[selected].w / slots[selected].h;
+  const framing = savedCrops.has(photoId)
+    ? { ...savedCrops.get(photoId), photoId }
+    : { ...smartFrame(pick, ratio), photoId };
+  const allFrames = cover.frames.slice();
+  allFrames[selected] = framing;
+  saveChange({ ...cover, frames: allFrames });
 }
 
-// ---------- layout / grade / size / presets ----------
+// ---------- layout tiles, grade/size chips, presets ----------
 
-function buildTiles() {
-  const wrap = $("layoutTiles");
-  for (const layout of LAYOUTS) {
-    const b = document.createElement("button");
-    b.type = "button";
-    b.dataset.layout = layout.id;
-    b.innerHTML = layoutTileSVG(layout.id) + `<span>${layout.name}</span>`;
-    b.title = layout.blurb;
-    b.addEventListener("click", () => {
+function buildLayoutTiles() {
+  const rail = $("layoutTiles");
+  for (const entry of LAYOUTS) {
+    const tile = document.createElement("button");
+    tile.type = "button";
+    tile.dataset.layout = entry.id;
+    tile.innerHTML = layoutTileSVG(entry.id) + `<span>${entry.name}</span>`;
+    tile.title = entry.blurb;
+    tile.addEventListener("click", () => {
       selected = 0;
-      commit(changeLayout(library, cover, layout.id));
+      saveChange(changeLayout(library, cover, entry.id));
     });
-    wrap.appendChild(b);
+    rail.appendChild(tile);
   }
 }
 
-function buildChips() {
-  const grades = $("gradeChips");
-  for (const g of GRADES) {
-    const b = document.createElement("button");
-    b.type = "button";
-    b.dataset.grade = g.id;
-    b.textContent = g.name;
-    b.addEventListener("click", () => commit({ ...cover, grade: g.id }));
-    grades.appendChild(b);
+function buildChoiceChips() {
+  const gradeRail = $("gradeChips");
+  for (const grade of GRADES) {
+    const chip = document.createElement("button");
+    chip.type = "button";
+    chip.dataset.grade = grade.id;
+    chip.textContent = grade.name;
+    chip.addEventListener("click", () => saveChange({ ...cover, grade: grade.id }));
+    gradeRail.appendChild(chip);
   }
-  const sizes = $("sizeChips");
-  for (const [id, s] of Object.entries(SIZES)) {
-    const b = document.createElement("button");
-    b.type = "button";
-    b.dataset.size = id;
-    b.textContent = `${s.w} x ${s.h}`;
-    b.addEventListener("click", () => commit({ ...cover, size: id }));
-    sizes.appendChild(b);
+  const sizeRail = $("sizeChips");
+  for (const [id, dims] of Object.entries(SIZES)) {
+    const chip = document.createElement("button");
+    chip.type = "button";
+    chip.dataset.size = id;
+    chip.textContent = `${dims.w} x ${dims.h}`;
+    chip.addEventListener("click", () => saveChange({ ...cover, size: id }));
+    sizeRail.appendChild(chip);
   }
-  const presets = $("presetList");
-  for (const p of PRESETS) {
-    const b = document.createElement("button");
-    b.type = "button";
-    b.textContent = p.name;
-    b.addEventListener("click", () => {
-      let next = { ...cover, ...p.cover };
-      if (p.cover.layout !== cover.layout) {
-        next = changeLayout(library, next, p.cover.layout);
+  const presetRail = $("presetList");
+  for (const preset of PRESETS) {
+    const chip = document.createElement("button");
+    chip.type = "button";
+    chip.textContent = preset.name;
+    chip.addEventListener("click", () => {
+      let updated = { ...cover, ...preset.cover };
+      if (preset.cover.layout !== cover.layout) {
+        updated = changeLayout(library, updated, preset.cover.layout);
       }
       selected = 0;
-      commit(next);
+      saveChange(updated);
     });
-    presets.appendChild(b);
+    presetRail.appendChild(chip);
   }
 }
 
-// ---------- panel selection & reframe ----------
+// ---------- panel picking + reframing ----------
 
-function clampFrame(f) {
-  f.zoom = Math.max(1, Math.min(3, f.zoom));
-  f.panX = Math.max(-1, Math.min(1, f.panX));
-  f.panY = Math.max(-1, Math.min(1, f.panY));
-  return f;
+function clampCrop(frame) {
+  frame.zoom = Math.max(1, Math.min(3, frame.zoom));
+  frame.panX = Math.max(-1, Math.min(1, frame.panX));
+  frame.panY = Math.max(-1, Math.min(1, frame.panY));
+  return frame;
 }
 
-function panelAt(clientX, clientY) {
-  const rect = canvas.getBoundingClientRect();
-  const bx = ((clientX - rect.left) / rect.width) * canvas.width;
-  const by = ((clientY - rect.top) / rect.height) * canvas.height;
-  const artH = canvas.height * ART_SHARE;
-  if (by > artH) return -1;
-  const panels = layoutById(cover.layout).panels(canvas.width, artH);
-  for (let i = 0; i < panels.length; i++) {
-    const p = panels[i];
-    const inX = bx >= p.x * canvas.width && bx <= (p.x + p.w) * canvas.width;
-    const inY = by >= p.y * artH && by <= (p.y + p.h) * artH;
-    if (inX && inY) return i;
+function panelUnderPoint(clientX, clientY) {
+  const box = previewCanvas.getBoundingClientRect();
+  const px = ((clientX - box.left) / box.width) * previewCanvas.width;
+  const py = ((clientY - box.top) / box.height) * previewCanvas.height;
+  const artHeight = previewCanvas.height * ART_FRACTION;
+  if (py > artHeight) return -1;
+  const slots = layoutById(cover.layout).panels(previewCanvas.width, artHeight);
+  for (let i = 0; i < slots.length; i++) {
+    const slot = slots[i];
+    const hitX = px >= slot.x * previewCanvas.width && px <= (slot.x + slot.w) * previewCanvas.width;
+    const hitY = py >= slot.y * artHeight && py <= (slot.y + slot.h) * artHeight;
+    if (hitX && hitY) return i;
   }
   return -1;
 }
 
-function updateFrame(i, patch, pushHistory) {
-  const frames = cover.frames.slice();
-  const next = clampFrame({ ...frames[i], ...patch });
-  frames[i] = next;
-  keptFrames.set(next.photoId, { ...next });
-  if (pushHistory) commit({ ...cover, frames });
-  else applyCover({ ...cover, frames });
+function setFrame(i, patch, save) {
+  const allFrames = cover.frames.slice();
+  const updated = clampCrop({ ...allFrames[i], ...patch });
+  allFrames[i] = updated;
+  savedCrops.set(updated.photoId, { ...updated });
+  if (save) saveChange({ ...cover, frames: allFrames });
+  else previewChange({ ...cover, frames: allFrames });
 }
 
-function resetSelectedCrop() {
-  const frame = cover.frames[selected];
-  if (!frame) return;
-  const photo = library.find((p) => p.id === frame.photoId);
-  if (!photo) return;
-  const panels = layoutById(cover.layout).panels(1000, 1000);
-  const aspect = panels[selected].w / panels[selected].h;
-  updateFrame(selected, { ...smartFrame(photo, aspect), photoId: photo.id }, true);
+function resetCrop() {
+  const panelFrame = cover.frames[selected];
+  if (!panelFrame) return;
+  const pick = library.find((p) => p.id === panelFrame.photoId);
+  if (!pick) return;
+  const slots = layoutById(cover.layout).panels(1000, 1000);
+  const ratio = slots[selected].w / slots[selected].h;
+  setFrame(selected, { ...smartFrame(pick, ratio), photoId: pick.id }, true);
 }
 
-// ---------- all the wiring ----------
+// ---------- wiring ----------
 
-function wireControls() {
-  canvas.addEventListener("pointerdown", (e) => {
-    const i = panelAt(e.clientX, e.clientY);
-    if (i < 0) return;
-    selected = i;
-    drag = { panel: i, x: e.clientX, y: e.clientY };
-    canvas.setPointerCapture(e.pointerId);
-    renderPreview();
+function wireAllControls() {
+  previewCanvas.addEventListener("pointerdown", (e) => {
+    const idx = panelUnderPoint(e.clientX, e.clientY);
+    if (idx < 0) return;
+    selected = idx;
+    pointerDrag = { panel: idx, x: e.clientX, y: e.clientY };
+    previewCanvas.setPointerCapture(e.pointerId);
+    drawPreview();
   });
 
-  canvas.addEventListener("pointermove", (e) => {
-    if (!drag) return;
-    const rect = canvas.getBoundingClientRect();
-    const i = drag.panel;
-    const artH = canvas.height * ART_SHARE;
-    const panels = layoutById(cover.layout).panels(canvas.width, artH);
-    const p = panels[i];
-    const dx = ((e.clientX - drag.x) / rect.width) * canvas.width;
-    const dy = ((e.clientY - drag.y) / rect.height) * canvas.height;
-    drag.x = e.clientX;
-    drag.y = e.clientY;
-    const frame = cover.frames[i];
-    if (!frame) return;
-    updateFrame(i, {
-      panX: frame.panX + (dx / (p.w * canvas.width)) * 2.2,
-      panY: frame.panY + (dy / (p.h * artH)) * 2.2,
+  previewCanvas.addEventListener("pointermove", (e) => {
+    if (!pointerDrag) return;
+    const box = previewCanvas.getBoundingClientRect();
+    const idx = pointerDrag.panel;
+    const artHeight = previewCanvas.height * ART_FRACTION;
+    const slots = layoutById(cover.layout).panels(previewCanvas.width, artHeight);
+    const slot = slots[idx];
+    const moveX = ((e.clientX - pointerDrag.x) / box.width) * previewCanvas.width;
+    const moveY = ((e.clientY - pointerDrag.y) / box.height) * previewCanvas.height;
+    pointerDrag.x = e.clientX;
+    pointerDrag.y = e.clientY;
+    const panelFrame = cover.frames[idx];
+    if (!panelFrame) return;
+    setFrame(idx, {
+      panX: panelFrame.panX + (moveX / (slot.w * previewCanvas.width)) * 2.2,
+      panY: panelFrame.panY + (moveY / (slot.h * artHeight)) * 2.2,
     }, false);
   });
 
-  canvas.addEventListener("pointerup", () => {
-    if (!drag) return;
-    drag = null;
+  previewCanvas.addEventListener("pointerup", () => {
+    if (!pointerDrag) return;
+    pointerDrag = null;
     history.push(cover);
-    renderPreview();
+    drawPreview();
   });
 
-  canvas.addEventListener("wheel", (e) => {
+  previewCanvas.addEventListener("wheel", (e) => {
     e.preventDefault();
-    const frame = cover.frames[selected];
-    if (!frame) return;
-    updateFrame(selected, { zoom: frame.zoom * Math.exp(-e.deltaY * 0.0012) }, true);
+    const panelFrame = cover.frames[selected];
+    if (!panelFrame) return;
+    setFrame(selected, { zoom: panelFrame.zoom * Math.exp(-e.deltaY * 0.0012) }, true);
   }, { passive: false });
 
   // Sliders: live update while dragging, one history entry on release.
   for (const [id, key] of [["zoomSlider", "zoom"], ["panXSlider", "panX"], ["panYSlider", "panY"]]) {
-    on(id, "input", (e) => {
-      const frame = cover.frames[selected];
-      if (frame) updateFrame(selected, { [key]: Number(e.target.value) }, false);
+    listen(id, "input", (e) => {
+      const panelFrame = cover.frames[selected];
+      if (panelFrame) setFrame(selected, { [key]: Number(e.target.value) }, false);
     });
-    on(id, "change", () => history.push(cover));
+    listen(id, "change", () => history.push(cover));
   }
-  on("btnResetCrop", "click", resetSelectedCrop);
+  listen("btnResetCrop", "click", resetCrop);
 
   // Words: live preview while typing, one history entry on change.
   for (const [id, key] of [["inputTitle", "title"], ["inputSubtitle", "subtitle"], ["inputTagline", "tagline"]]) {
-    on(id, "input", (e) => {
+    listen(id, "input", (e) => {
       cover = { ...cover, [key]: e.target.value };
-      renderPreview();
+      drawPreview();
     });
-    on(id, "change", () => history.push(cover));
+    listen(id, "change", () => history.push(cover));
   }
 
   // Ink: toggle commits, slider previews live.
-  on("inkToggle", "change", (e) => commit({ ...cover, inkOn: e.target.checked }));
-  on("inkSlider", "input", (e) => applyCover({ ...cover, inkStrength: Number(e.target.value), inkOn: true }));
-  on("inkSlider", "change", () => history.push(cover));
+  listen("inkToggle", "change", (e) => saveChange({ ...cover, inkOn: e.target.checked }));
+  listen("inkSlider", "input", (e) => previewChange({ ...cover, inkStrength: Number(e.target.value), inkOn: true }));
+  listen("inkSlider", "change", () => history.push(cover));
 
   // Undo / redo, buttons and keys.
-  on("btnUndo", "click", () => {
+  listen("btnUndo", "click", () => {
     const prev = history.undo();
-    if (prev) { cover = prev; selected = 0; renderPreview(); }
+    if (prev) { cover = prev; selected = 0; drawPreview(); }
   });
-  on("btnRedo", "click", () => {
+  listen("btnRedo", "click", () => {
     const next = history.redo();
-    if (next) { cover = next; selected = 0; renderPreview(); }
+    if (next) { cover = next; selected = 0; drawPreview(); }
   });
   document.addEventListener("keydown", (e) => {
     const mod = e.ctrlKey || e.metaKey;
@@ -350,30 +355,30 @@ function wireControls() {
     }
   });
 
-  on("btnExportAll", "click", exportAllSizes);
+  listen("btnExportAll", "click", exportAllSizes);
 
   // Photos: samples, auto-fill, shuffle, upload.
-  on("btnSamples", "click", () => {
+  listen("btnSamples", "click", () => {
     selected = 0;
-    commit(dealCover(library, { ...cover, dealStart: 0 }));
+    saveChange(dealCover(library, { ...cover, dealStart: 0 }));
   });
-  on("btnAutofill", "click", () => {
+  listen("btnAutofill", "click", () => {
     selected = 0;
-    commit(dealCover(library, { ...cover, dealStart: (cover.dealStart || 0) + 1 }));
+    saveChange(dealCover(library, { ...cover, dealStart: (cover.dealStart || 0) + 1 }));
   });
-  on("btnShuffle", "click", () => {
+  listen("btnShuffle", "click", () => {
     const shuffled = library.slice();
     for (let i = shuffled.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
       [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
     }
     library = shuffled;
-    buildTray();
+    buildPhotoTray();
     selected = 0;
-    commit(dealCover(library, cover));
+    saveChange(dealCover(library, cover));
   });
-  on("btnUpload", "click", () => $("fileInput").click());
-  on("fileInput", "change", async (e) => {
+  listen("btnUpload", "click", () => $("fileInput").click());
+  listen("fileInput", "change", async (e) => {
     await addUserFiles(e.target.files);
     e.target.value = "";
   });
@@ -383,46 +388,46 @@ function wireControls() {
     await addUserFiles(e.dataTransfer.files);
   });
   document.addEventListener("paste", async (e) => {
-    if (scene.mode === "cover") return;
+    if (shotScene.mode === "cover") return;
     const files = [...(e.clipboardData?.files || [])];
     if (files.length) await addUserFiles(files);
   });
 }
 
 async function addUserFiles(files) {
-  const recs = await readUserFiles(files);
-  if (!recs.length) return;
-  library = [...library, ...recs];
-  buildTray();
-  renderPreview();
+  const added = await readUserFiles(files);
+  if (!added.length) return;
+  library = [...library, ...added];
+  buildPhotoTray();
+  drawPreview();
 }
 
 function downloadBlob(blob, name) {
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = name;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 5000);
+  const href = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = href;
+  link.download = name;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(href), 5000);
 }
 
 async function exportAllSizes() {
-  const btn = $("btnExportAll");
-  btn.disabled = true;
-  btn.textContent = "Exporting…";
+  const button = $("btnExportAll");
+  button.disabled = true;
+  button.textContent = "Exporting…";
   try {
-    const view = { ...cover, photoById: photoById() };
-    for (const sizeId of ["square", "portrait", "wide"]) {
-      const blob = await exportCoverBlob(view, sizeId);
-      const s = SIZES[sizeId];
-      downloadBlob(blob, `afterglow-cover-${s.w}x${s.h}.png`);
+    const state = { ...cover, photoById: photoIndex() };
+    for (const id of ["square", "portrait", "wide"]) {
+      const png = await exportCoverBlob(state, id);
+      const dims = SIZES[id];
+      downloadBlob(png, `afterglow-cover-${dims.w}x${dims.h}.png`);
     }
     $("hintLine").textContent = "Exported 3 PNGs — Square 1080 x 1080, Portrait 1080 x 1350, Wide 1920 x 1080.";
   } finally {
-    btn.disabled = false;
-    btn.textContent = "Export all 3 sizes";
+    button.disabled = false;
+    button.textContent = "Export all 3 sizes";
   }
 }
 

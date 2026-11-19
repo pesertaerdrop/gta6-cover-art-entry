@@ -7,9 +7,11 @@ import { createServer } from "node:http";
 import { readFile } from "node:fs/promises";
 import { join, extname } from "node:path";
 
-const appRoot = new URL("./app", import.meta.url).pathname;
+// The app directory, next to this file.
+const appDir = new URL("./app", import.meta.url).pathname;
 
-const TYPES: Record<string, string> = {
+// Content types by extension; anything unknown is a generic binary.
+const MIME: Record<string, string> = {
   ".css": "text/css; charset=utf-8",
   ".html": "text/html; charset=utf-8",
   ".jpeg": "image/jpeg",
@@ -21,17 +23,19 @@ const TYPES: Record<string, string> = {
   ".ttf": "font/ttf",
 };
 
-// Map a request path to a file under app/, or null when it escapes.
-function resolveFile(pathname) {
-  const file = join(appRoot, pathname === "/" ? "index.html" : pathname);
-  return file.startsWith(appRoot) ? file : null;
+// Map a request path to a file under app/. A path that escapes the
+// app directory (../ and friends) maps to null and is refused.
+function mapToFile(pathname) {
+  const target = join(appDir, pathname === "/" ? "index.html" : pathname);
+  return target.startsWith(appDir) ? target : null;
 }
 
-async function sendFile(res, file) {
+// Send one file, or 404 when it is not there.
+async function serveFile(res, target) {
   try {
-    const body = await readFile(file);
-    res.writeHead(200, { "content-type": TYPES[extname(file)] || "application/octet-stream" });
-    res.end(body);
+    const bytes = await readFile(target);
+    res.writeHead(200, { "content-type": MIME[extname(target)] || "application/octet-stream" });
+    res.end(bytes);
   } catch {
     res.writeHead(404);
     res.end("not found");
@@ -39,14 +43,14 @@ async function sendFile(res, file) {
 }
 
 const server = createServer(async (req, res) => {
-  const url = new URL(req.url || "/", "http://localhost");
-  const file = resolveFile(decodeURIComponent(url.pathname));
-  if (!file) {
+  const parsed = new URL(req.url || "/", "http://localhost");
+  const target = mapToFile(decodeURIComponent(parsed.pathname));
+  if (!target) {
     res.writeHead(403);
     res.end("forbidden");
     return;
   }
-  await sendFile(res, file);
+  await serveFile(res, target);
 });
 
 server.listen(8080, () => {

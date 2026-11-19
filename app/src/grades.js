@@ -6,6 +6,8 @@
 // Stock is the photoreal grade: no colour map, just the levels
 // stretch and a whisper of warmth.
 
+// The six grades. `mix` is how far the ramp colour replaces the
+// photo's own hue — faces keep their skin because it never reaches 1.
 export const GRADES = [
   { id: "vice", name: "Vice Sunset", mix: 0.85 },
   { id: "neon", name: "Neon Nights", mix: 0.85 },
@@ -15,27 +17,55 @@ export const GRADES = [
   { id: "raw", name: "Raw Stock", mix: 0 },
 ];
 
-// gold -> orange -> hot pink, deep warm black at the foot
-// magenta -> violet-pink -> pale pink, kept off the UI chrome
-// honey -> amber -> cream
-// deep teal -> aqua -> foam white
-// warm black-and-white
-// identity ramp (Raw Stock maps luminance to itself)
+// The ramps, one stop list per grade:
+// vice — gold -> orange -> hot pink, deep warm black at the foot
+// neon — magenta -> violet-pink -> pale pink, kept off the UI chrome
+// golden — honey -> amber -> cream
+// aqua — deep teal -> aqua -> foam white
+// noir — warm black-and-white
+// raw — identity ramp (Raw Stock maps luminance to itself)
 const STOPS = {
-  vice: [[16, 6, 10], [92, 32, 22], [196, 96, 30], [255, 176, 64], [255, 224, 148]],
-  neon: [[12, 6, 18], [88, 18, 66], [178, 44, 110], [238, 96, 150], [255, 190, 220]],
-  golden: [[18, 10, 6], [96, 52, 14], [198, 128, 34], [252, 196, 88], [255, 238, 180]],
-  aqua: [[8, 18, 22], [24, 78, 88], [44, 150, 150], [120, 210, 196], [220, 250, 240]],
-  noir: [[10, 8, 8], [70, 64, 60], [140, 134, 128], [205, 200, 194], [250, 246, 240]],
-  raw: [[0, 0, 0], [64, 64, 64], [128, 128, 128], [192, 192, 192], [255, 255, 255]],
+  vice: [
+    [16, 6, 10], [92, 32, 22], [196, 96, 30],
+    [255, 176, 64], [255, 224, 148],
+  ],
+  neon: [
+    [12, 6, 18], [88, 18, 66], [178, 44, 110],
+    [238, 96, 150], [255, 190, 220],
+  ],
+  golden: [
+    [18, 10, 6], [96, 52, 14], [198, 128, 34],
+    [252, 196, 88], [255, 238, 180],
+  ],
+  aqua: [
+    [8, 18, 22], [24, 78, 88], [44, 150, 150],
+    [120, 210, 196], [220, 250, 240],
+  ],
+  noir: [
+    [10, 8, 8], [70, 64, 60], [140, 134, 128],
+    [205, 200, 194], [250, 246, 240],
+  ],
+  raw: [
+    [0, 0, 0], [64, 64, 64], [128, 128, 128],
+    [192, 192, 192], [255, 255, 255],
+  ],
 };
 
 export function gradeById(gradeId) {
   return GRADES.find((g) => g.id === gradeId) || GRADES[0];
 }
 
+function luma(r, g, b) {
+  return (r * 299 + g * 587 + b * 114) >> 10;
+}
+
+function stretchValue(l, lo, span) {
+  const v = ((l - lo) * 255) / span;
+  return v < 0 ? 0 : v > 255 ? 255 : v;
+}
+
 // Interpolate one stop list at t in 0..1.
-function rampAt(stops, t) {
+function sampleStops(stops, t) {
   const pos = t * (stops.length - 1);
   const i = Math.min(stops.length - 2, Math.floor(pos));
   const f = pos - i;
@@ -51,51 +81,42 @@ function rampAt(stops, t) {
 // Build the 256-entry ramp for one grade id.
 export function buildGradeLUT(gradeId) {
   const stops = STOPS[gradeId] || STOPS.vice;
-  const lut = new Uint8Array(256 * 3);
+  const ramp = new Uint8Array(256 * 3);
   for (let i = 0; i < 256; i++) {
-    const [r, g, b] = rampAt(stops, i / 255);
-    lut[i * 3] = r;
-    lut[i * 3 + 1] = g;
-    lut[i * 3 + 2] = b;
+    const [r, g, b] = sampleStops(stops, i / 255);
+    ramp[i * 3] = r;
+    ramp[i * 3 + 1] = g;
+    ramp[i * 3 + 2] = b;
   }
-  return lut;
+  return ramp;
 }
 
-const lutCache = {};
+const tableCache = {};
 export function gradeLUT(gradeId) {
-  if (!lutCache[gradeId]) lutCache[gradeId] = buildGradeLUT(gradeId);
-  return lutCache[gradeId];
-}
-
-function luminance(r, g, b) {
-  return (r * 299 + g * 587 + b * 114) >> 10;
+  if (!tableCache[gradeId]) tableCache[gradeId] = buildGradeLUT(gradeId);
+  return tableCache[gradeId];
 }
 
 // Auto-levels: the 1st and 99th percentile of luminance, so the ramp
 // is used end to end even on dark night photos.
 export function luminanceRange(data) {
-  const hist = new Uint32Array(256);
+  const buckets = new Uint32Array(256);
   for (let i = 0; i < data.length; i += 4) {
-    hist[luminance(data[i], data[i + 1], data[i + 2])]++;
+    buckets[luma(data[i], data[i + 1], data[i + 2])]++;
   }
   const total = data.length / 4;
-  const cut = total * 0.01;
+  const edge = total * 0.01;
   let lo = 0;
-  let acc = 0;
-  while (lo < 255 && acc < cut) acc += hist[lo++];
+  let seen = 0;
+  while (lo < 255 && seen < edge) seen += buckets[lo++];
   let hi = 255;
-  acc = 0;
-  while (hi > 0 && acc < cut) acc += hist[hi--];
+  seen = 0;
+  while (hi > 0 && seen < edge) seen += buckets[hi--];
   if (hi - lo < 24) {
     lo = Math.max(0, lo - 12);
     hi = Math.min(255, hi + 12);
   }
   return { lo, hi };
-}
-
-function stretch(l, lo, span) {
-  const v = ((l - lo) * 255) / span;
-  return v < 0 ? 0 : v > 255 ? 255 : v;
 }
 
 // Map the art canvas through a grade in place. `mix` blends the ramp
@@ -107,17 +128,17 @@ export function gradeCanvas(ctx, w, h, gradeId) {
   const data = img.data;
   const { lo, hi } = luminanceRange(data);
   const span = Math.max(1, hi - lo);
-  const lut = gradeLUT(gradeId);
+  const ramp = gradeLUT(gradeId);
   const mix = grade.mix;
-  const inv = 1 - mix;
+  const rest = 1 - mix;
   for (let i = 0; i < data.length; i += 4) {
     const r = data[i];
     const g = data[i + 1];
     const b = data[i + 2];
-    const li = (stretch(luminance(r, g, b), lo, span) | 0) * 3;
-    data[i] = lut[li] * mix + r * inv;
-    data[i + 1] = lut[li + 1] * mix + g * inv;
-    data[i + 2] = lut[li + 2] * mix + b * inv;
+    const li = (stretchValue(luma(r, g, b), lo, span) | 0) * 3;
+    data[i] = ramp[li] * mix + r * rest;
+    data[i + 1] = ramp[li + 1] * mix + g * rest;
+    data[i + 2] = ramp[li + 2] * mix + b * rest;
   }
   ctx.putImageData(img, 0, 0);
 }
@@ -129,7 +150,7 @@ export function levelsCanvas(ctx, w, h) {
   const { lo, hi } = luminanceRange(data);
   const span = Math.max(1, hi - lo);
   for (let i = 0; i < data.length; i += 4) {
-    const l = stretch(luminance(data[i], data[i + 1], data[i + 2]), lo, span);
+    const l = stretchValue(luma(data[i], data[i + 1], data[i + 2]), lo, span);
     const f = l / 255;
     const warm = 1 + (f - 0.5) * 0.06;
     data[i] = Math.min(255, data[i] * warm);

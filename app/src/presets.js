@@ -2,16 +2,21 @@
 //
 // A preset sets layout, grade, ink and words in one tap. The photos
 // stay whatever the cover already has, so a preset never throws away
-// a hand-set crop.
+// a hand-set crop. The four scenes are the four screenshots' looks:
+// Sunset Heist is the hero cover, Motor Mile the editor and the grid,
+// Night Market the portrait strip cover, Marina Lights the polaroids.
 
 export const PRESETS = [
   {
     id: "sunset-heist",
     name: "Sunset Heist",
     cover: {
-      layout: "heroThree", grade: "vice",
-      inkOn: true, inkStrength: 0.7,
-      title: "AFTERGLOW", subtitle: "one last sunset",
+      layout: "heroThree",
+      grade: "vice",
+      inkOn: true,
+      inkStrength: 0.7,
+      title: "AFTERGLOW",
+      subtitle: "one last sunset",
       tagline: "ONE NIGHT ON THE COAST",
     },
   },
@@ -19,9 +24,12 @@ export const PRESETS = [
     id: "motor-mile",
     name: "Motor Mile",
     cover: {
-      layout: "nine", grade: "vice",
-      inkOn: true, inkStrength: 0.7,
-      title: "MOTOR MILE", subtitle: "fast lane nights",
+      layout: "nine",
+      grade: "vice",
+      inkOn: true,
+      inkStrength: 0.7,
+      title: "MOTOR MILE",
+      subtitle: "fast lane nights",
       tagline: "NINE FRAMES, ONE RIDE",
     },
   },
@@ -29,9 +37,12 @@ export const PRESETS = [
     id: "night-market",
     name: "Night Market",
     cover: {
-      layout: "stripFive", grade: "golden",
-      inkOn: true, inkStrength: 0.6,
-      title: "NIGHT MARKET", subtitle: "neon and noise",
+      layout: "stripFive",
+      grade: "golden",
+      inkOn: true,
+      inkStrength: 0.6,
+      title: "NIGHT MARKET",
+      subtitle: "neon and noise",
       tagline: "FIVE CROPS, ONE SNAPSHOT",
     },
   },
@@ -39,9 +50,12 @@ export const PRESETS = [
     id: "marina-lights",
     name: "Marina Lights",
     cover: {
-      layout: "snapshots", grade: "neon",
-      inkOn: true, inkStrength: 0.8,
-      title: "MARINA LIGHTS", subtitle: "where the boats sleep",
+      layout: "snapshots",
+      grade: "neon",
+      inkOn: true,
+      inkStrength: 0.8,
+      title: "MARINA LIGHTS",
+      subtitle: "where the boats sleep",
       tagline: "THREE PRINTS, ONE HARBOUR",
     },
   },
