@@ -1,12 +1,22 @@
-// ink.js — Poster Ink: the illustrated-photo pipeline that makes a cover
-// read as a printed poster instead of a photo collage. Steps, in order:
-// soften, posterize luminance into five bands while keeping hue, lift
-// dark panels toward a mid grey, halftone dots in the shadows, Sobel ink
-// lines on edges, seeded grain, vignette. The grain seed is fixed, so
-// the same photo renders the same pixels every time. Strength blends the
-// inked result back over the graded photo; 0 leaves the photo alone.
+// ink.js — Poster Ink, the signature print effect.
+//
+// The winning pattern from the top-1 study: run the photos through a
+// poster pipeline so the cover reads as a printed poster and stays legible
+// at 300 px. The pipeline, in order:
+//   1. soften — a half-size downscale and back, which takes the digital
+//      edge off before the posterise step
+//   2. posterise luminance into five bands, keeping the hue — the flat
+//      colour fields of a screen print
+//   3. lift the darks toward mid grey, so shadows keep detail instead of
+//      crushing to black, plus a whisper of seeded grain in the same pass
+//   4. halftone dots where the picture is dark, the print texture
+//   5. Sobel ink lines along strong edges, the comic-book outline
+//   6. a vignette, the paper's dark corners
+// The grain seed is fixed (1337) so the same cover renders byte-identical
+// pixels every run — determinism is a gate, not a nice-to-have.
+// `strength` blends the inked result back over the graded photo; 0 leaves
+// the photo alone (Raw Stock).
 
-/** A small deterministic PRNG (mulberry32) so grain never flickers. */
 export function seededRandom(seed) {
   let a = seed >>> 0;
   return function () {
@@ -18,21 +28,21 @@ export function seededRandom(seed) {
   };
 }
 
-function makeCanvas(w, h) {
+function blankCanvas(w, h) {
   const c = document.createElement('canvas');
   c.width = Math.max(1, Math.round(w));
   c.height = Math.max(1, Math.round(h));
   return c;
 }
 
-/** Two-pass cheap blur: draw the canvas down to half size and back up. */
+// Two-pass cheap blur: draw the canvas down to half size and back up.
 function soften(source) {
-  const half = makeCanvas(source.width / 2, source.height / 2);
+  const half = blankCanvas(source.width / 2, source.height / 2);
   const hctx = half.getContext('2d');
   hctx.imageSmoothingEnabled = true;
   hctx.imageSmoothingQuality = 'high';
   hctx.drawImage(source, 0, 0, half.width, half.height);
-  const out = makeCanvas(source.width, source.height);
+  const out = blankCanvas(source.width, source.height);
   const octx = out.getContext('2d');
   octx.imageSmoothingEnabled = true;
   octx.imageSmoothingQuality = 'high';
@@ -40,9 +50,11 @@ function soften(source) {
   return out;
 }
 
+// The five luminance bands. A pixel's luminance snaps to the largest band
+// edge at or below it, and its colour is scaled to match — hue kept,
+// tonal steps flattened.
 const BANDS = [0.09, 0.26, 0.45, 0.66, 0.88];
 
-/** Posterize one pixel's luminance into five bands, keeping its hue. */
 function posterizePixel(r, g, b) {
   const lum = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
   let band = BANDS[0];
@@ -51,18 +63,14 @@ function posterizePixel(r, g, b) {
   const cur = 0.2126 * r + 0.7152 * g + 0.0722 * b;
   if (cur < 4) return [target * 0.4, target * 0.4, target * 0.4];
   const k = target / cur;
-  return [
-    Math.min(255, r * k),
-    Math.min(255, g * k),
-    Math.min(255, b * k),
-  ];
+  return [Math.min(255, r * k), Math.min(255, g * k), Math.min(255, b * k)];
 }
 
-/** Sobel edge strength on a half-size greyscale copy, 0..1 per pixel. */
+// Sobel edge strength on a half-size greyscale copy, 0..1 per pixel.
 function sobelEdges(source) {
   const w = Math.max(2, Math.floor(source.width / 2));
   const h = Math.max(2, Math.floor(source.height / 2));
-  const small = makeCanvas(w, h);
+  const small = blankCanvas(w, h);
   const sctx = small.getContext('2d');
   sctx.drawImage(source, 0, 0, w, h);
   const data = sctx.getImageData(0, 0, w, h).data;
@@ -86,10 +94,8 @@ function sobelEdges(source) {
   return { edge, w, h };
 }
 
-/**
- * Run Poster Ink over a canvas and return a new canvas. `strength`
- * 0..1 blends the inked result over the input; 1 is full ink.
- */
+// Run Poster Ink over a canvas and return a new canvas. `strength` 0..1
+// blends the inked result over the input; 1 is full ink.
 export function applyInk(source, strength = 1) {
   if (strength <= 0) return source;
   const w = source.width;
@@ -112,14 +118,16 @@ export function applyInk(source, strength = 1) {
   }
   ctx.putImageData(img, 0, 0);
 
-  // Halftone dots where the picture is dark.
-  const dot = makeCanvas(w, h);
+  // Halftone dots where the picture is dark. One full read, indexed per
+  // dot, instead of a getImageData call per dot.
+  const dot = blankCanvas(w, h);
   const dctx = dot.getContext('2d');
   const step = Math.max(5, Math.round(w / 220));
+  const full = ctx.getImageData(0, 0, w, h).data;
   for (let y = step / 2; y < h; y += step) {
     for (let x = step / 2; x < w; x += step) {
-      const p = ctx.getImageData(Math.min(w - 1, Math.floor(x)), Math.min(h - 1, Math.floor(y)), 1, 1).data;
-      const lum = (0.2126 * p[0] + 0.7152 * p[1] + 0.0722 * p[2]) / 255;
+      const p = (Math.floor(y) * w + Math.floor(x)) * 4;
+      const lum = (0.2126 * full[p] + 0.7152 * full[p + 1] + 0.0722 * full[p + 2]) / 255;
       if (lum < 0.28) {
         const rad = step * 0.42 * (1 - lum / 0.28);
         dctx.fillStyle = 'rgba(20, 8, 16, 0.55)';
@@ -133,7 +141,7 @@ export function applyInk(source, strength = 1) {
 
   // Sobel ink lines, drawn from the half-size edge map.
   const { edge, w: ew, h: eh } = sobelEdges(soft);
-  const line = makeCanvas(w, h);
+  const line = blankCanvas(w, h);
   const lctx = line.getContext('2d');
   lctx.fillStyle = 'rgba(24, 10, 18, 0.85)';
   const sx = w / ew;
@@ -158,7 +166,7 @@ export function applyInk(source, strength = 1) {
   ctx.fillRect(0, 0, w, h);
 
   if (strength >= 1) return soft;
-  const out = makeCanvas(w, h);
+  const out = blankCanvas(w, h);
   const octx = out.getContext('2d');
   octx.drawImage(source, 0, 0);
   octx.globalAlpha = strength;

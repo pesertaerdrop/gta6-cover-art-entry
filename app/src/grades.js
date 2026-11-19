@@ -72,7 +72,7 @@ export function gradeById(id) {
   return GRADES.find((g) => g.id === id) || GRADES[0];
 }
 
-/** Sample a grade's ramp into a 256-entry RGB lookup table. */
+// Sample a grade's ramp into a 256-entry RGB lookup table.
 export function buildRamp(grade) {
   if (!grade.stops) return null;
   const ramp = new Uint8Array(256 * 3);
@@ -97,10 +97,8 @@ export function buildRamp(grade) {
   return ramp;
 }
 
-/**
- * Auto-levels: the 1st and 99th percentile luminance of an ImageData,
- * so night shots use the whole ramp instead of sitting in the dark.
- */
+// Auto-levels: the 1st and 99th percentile luminance of an ImageData,
+// so night shots use the whole ramp instead of sitting in the dark.
 export function levelRange(data) {
   const hist = new Uint32Array(256);
   const px = data.data;
@@ -122,11 +120,9 @@ export function levelRange(data) {
   return { lo, hi: Math.max(hi, lo + 1) };
 }
 
-/**
- * Grade an ImageData in place: stretch its luminance through the level
- * range, map it through the ramp, and blend the ramp colour back over
- * the original pixel. Raw Stock returns the data untouched.
- */
+// Grade an ImageData in place: stretch its luminance through the level
+// range, map it through the ramp, and blend the ramp colour back over
+// the original pixel. Raw Stock returns the data untouched.
 export function applyGrade(data, grade) {
   if (!grade.stops) return data;
   const ramp = buildRamp(grade);

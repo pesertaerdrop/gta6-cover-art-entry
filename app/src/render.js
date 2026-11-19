@@ -3,6 +3,13 @@
 // relative state (relative zooms, pans and panel rects), so the square,
 // portrait and wide exports are the same cover, re-framed, never
 // stretched.
+//
+// Strip Five panels are slices, not crops: a panel carries
+// slice { x0, x1, fx } — the horizontal span of the lead photo it shows
+// and the focus point inside it. sliceWindow keeps the visible window
+// inside the slice, so a face that sits wholly inside a slice can never
+// be cut by a gutter. A normal panel carries { zoom, x, y } and uses the
+// cover-fit cropWindow instead.
 
 import { panelsFor } from './layouts.js';
 import { gradeById, applyGrade } from './grades.js';
@@ -17,11 +24,9 @@ function makeCanvas(w, h) {
   return c;
 }
 
-/**
- * Cover-fit source window for a photo inside a panel: the window keeps
- * the panel's aspect, scales by zoom, and centres on (x, y) — fractions
- * of the photo. y defaults to the upper third, where faces live.
- */
+// Cover-fit source window for a photo inside a panel: the window keeps
+// the panel's aspect, scales by zoom, and centres on (x, y) — fractions
+// of the photo. y defaults to the upper third, where faces live.
 export function cropWindow(img, rectW, rectH, crop) {
   const base = Math.max(rectW / img.naturalWidth, rectH / img.naturalHeight);
   const scale = base * (crop.zoom || 1);
@@ -33,16 +38,54 @@ export function cropWindow(img, rectW, rectH, crop) {
   let sy = cy - sh / 2;
   sx = Math.min(Math.max(sx, 0), Math.max(0, img.naturalWidth - sw));
   sy = Math.min(Math.max(sy, 0), Math.max(0, img.naturalHeight - sh));
-  return { sx, sy, sw, sh };
+  return { sx, sy, sw, sh, scale };
 }
 
-/** Draw one photo into one panel (offscreen, at panel pixels). */
+// Source window for a strip slice: the window keeps the panel's aspect,
+// scales by zoom, and centres horizontally on the slice's focus point
+// (fx) and vertically on y. The window never leaves the slice: sx is
+// clamped to [x0, x1 - sw], so the gutter between two strips can never
+// show half a face. Zoom below 1 is a no-op here — a slice is already
+// the widest view of its own span; zooming out would bleed into the
+// neighbouring strip.
+export function sliceWindow(img, rectW, rectH, slice, y, zoom) {
+  const imgW = img.naturalWidth;
+  const imgH = img.naturalHeight;
+  const slicePx = (slice.x1 - slice.x0) * imgW;
+  const fit = Math.max(rectW / slicePx, rectH / imgH);
+  const scale = fit * Math.max(zoom || 1, 1);
+  const sw = rectW / scale;
+  const sh = rectH / scale;
+  const fxPx = (slice.fx ?? (slice.x0 + slice.x1) / 2) * imgW;
+  const cy = (y ?? 0.35) * imgH;
+  let sx = fxPx - sw / 2;
+  let sy = cy - sh / 2;
+  const minSx = slice.x0 * imgW;
+  const maxSx = Math.max(minSx, slice.x1 * imgW - sw);
+  sx = Math.min(Math.max(sx, minSx), maxSx);
+  sy = Math.min(Math.max(sy, 0), Math.max(0, imgH - sh));
+  return { sx, sy, sw, sh, scale };
+}
+
+// The source window for any panel: a slice window for Strip Five
+// panels, a cover-fit crop for everything else. Always carries `scale`
+// (panel pixels per photo pixel) so the drag handler can turn a pointer
+// move into a photo-space pan.
+export function panelWindow(photo, rectW, rectH, panel) {
+  if (panel.slice) {
+    return sliceWindow(photo.img, rectW, rectH, panel.slice, panel.y, panel.zoom);
+  }
+  const win = cropWindow(photo.img, rectW, rectH, panel);
+  return win;
+}
+
+// Draw one photo into one panel (offscreen, at panel pixels).
 function drawPanel(photo, rect, crop, grade, ink) {
   const w = Math.max(2, Math.round(rect.w));
   const h = Math.max(2, Math.round(rect.h));
   const c = makeCanvas(w, h);
   const ctx = c.getContext('2d');
-  const win = cropWindow(photo.img, w, h, crop);
+  const win = panelWindow(photo, w, h, crop);
   ctx.drawImage(photo.img, win.sx, win.sy, win.sw, win.sh, 0, 0, w, h);
   const img = ctx.getImageData(0, 0, w, h);
   applyGrade(img, grade);
@@ -55,11 +98,9 @@ function drawPanel(photo, rect, crop, grade, ink) {
   return c;
 }
 
-/**
- * Render the whole cover into ctx at W x H. `state` is the cover state,
- * `library` the loaded photo records. The art area is the top 74% of
- * the cover; the title band takes the bottom 26%.
- */
+// Render the whole cover into ctx at W x H. `state` is the cover state,
+// `library` the loaded photo records. The art area is the top 74% of
+// the cover; the title band takes the bottom 26%.
 export function renderCover(ctx, W, H, state, library) {
   const bandH = Math.round(H * 0.26);
   const bandY = H - bandH;
@@ -68,7 +109,7 @@ export function renderCover(ctx, W, H, state, library) {
   ctx.fillRect(0, 0, W, H);
 
   const byId = new Map(library.map((p) => [p.id, p]));
-  const rects = panelsFor(state.layout, W, artH);
+  const rects = panelsFor(state.layout, W, artH, state.stripDividers);
   const grade = gradeById(state.grade);
 
   rects.forEach((r, i) => {
@@ -142,14 +183,14 @@ export function renderCover(ctx, W, H, state, library) {
   drawRibbon(ctx, 0, bandY, W, bandH);
 }
 
-/** Render a cover to a fresh canvas at the given pixel size. */
+// Render a cover to a fresh canvas at the given pixel size.
 export function renderToCanvas(W, H, state, library) {
   const c = makeCanvas(W, H);
   renderCover(c.getContext('2d'), W, H, state, library);
   return c;
 }
 
-/** The three post sizes the app exports, in the order it exports them. */
+// The three post sizes the app exports, in the order it exports them.
 export const EXPORT_SIZES = [
   { id: 'square', label: 'Square', w: 1080, h: 1080 },
   { id: 'portrait', label: 'Portrait', w: 1080, h: 1350 },

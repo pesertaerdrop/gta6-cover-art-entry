@@ -15,6 +15,15 @@
 // nine-panel grid, hero and three, full bleed, tilted snapshots,
 // Strip Five (one photo, five crops), split duo and a comic strip.
 //
+// Strip Five is face-aware in this version. The old equal split cut the
+// hero duo's faces with its gutters; now each sample photo carries the
+// horizontal span of its faces (photos.js), faces.js computes divider
+// positions that never cross a face, and each strip is a true slice of
+// the photo that keeps its face whole (render.js sliceWindow). The
+// dividers are computed from face data for any photo — nothing is
+// hard-coded to one portrait — and uploads without face data fall back
+// to equal strips.
+//
 // Poster Ink is the house effect, written here from scratch: it
 // posterizes each photo into flat ink bands, dots halftone into the
 // shadows, draws Sobel ink lines along the edges, and finishes with

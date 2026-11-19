@@ -15,10 +15,8 @@ function roundRect(ctx, x, y, w, h, r) {
   ctx.closePath();
 }
 
-/**
- * A city skyline strip: seeded towers with lit windows, a pink rim glow
- * along the rooftops, and two palm silhouettes. Drawn dark on the band.
- */
+// A city skyline strip: seeded towers with lit windows, a pink rim glow
+// along the rooftops, and two palm silhouettes. Drawn dark on the band.
 export function drawSkyline(ctx, x, y, w, h, seed = 7) {
   const rnd = seededRandom(seed);
   ctx.save();
@@ -73,7 +71,7 @@ export function drawSkyline(ctx, x, y, w, h, seed = 7) {
   ctx.restore();
 }
 
-/** A five-point star path centred at (cx, cy) with outer radius r. */
+// A five-point star path centred at (cx, cy) with outer radius r.
 export function starPath(ctx, cx, cy, r) {
   ctx.beginPath();
   for (let i = 0; i < 10; i++) {
@@ -87,12 +85,10 @@ export function starPath(ctx, cx, cy, r) {
   ctx.closePath();
 }
 
-/**
- * The HEAT pill: a gold rounded pill holding the word HEAT and five
- * stars (four filled, one outline). Returns the pill's drawn width so
- * the caller can right-align it. The pill widens itself on tall covers
- * because the caller passes the full width it may use.
- */
+// The HEAT pill: a gold rounded pill holding the word HEAT and five
+// stars (four filled, one outline). Returns the pill's drawn width so
+// the caller can right-align it. The pill widens itself on tall covers
+// because the caller passes the full width it may use.
 export function drawHeatPill(ctx, x, y, h, maxW) {
   const label = 'HEAT';
   const starR = h * 0.26;
@@ -133,7 +129,7 @@ export function drawHeatPill(ctx, x, y, h, maxW) {
   return pillW;
 }
 
-/** The round EST. 2026 badge: gold ring, dark disc, two lines of text. */
+// The round EST. 2026 badge: gold ring, dark disc, two lines of text.
 export function drawEstBadge(ctx, cx, cy, r) {
   ctx.save();
   ctx.beginPath();
@@ -153,17 +149,15 @@ export function drawEstBadge(ctx, cx, cy, r) {
   ctx.restore();
 }
 
-/**
- * The NOW SHOWING ribbon: a gold diagonal sash across the band's
- * top-right corner, on the 45-degree chord from the band's top edge to
- * its right edge, with the words set in dark Bebas along the sash.
- * The sash is a band of constant width (not a triangle), so the words
- * have the full chord to sit on and never straddle an edge: the font
- * shrinks until the words fit the chord, and caps at a size that
- * leaves a margin inside the band's width. If they cannot fit at the
- * smallest readable size, the ribbon draws nothing instead of a bare
- * triangle.
- */
+// The NOW SHOWING ribbon: a gold diagonal sash across the band's
+// top-right corner, on the 45-degree chord from the band's top edge to
+// its right edge, with the words set in dark Bebas along the sash.
+// The sash is a band of constant width (not a triangle), so the words
+// have the full chord to sit on and never straddle an edge: the font
+// shrinks until the words fit the chord, and caps at a size that
+// leaves a margin inside the band's width. If they cannot fit at the
+// smallest readable size, the ribbon draws nothing instead of a bare
+// triangle.
 export function drawRibbon(ctx, bandX, bandY, bandW, bandH) {
   const run = bandH * 0.5;
   const x0 = bandX + bandW - run;
@@ -207,10 +201,8 @@ export function drawRibbon(ctx, bandX, bandY, bandW, bandH) {
   ctx.restore();
 }
 
-/**
- * The FRESH INK starburst sticker: a pink spiked disc with two lines of
- * white text, drawn at the top-left of the art area.
- */
+// The FRESH INK starburst sticker: a pink spiked disc with two lines of
+// white text, drawn at the top-left of the art area.
 export function drawStarburst(ctx, cx, cy, r, top, bottom) {
   ctx.save();
   ctx.translate(cx, cy);

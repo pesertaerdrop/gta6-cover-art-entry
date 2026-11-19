@@ -12,6 +12,11 @@
 // library's first eight photos land in the right slots: police chase,
 // airboat, boat party, hero duo, convertible duo, yacht + blimp,
 // dirt-bike jump, drawbridge.
+//
+// Strip Five is the face-aware one: it takes optional divider positions
+// (photo fractions, from faces.js via the state) and places its gutters
+// on those dividers instead of the equal split, so no gutter ever lands
+// on a face. Without dividers it falls back to five equal strips.
 
 const GUT = 0.012; // gutter, relative to the art area's width
 
@@ -56,12 +61,23 @@ function tiltedSnaps() {
   ];
 }
 
-function stripFive() {
-  const panels = [];
+// Five vertical strips of one photo. `dividers` is an optional array of
+// four positions in (0, 1) — the face-aware divider set for the lead
+// photo. Each strip's width follows its slice's width, so the five
+// strips still reconstruct the photo with gutters on the dividers.
+// Without dividers, five equal strips.
+function stripFive(w, h, dividers) {
   const gw = GUT;
-  const cw = (1 - gw * 4) / 5;
+  const edges = dividers && dividers.length === 4
+    ? [0, ...dividers, 1]
+    : [0, 0.2, 0.4, 0.6, 0.8, 1];
+  const avail = 1 - gw * 4;
+  const panels = [];
+  let x = 0;
   for (let i = 0; i < 5; i++) {
-    panels.push({ x: i * (cw + gw), y: 0, w: cw, h: 1, rot: 0, frame: false });
+    const sliceW = (edges[i + 1] - edges[i]) * avail;
+    panels.push({ x, y: 0, w: sliceW, h: 1, rot: 0, frame: false });
+    x += sliceW + gw;
   }
   return panels;
 }
@@ -209,7 +225,8 @@ export function layoutById(id) {
   return LAYOUTS.find((l) => l.id === id) || LAYOUTS[0];
 }
 
-/** Panel rects for a layout in a given art area (pixels). */
-export function panelsFor(layoutId, w, h) {
-  return layoutById(layoutId).panels(w, h);
+// Panel rects for a layout in a given art area (pixels). `dividers` is
+// only read by Strip Five; other layouts ignore it.
+export function panelsFor(layoutId, w, h, dividers) {
+  return layoutById(layoutId).panels(w, h, dividers);
 }

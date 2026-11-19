@@ -3,7 +3,7 @@
 // clear zone above the tagline bar (never clipped by it), and a Bebas
 // Neue tagline bar with hand-spaced capitals.
 
-/** Shrink an Anton title until it fits maxW; returns the fitted size. */
+// Shrink an Anton title until it fits maxW; returns the fitted size.
 export function fitAnton(ctx, text, maxW, start) {
   let fs = start;
   ctx.font = `${fs}px Anton, sans-serif`;
@@ -14,11 +14,9 @@ export function fitAnton(ctx, text, maxW, start) {
   return fs;
 }
 
-/**
- * The big title: a sunset gradient (gold to orange to pink, one hue
- * ramp), a dark outline and a hard offset shadow. Drawn left-aligned
- * at the given baseline.
- */
+// The big title: a sunset gradient (gold to orange to pink, one hue
+// ramp), a dark outline and a hard offset shadow. Drawn left-aligned
+// at the given baseline.
 export function drawTitle(ctx, text, x, baselineY, maxW, startSize) {
   const fs = fitAnton(ctx, text, maxW, startSize);
   const grad = ctx.createLinearGradient(x, baselineY - fs, x, baselineY);
@@ -42,11 +40,9 @@ export function drawTitle(ctx, text, x, baselineY, maxW, startSize) {
   return fs;
 }
 
-/**
- * The script subtitle in neon pink with a soft glow, fitted to maxW.
- * The caller gives it its own clear zone (top and height) above the
- * tagline bar, so the script is never overlapped or clipped.
- */
+// The script subtitle in neon pink with a soft glow, fitted to maxW.
+// The caller gives it its own clear zone (top and height) above the
+// tagline bar, so the script is never overlapped or clipped.
 export function drawSubtitle(ctx, text, x, zoneTop, zoneH, maxW, startSize) {
   let fs = startSize;
   ctx.font = `${fs}px "Kaushan Script", cursive`;
@@ -66,11 +62,9 @@ export function drawSubtitle(ctx, text, x, zoneTop, zoneH, maxW, startSize) {
   return fs;
 }
 
-/**
- * The tagline bar: a black strip with Bebas capitals spaced by hand
- * (canvas has no letter-spacing here, so each glyph is placed). The
- * spacing spreads the text across the full width.
- */
+// The tagline bar: a black strip with Bebas capitals spaced by hand
+// (canvas has no letter-spacing here, so each glyph is placed). The
+// spacing spreads the text across the full width.
 export function drawTagline(ctx, text, x, y, w, h) {
   ctx.save();
   ctx.fillStyle = '#12060d';

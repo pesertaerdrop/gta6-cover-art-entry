@@ -69,7 +69,7 @@ export function presetById(id) {
   return PRESETS.find((p) => p.id === id) || PRESETS[0];
 }
 
-/** Apply a preset's words, layout and grade to a state (photos untouched). */
+// Apply a preset's words, layout and grade to a state (photos untouched).
 export function applyPreset(state, preset) {
   state.title = preset.title;
   state.subtitle = preset.subtitle;

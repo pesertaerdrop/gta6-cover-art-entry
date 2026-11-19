@@ -3,25 +3,103 @@
 // stable id, a label for the tray, and a loaded Image. Nothing here is a
 // photo of a real person: all 14 samples were made with an image model
 // for this entry, and uploads stay on the machine (object URLs only).
+//
+// Each sample also carries `faces`: the horizontal span of each prominent
+// face, in photo fractions, measured by eye from the photo itself. Strip
+// Five reads this data (see faces.js) and places its dividers so no
+// divider ever crosses a face. Photos whose people are tiny or distant
+// list no faces: at that size a divider crossing a figure is invisible,
+// and claiming a box would be guessing.
 
 export const SAMPLE_PHOTOS = [
-  { id: 'police-chase', file: 'samples/police-chase.jpg', label: 'Police chase' },
-  { id: 'airboat-gator', file: 'samples/airboat-gator.jpg', label: 'Airboat + gator' },
-  { id: 'boat-party', file: 'samples/boat-party.jpg', label: 'Boat party' },
-  { id: 'hero-duo', file: 'samples/hero-duo.jpg', label: 'Hero duo' },
-  { id: 'convertible-duo', file: 'samples/convertible-duo.jpg', label: 'Convertible duo' },
-  { id: 'yacht-blimp', file: 'samples/yacht-blimp.jpg', label: 'Yacht + blimp' },
-  { id: 'dirtbike-jump', file: 'samples/dirtbike-jump.jpg', label: 'Dirt-bike jump' },
-  { id: 'drawbridge-boat', file: 'samples/drawbridge-boat.jpg', label: 'Drawbridge' },
-  { id: 'dj-neon', file: 'samples/dj-neon.jpg', label: 'Neon DJ' },
-  { id: 'skater-boy', file: 'samples/skater-boy.jpg', label: 'Skate park' },
-  { id: 'chef-grill', file: 'samples/chef-grill.jpg', label: 'Street grill' },
-  { id: 'cowboy-gas', file: 'samples/cowboy-gas.jpg', label: 'Desert gas stop' },
-  { id: 'sax-corner', file: 'samples/sax-corner.jpg', label: 'Sax at midnight' },
-  { id: 'surfer-dawn', file: 'samples/surfer-dawn.jpg', label: 'Surfer at dawn' },
+  { id: 'police-chase', file: 'samples/police-chase.jpg', label: 'Police chase', faces: [] },
+  { id: 'airboat-gator', file: 'samples/airboat-gator.jpg', label: 'Airboat + gator', faces: [] },
+  {
+    id: 'boat-party',
+    file: 'samples/boat-party.jpg',
+    label: 'Boat party',
+    // Six faces across the deck, left to right: the dancer in pink, the
+    // curly-haired man, the laughing woman behind, the blonde in
+    // sunglasses, the man in the white cap, the woman at the stern.
+    faces: [
+      [0.29, 0.38],
+      [0.47, 0.54],
+      [0.55, 0.61],
+      [0.6, 0.67],
+      [0.7, 0.76],
+      [0.79, 0.86],
+    ],
+  },
+  {
+    id: 'hero-duo',
+    file: 'samples/hero-duo.jpg',
+    label: 'Hero duo',
+    // The cover's lead pair. Her head (braids included) runs 0.27–0.46,
+    // his 0.55–0.76; the old equal dividers at 0.40 and 0.60 cut straight
+    // through both faces.
+    faces: [
+      [0.27, 0.46],
+      [0.55, 0.76],
+    ],
+  },
+  {
+    id: 'convertible-duo',
+    file: 'samples/convertible-duo.jpg',
+    label: 'Convertible duo',
+    // Two faces nearly touching: hers 0.33–0.49, his 0.50–0.63. The
+    // margin merges them into one blocked zone, so the dividers go
+    // around the pair instead of between them.
+    faces: [
+      [0.33, 0.49],
+      [0.5, 0.63],
+    ],
+  },
+  { id: 'yacht-blimp', file: 'samples/yacht-blimp.jpg', label: 'Yacht + blimp', faces: [] },
+  { id: 'dirtbike-jump', file: 'samples/dirtbike-jump.jpg', label: 'Dirt-bike jump', faces: [] },
+  { id: 'drawbridge-boat', file: 'samples/drawbridge-boat.jpg', label: 'Drawbridge', faces: [] },
+  {
+    id: 'dj-neon',
+    file: 'samples/dj-neon.jpg',
+    label: 'Neon DJ',
+    // One face, purple hair included at face height.
+    faces: [[0.38, 0.6]],
+  },
+  {
+    id: 'skater-boy',
+    file: 'samples/skater-boy.jpg',
+    label: 'Skate park',
+    // Small face, cap and braids flying; the box covers the face itself.
+    faces: [[0.42, 0.52]],
+  },
+  {
+    id: 'chef-grill',
+    file: 'samples/chef-grill.jpg',
+    label: 'Street grill',
+    faces: [[0.38, 0.52]],
+  },
+  {
+    id: 'cowboy-gas',
+    file: 'samples/cowboy-gas.jpg',
+    label: 'Desert gas stop',
+    // Profile face under the hat brim.
+    faces: [[0.42, 0.53]],
+  },
+  {
+    id: 'sax-corner',
+    file: 'samples/sax-corner.jpg',
+    label: 'Sax at midnight',
+    faces: [[0.43, 0.57]],
+  },
+  {
+    id: 'surfer-dawn',
+    file: 'samples/surfer-dawn.jpg',
+    label: 'Surfer at dawn',
+    // Profile face, blond hair to the left of it.
+    faces: [[0.45, 0.56]],
+  },
 ];
 
-/** Load one image from a URL; resolves with the HTMLImageElement. */
+// Load one image from a URL; resolves with the HTMLImageElement.
 export function loadImage(src) {
   return new Promise((resolve, reject) => {
     const img = new Image();
@@ -31,17 +109,15 @@ export function loadImage(src) {
   });
 }
 
-/**
- * Load every sample photo. Returns an array of photo records
- * { id, label, src, img, uploaded: false } in SAMPLE_PHOTOS order.
- * A sample that fails to load is skipped, never fatal.
- */
+// Load every sample photo. Returns an array of photo records
+// { id, label, src, img, uploaded: false, faces } in SAMPLE_PHOTOS
+// order. A sample that fails to load is skipped, never fatal.
 export async function loadSamples() {
   const out = [];
   for (const s of SAMPLE_PHOTOS) {
     try {
       const img = await loadImage(s.file);
-      out.push({ id: s.id, label: s.label, src: s.file, img, uploaded: false });
+      out.push({ id: s.id, label: s.label, src: s.file, img, uploaded: false, faces: s.faces });
     } catch {
       // A missing sample never blocks the editor; the tray just shows fewer.
     }
@@ -49,22 +125,22 @@ export async function loadSamples() {
   return out;
 }
 
-/**
- * Turn user-chosen File objects into photo records with the same shape
- * as samples, backed by object URLs (the bytes never leave the machine).
- */
+// Turn user-chosen File objects into photo records with the same shape
+// as samples, backed by object URLs (the bytes never leave the machine).
+// Uploads carry no face data, so Strip Five falls back to equal
+// dividers for them.
 export function filesToPhotos(files) {
   const out = [];
   for (const f of files) {
     if (!f.type.startsWith('image/')) continue;
     const url = URL.createObjectURL(f);
     const label = f.name.replace(/\.[^.]+$/, '').replace(/[-_]+/g, ' ').slice(0, 24) || 'Your photo';
-    out.push({ id: `up-${Date.now()}-${out.length}`, label, src: url, img: null, uploaded: true, file: f });
+    out.push({ id: `up-${Date.now()}-${out.length}`, label, src: url, img: null, uploaded: true, faces: [], file: f });
   }
   return out;
 }
 
-/** Finish loading the image of an uploaded photo record, in place. */
+// Finish loading the image of an uploaded photo record, in place.
 export async function hydrateUpload(photo) {
   if (photo.img) return photo;
   photo.img = await loadImage(photo.src);

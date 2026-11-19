@@ -9,9 +9,8 @@ import { loadSamples, filesToPhotos, hydrateUpload } from './photos.js';
 import { LAYOUTS, layoutById, panelsFor } from './layouts.js';
 import { GRADES, gradeById } from './grades.js';
 import { PRESETS, presetById, applyPreset } from './presets.js';
-import { renderToCanvas, renderCover, EXPORT_SIZES } from './render.js';
+import { renderToCanvas, renderCover, EXPORT_SIZES, panelWindow } from './render.js';
 import { shotFromUrl, applyShotScene } from './shots.js';
-import { cropWindow } from './render.js';
 
 const $ = (sel) => document.querySelector(sel);
 
@@ -25,7 +24,7 @@ function photoById(id) {
   return library.find((p) => p.id === id);
 }
 
-/** Re-render the preview canvas from the current state. */
+// Re-render the preview canvas from the current state.
 function renderPreview() {
   const canvas = $('#preview');
   if (!canvas) return;
@@ -39,11 +38,11 @@ function renderPreview() {
   drawSelection(ctx, canvas.width, canvas.height);
 }
 
-/** Outline the selected panel so the user sees what they are editing. */
+// Outline the selected panel so the user sees what they are editing.
 function drawSelection(ctx, W, H) {
   const bandH = Math.round(H * 0.26);
   const artH = H - bandH;
-  const rects = panelsFor(state.layout, W, artH);
+  const rects = panelsFor(state.layout, W, artH, state.stripDividers);
   const r = rects[state.selected];
   if (!r) return;
   ctx.save();
@@ -54,7 +53,7 @@ function drawSelection(ctx, W, H) {
   ctx.restore();
 }
 
-/** Commit a new state snapshot to the history and re-render. */
+// Commit a new state snapshot to the history and re-render.
 function commit(next) {
   history.commit(next);
   state = history.current;
@@ -62,7 +61,7 @@ function commit(next) {
   syncControls();
 }
 
-/** Refresh every control to match the current state. */
+// Refresh every control to match the current state.
 function syncControls() {
   const titleEl = $('#title-input');
   if (titleEl && titleEl.value !== state.title) titleEl.value = state.title;
@@ -95,7 +94,7 @@ function syncControls() {
   if (redoBtn) redoBtn.disabled = !history.canRedo();
 }
 
-/** Build the photo tray: 14 samples plus the upload tile. */
+// Build the photo tray: 14 samples plus the upload tile.
 function buildTray() {
   const tray = $('#tray');
   if (!tray) return;
@@ -117,7 +116,8 @@ function buildTray() {
       const next = snapshot(state);
       if (next.layout === 'strip') {
         // Strip Five slices one photo: picking a tray photo picks the
-        // photo the five strips are cut from.
+        // photo the five strips are cut from. The slices are rebuilt
+        // from that photo's faces, so the dividers move with it.
         next.leadPhotoId = photo.id;
         assignPhotos(next, library);
       } else {
@@ -154,7 +154,7 @@ function buildTray() {
   tray.appendChild(up);
 }
 
-/** Build the layout rail: one mini-drawing tile per layout. */
+// Build the layout rail: one mini-drawing tile per layout.
 function buildLayoutRail() {
   const rail = $('#layout-rail');
   if (!rail) return;
@@ -174,7 +174,7 @@ function buildLayoutRail() {
   }
 }
 
-/** Build the preset and grade rows. */
+// Build the preset and grade rows.
 function buildRows() {
   const presetRow = $('#preset-row');
   if (presetRow) {
@@ -213,7 +213,7 @@ function buildRows() {
   }
 }
 
-/** Download one canvas as a PNG file. */
+// Download one canvas as a PNG file.
 function downloadCanvas(canvas, filename) {
   canvas.toBlob((blob) => {
     if (!blob) return;
@@ -232,7 +232,7 @@ function slug(s) {
   return s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'cover';
 }
 
-/** Export the current cover in all three sizes, one PNG each. */
+// Export the current cover in all three sizes, one PNG each.
 function exportAll() {
   const base = slug(state.title);
   for (const size of EXPORT_SIZES) {
@@ -241,7 +241,7 @@ function exportAll() {
   }
 }
 
-/** Which panel (if any) sits under a point on the preview canvas. */
+// Which panel (if any) sits under a point on the preview canvas.
 function panelAt(clientX, clientY) {
   const canvas = $('#preview');
   const rect = canvas.getBoundingClientRect();
@@ -250,7 +250,7 @@ function panelAt(clientX, clientY) {
   const bandH = 0.26;
   if (y > 1 - bandH) return -1;
   const artH = 1 - bandH;
-  const rects = panelsFor(state.layout, canvas.width, canvas.height * artH);
+  const rects = panelsFor(state.layout, canvas.width, canvas.height * artH, state.stripDividers);
   for (let i = 0; i < rects.length; i++) {
     const r = rects[i];
     if (x >= r.x && x <= r.x + r.w && (y / artH) >= r.y && (y / artH) <= r.y + r.h) return i;
@@ -279,17 +279,28 @@ function bindPreview() {
     const rect = canvas.getBoundingClientRect();
     const bandH = Math.round(rect.height * 0.26);
     const artH = rect.height - bandH;
-    const rects = panelsFor(state.layout, rect.width, artH);
+    const rects = panelsFor(state.layout, rect.width, artH, state.stripDividers);
     const r = rects[dragging.index];
     if (!r) return;
     const pw = r.w * rect.width;
     const ph = r.h * artH;
-    const win = cropWindow(photo.img, pw, ph, panel);
-    const scale = pw / win.sw;
+    const win = panelWindow(photo, pw, ph, panel);
+    const scale = win.scale;
     const next = snapshot(state);
     const p = next.panels[dragging.index];
-    p.x = Math.min(1, Math.max(0, p.x - (e.clientX - dragging.x) / scale / photo.img.naturalWidth));
-    p.y = Math.min(1, Math.max(0, p.y - (e.clientY - dragging.y) / scale / photo.img.naturalHeight));
+    if (p.slice) {
+      // A strip panel reframes inside its slice: horizontal drag moves
+      // the focus point, clamped so it never leaves the slice; the
+      // divider positions themselves never move (they are face data).
+      p.slice.fx = Math.min(
+        p.slice.x1 - 0.02,
+        Math.max(p.slice.x0 + 0.02, p.slice.fx - (e.clientX - dragging.x) / scale / photo.img.naturalWidth),
+      );
+      p.y = Math.min(1, Math.max(0, p.y - (e.clientY - dragging.y) / scale / photo.img.naturalHeight));
+    } else {
+      p.x = Math.min(1, Math.max(0, p.x - (e.clientX - dragging.x) / scale / photo.img.naturalWidth));
+      p.y = Math.min(1, Math.max(0, p.y - (e.clientY - dragging.y) / scale / photo.img.naturalHeight));
+    }
     dragging.x = e.clientX;
     dragging.y = e.clientY;
     state = next;
@@ -390,9 +401,9 @@ function bindControls() {
   });
 }
 
-/** Draw one cover full-bleed for a ?shot= scene, then signal readiness.
- * A scene with mode 'editor' instead shows the real editor with that
- * preset applied, so the screenshot proves the app at work. */
+// Draw one cover full-bleed for a ?shot= scene, then signal readiness.
+// A scene with mode 'editor' instead shows the real editor with that
+// preset applied, so the screenshot proves the app at work.
 async function runShot(shotName) {
   const scene = applyShotScene(state, shotName);
   if (!scene) return;

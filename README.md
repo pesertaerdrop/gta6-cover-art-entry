@@ -16,6 +16,7 @@ An entry for the [GTA 6 cover art bounty](https://make.fun/bounty/gta6-cover-art
 
 - **Poster Ink** (written from scratch): posterized ink bands, halftone dots in the shadows, Sobel ink edges, seeded grain and a vignette — with a strength slider and an off switch for the Raw Stock photoreal grade.
 - **Six grades**: Vice Sunset, Neon Nights, Golden Hour, Aqua Pop, Noir Vice, Raw Stock.
+- **Face-aware Strip Five**: the five strips of one photo are cut where the faces aren't. Each sample photo carries the horizontal span of its faces, and the divider positions are computed from that data — every face falls wholly inside one strip, with a margin around it, and each strip focuses on its face. Pick any photo from the tray and the dividers move with it. Uploads have no face data and fall back to equal strips.
 - **Title-block furniture**: skyline strip, gradient Anton title, Kaushan Script subtitle in its own clear zone, HEAT star pill, EST. 2026 badge, FRESH INK starburst and a legible NOW SHOWING diagonal ribbon.
 - **Editor craft**: drag-to-reframe with per-photo crops that survive layout changes, smart face framing (upper third by default), 50-step undo/redo, editable title/subtitle/tagline, one-tap presets, shuffle.
 

@@ -13,17 +13,15 @@ export const SHOT_SCENES = {
   grid: { preset: 'motormile', mode: 'canvas', note: 'Nine-panel exported cover' },
 };
 
-/** The scene name from the page URL (?shot=cover), or null. */
+// The scene name from the page URL (?shot=cover), or null.
 export function shotFromUrl() {
   const q = new URLSearchParams(window.location.search);
   const name = q.get('shot');
   return name && SHOT_SCENES[name] ? name : null;
 }
 
-/**
- * Set a state up for a shot scene and return the scene. Photos are
- * assigned by the caller afterwards, in library order.
- */
+// Set a state up for a shot scene and return the scene. Photos are
+// assigned by the caller afterwards, in library order.
 export function applyShotScene(state, shotName) {
   const scene = SHOT_SCENES[shotName];
   if (!scene) return null;
