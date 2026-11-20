@@ -1,21 +1,21 @@
-// ink.js — Poster Ink, the signature print effect.
+// ink.js — Poster Ink, the print effect that makes the photos read as
+// a poster instead of a collage.
 //
-// The winning pattern from the top-1 study: run the photos through a
-// poster pipeline so the cover reads as a printed poster and stays legible
-// at 300 px. The pipeline, in order:
+// The pipeline, in order:
 //   1. soften — a half-size downscale and back, which takes the digital
 //      edge off before the posterise step
 //   2. posterise luminance into five bands, keeping the hue — the flat
 //      colour fields of a screen print
-//   3. lift the darks toward mid grey, so shadows keep detail instead of
-//      crushing to black, plus a whisper of seeded grain in the same pass
+//   3. lift the darks toward mid grey, so shadows keep detail instead
+//      of crushing to black, plus a whisper of seeded grain in the same
+//      pass
 //   4. halftone dots where the picture is dark, the print texture
 //   5. Sobel ink lines along strong edges, the comic-book outline
 //   6. a vignette, the paper's dark corners
 // The grain seed is fixed (1337) so the same cover renders byte-identical
 // pixels every run — determinism is a gate, not a nice-to-have.
-// `strength` blends the inked result back over the graded photo; 0 leaves
-// the photo alone (Raw Stock).
+// `strength` blends the inked result back over the graded photo; 0
+// leaves the photo alone (Raw Stock).
 
 export function seededRandom(seed) {
   let a = seed >>> 0;
@@ -50,9 +50,9 @@ function soften(source) {
   return out;
 }
 
-// The five luminance bands. A pixel's luminance snaps to the largest band
-// edge at or below it, and its colour is scaled to match — hue kept,
-// tonal steps flattened.
+// The five luminance bands. A pixel's luminance snaps to the largest
+// band edge at or below it, and its colour is scaled to match — hue
+// kept, tonal steps flattened.
 const BANDS = [0.09, 0.26, 0.45, 0.66, 0.88];
 
 function posterizePixel(r, g, b) {

@@ -1,64 +1,56 @@
-// faces.js — face-aware slicing for Strip Five, with a whole-face guarantee.
+// faces.js — where Strip Five's dividers go, so a face is never cut.
 //
-// v7 kept the dividers off faces. v8 goes one step further: every face
-// must be WHOLE inside its strip's visible window — eyes, nose, mouth,
-// chin, ears and hairline, with air around it — at every export size.
+// Strip Five slices one photo into five tall strips. A strip panel is
+// narrow, so at cover-fit it only shows a slice of its slice — and on
+// the portrait cover that visible slice is at its narrowest. Two
+// different things can cut a face then:
+//   1. a divider lands on the face itself, or
+//   2. the strip is too narrow for the face, so the strip's own edges
+//      cut the cheeks and ears even with the face perfectly centred.
+// This module fixes both. It searches for four divider positions that
+// (a) never fall inside a face, and (b) leave every face-bearing strip
+// wide enough that the narrowest window any export size shows still
+// contains the whole face span plus air on each side. When no such set
+// exists — a crowd filling the frame, for instance — it says so, and the
+// caller falls back to rule (a) alone instead of pretending.
 //
-// Why a strip can still cut a face even when no divider crosses it: a
-// strip panel is tall and narrow, so at cover-fit it shows only a
-// fraction of its slice. The fraction is narrowest on the portrait
-// cover (a strip shows ~0.686 of its slice there). A face wider than
-// that fraction gets its cheeks and ears cut by the strip's own edges,
-// even perfectly centred. So the divider search now enforces a width
-// rule: every slice that holds a face must be wide enough that its
-// narrowest window contains the whole face span plus WHOLE_MARGIN of
-// air on each side. Where the faces allow it, the dividers move until
-// the rule holds; where they don't (a crowd filling the frame), the
-// search returns null and the caller falls back to the v7 rule —
-// dividers never cross a face, focus on the widest face — instead of
-// pretending.
-//
-// Nothing here knows about one photo. Faces are horizontal intervals
-// [x0, x1] in photo fractions (strip panels run the full height of the
-// art area, and the window shows the full photo height on portrait and
-// square, so only the horizontal span can be cut). The positions are
-// computed from the face data and the photo's own dimensions every
-// time, so any photo — sample or user upload — gets the same treatment.
-// Uploads carry no face data, so they use equal dividers.
+// Faces are horizontal spans [x0, x1] in photo fractions, ear to ear.
+// Strip panels run the full height of the art area and the window shows
+// the full photo height at portrait and square sizes, so only the
+// horizontal span can be cut. Nothing here knows about one photo: the
+// positions come from the face data and the photo's own size every time,
+// so a sample and a user upload get the same treatment. Uploads carry
+// no face data, so they use equal dividers.
 
-export const FACE_MARGIN = 0.015; // breathing room around each face, for dividers
-export const WHOLE_MARGIN = 0.015; // air around a face inside its window, each side
-export const MIN_STRIP = 0.03; // narrowest strip worth drawing (sky or palm sliver)
-export const GAP_MIN = 0.02; // narrowest strip between two faces (a sliver of sky)
-export const EDGE_CLEARANCE = 0.002; // divider never sits exactly on a face edge
-export const ART_FRACTION = 0.74; // art area share of cover height (matches render.js)
-export const STRIP_GUT = 0.012; // gutter share of art width (matches layouts.js)
+export const FACE_MARGIN = 0.015; // keep-out around each face, for dividers
+export const WHOLE_MARGIN = 0.015; // air around a face inside its window
+export const MIN_STRIP = 0.03; // narrowest strip worth drawing at all
+export const GAP_MIN = 0.02; // narrowest strip that is only sky
+export const EDGE_CLEARANCE = 0.002; // a divider never sits on a face edge
+export const ART_FRACTION = 0.74; // art area share of cover height
+export const STRIP_GUT = 0.012; // gutter share of art width
 export const SEARCH_STEP = 0.005; // divider search grid, photo fractions
 export const SEARCH_NODES = 400000; // safety budget for the divider search
 
-// Merge a list of [x0, x1] intervals (sorted by x0) into the smallest set
-// of non-overlapping intervals. Overlapping or touching faces become one
-// blocked zone, because a divider cannot pass between two faces that
-// overlap or touch.
+// Collapse overlapping or touching intervals into the smallest set of
+// disjoint ones. Two faces that overlap or touch become one blocked
+// zone, because no divider can pass between them.
 export function mergeIntervals(intervals) {
-  const sorted = intervals
+  const cleaned = (intervals || [])
     .map(([a, b]) => [Math.min(a, b), Math.max(a, b)])
     .filter(([a, b]) => b > a)
     .sort((p, q) => p[0] - q[0] || p[1] - q[1]);
   const merged = [];
-  for (const [a, b] of sorted) {
+  for (const [a, b] of cleaned) {
     const last = merged[merged.length - 1];
-    if (last && a <= last[1]) {
-      last[1] = Math.max(last[1], b);
-    } else {
-      merged.push([a, b]);
-    }
+    if (last && a <= last[1]) last[1] = Math.max(last[1], b);
+    else merged.push([a, b]);
   }
   return merged;
 }
 
-// Blocked zones: each face widened by the margin, clamped to the frame,
-// then merged. A divider may not land inside any of these.
+// Each face widened by the margin and clamped to the frame, then
+// merged. A divider may not land inside any of these zones.
 export function blockedZones(faces, margin = FACE_MARGIN) {
   const widened = (faces || []).map(([a, b]) => [
     Math.max(0, a - margin),
@@ -71,8 +63,8 @@ function insideBlocked(x, zones) {
   return zones.some(([a, b]) => x > a && x < b);
 }
 
-// The free gaps between blocked zones, as [start, end] pairs. Dividers
-// live in these gaps.
+// The free gaps between the blocked zones, as [start, end] pairs.
+// Dividers live in these gaps.
 export function freeGaps(faces, margin = FACE_MARGIN) {
   const zones = blockedZones(faces, margin);
   const gaps = [];
@@ -85,13 +77,12 @@ export function freeGaps(faces, margin = FACE_MARGIN) {
   return gaps;
 }
 
-// The fraction of a slice its strip panel actually shows, for one
-// export size: a cover-fit window of the slice inside the panel. The
-// panel is sliceW * (1 - 4 gutters) of the art width and the full art
-// height; the window's width over the slice's width is the ratio below.
+// What fraction of a slice its strip panel actually shows, for one
+// export size: the panel is sliceW * (1 - 4 gutters) of the art width
+// and the full art height, and the window keeps the panel's aspect.
 // The narrowest ratio over the export sizes is the one the width rule
-// must satisfy, because a face whole at the narrowest size is whole at
-// every size.
+// must satisfy — a face whole at the narrowest size is whole at every
+// size.
 export function windowRatioForSize(photoW, photoH, sizeW, sizeH) {
   const avail = 1 - 4 * STRIP_GUT;
   const artH = ART_FRACTION * sizeH;
@@ -103,9 +94,7 @@ export function windowRatioForSize(photoW, photoH, sizeW, sizeH) {
 export function narrowWindowRatio(photoW, photoH, sizes) {
   if (!sizes || sizes.length === 0) return 0.686;
   let ratio = 1;
-  for (const s of sizes) {
-    ratio = Math.min(ratio, windowRatioForSize(photoW, photoH, s.w, s.h));
-  }
+  for (const s of sizes) ratio = Math.min(ratio, windowRatioForSize(photoW, photoH, s.w, s.h));
   return ratio;
 }
 
@@ -125,26 +114,26 @@ export function faceSpanInSlice(faces, x0, x1) {
   return [Math.min(...inside.map(([a]) => a)), Math.max(...inside.map(([, b]) => b))];
 }
 
-// Choose `count - 1` divider positions for `count` strips.
-//
-// Candidates: the ideal equal divider, or — when the ideal falls inside a
-// blocked zone — the two edges of that zone (nudged clear of the face).
-// Every combination is tried; the winner maximises the narrowest strip,
-// then minimises the total drift from the equal split. That keeps the
-// strips as even as the faces allow instead of shoving every divider to
-// one side.
-//
-// This is the v7 rule: dividers never cross a face. It is the fallback
-// when the whole-face search finds no divider set that also fits every
-// face whole inside its strip's window.
+export function equalDividers(count) {
+  const out = [];
+  for (let i = 1; i < count; i++) out.push(i / count);
+  return out;
+}
+
+// Pick `count - 1` divider positions that never cross a face. For each
+// divider, the candidates are the equal-split ideal — or, when the ideal
+// falls inside a blocked zone, the two edges of that zone, nudged clear
+// of the face. Every combination is tried; the winner maximises the
+// narrowest strip, then minimises the total drift from the equal split,
+// so the strips stay as even as the faces allow. This is the fallback
+// rule: it is used when the whole-face search below finds no divider
+// set that also fits every face whole inside its strip's window.
 export function stripDividers(faces, count, opts = {}) {
   const margin = opts.margin ?? FACE_MARGIN;
   const minStrip = opts.minStrip ?? MIN_STRIP;
   if (!count || count < 2) return [];
   const zones = blockedZones(faces, margin);
-  if (zones.length === 0) {
-    return equalDividers(count);
-  }
+  if (zones.length === 0) return equalDividers(count);
   const perDivider = [];
   for (let i = 1; i < count; i++) {
     const ideal = i / count;
@@ -168,19 +157,14 @@ export function stripDividers(faces, count, opts = {}) {
   const walk = (idx, chosen) => {
     if (idx === perDivider.length) {
       const dividers = [...chosen].sort((a, b) => a - b);
-      // Dividers must increase and every strip must clear the minimum.
       const edges = [0, ...dividers, 1];
       let minGap = Infinity;
-      for (let i = 1; i < edges.length; i++) {
-        minGap = Math.min(minGap, edges[i] - edges[i - 1]);
-      }
+      for (let i = 1; i < edges.length; i++) minGap = Math.min(minGap, edges[i] - edges[i - 1]);
       if (minGap < minStrip) return;
       if (dividers.some((d) => d <= 0 || d >= 1)) return;
       if (dividers.some((d) => insideBlocked(d, zones))) return;
       let drift = 0;
-      for (let i = 0; i < dividers.length; i++) {
-        drift += Math.abs(dividers[i] - (i + 1) / count);
-      }
+      for (let i = 0; i < dividers.length; i++) drift += Math.abs(dividers[i] - (i + 1) / count);
       const score = [minGap, -drift];
       if (!best || score[0] > best.score[0] || (score[0] === best.score[0] && score[1] > best.score[1])) {
         best = { dividers, score };
@@ -197,21 +181,14 @@ export function stripDividers(faces, count, opts = {}) {
   return best ? best.dividers : equalDividers(count);
 }
 
-export function equalDividers(count) {
-  const out = [];
-  for (let i = 1; i < count; i++) out.push(i / count);
-  return out;
-}
-
-// True when a divider set keeps every face whole inside its strip's
-// narrowest window: no divider falls inside any face interval (margin
-// included), every slice holding a face is wide enough that the window
-// it shows at the narrowest export size contains the whole face span
-// plus WHOLE_MARGIN of air on each side, and every strip meets its
-// minimum width — MIN_STRIP, or GAP_MIN for a strip lying wholly inside
-// one free gap (a sliver of sky). This is the single validator: both
-// the search and the refinement below must pass it, so neither can
-// produce a set the other would reject.
+// True when a divider set keeps every face whole: no divider falls
+// inside any face interval (margin included), every slice holding a
+// face is wide enough that the window it shows at the narrowest export
+// size contains the whole face span plus WHOLE_MARGIN of air on each
+// side, and every strip meets its minimum width — MIN_STRIP, or GAP_MIN
+// for a strip lying wholly inside one free gap (a sliver of sky). This
+// is the single validator: both the search and the refinement below
+// must pass it, so neither can produce a set the other would reject.
 export function dividersWholeFace(dividers, faces, ratio, opts = {}) {
   const margin = opts.wholeMargin ?? WHOLE_MARGIN;
   const minStrip = opts.minStrip ?? MIN_STRIP;
@@ -245,7 +222,7 @@ export function dividersWholeFace(dividers, faces, ratio, opts = {}) {
 // The winner maximises the minimum slack (window minus required width
 // over the face slices), then minimises drift from the equal split.
 // Returns the divider array, or null when no set satisfies the rule —
-// the caller then falls back to stripDividers() (v7 behaviour).
+// the caller then falls back to stripDividers().
 export function wholeFaceDividers(faces, count, ratio, opts = {}) {
   const margin = opts.margin ?? FACE_MARGIN;
   const wholeMargin = opts.wholeMargin ?? WHOLE_MARGIN;
@@ -306,11 +283,9 @@ export function wholeFaceDividers(faces, count, ratio, opts = {}) {
     for (let i = 0; i < edges.length; i++) {
       const w = edges[i + 1] - edges[i];
       const need = faceNeed(edges[i], edges[i + 1]);
-      if (need > 0) minSlack = Math.min(minSlack, w * ratio - (need * ratio));
+      if (need > 0) minSlack = Math.min(minSlack, w * ratio - need * ratio);
     }
-    for (let i = 0; i < dividers.length; i++) {
-      drift += Math.abs(dividers[i] - (i + 1) / count);
-    }
+    for (let i = 0; i < dividers.length; i++) drift += Math.abs(dividers[i] - (i + 1) / count);
     const score = [minSlack, -drift];
     if (!best || score[0] > best.score[0] || (score[0] === best.score[0] && score[1] > best.score[1])) {
       best = { dividers: [...dividers], score };
@@ -325,7 +300,7 @@ export function wholeFaceDividers(faces, count, ratio, opts = {}) {
       // The last strip [prev, 1]: check its minimum, then score.
       if (1 - prev < minWidthFor(prev, 1)) return;
       const need = faceNeed(prev, 1);
-      if (need > 0 && (1 - prev) < need) return;
+      if (need > 0 && 1 - prev < need) return;
       evaluate(chosen);
       return;
     }
@@ -338,7 +313,7 @@ export function wholeFaceDividers(faces, count, ratio, opts = {}) {
       // when it holds a face.
       if (x - prev < minWidthFor(prev, x)) continue;
       const need = faceNeed(prev, x);
-      if (need > 0 && (x - prev) < need) continue;
+      if (need > 0 && x - prev < need) continue;
       // Room must remain for the dividers after this one.
       if (1 - x < remaining * gapMin) continue;
       chosen.push(x);

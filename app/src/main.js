@@ -1,22 +1,23 @@
-// main.js — the editor: loads the samples, owns the undo history,
+// main.js — the editor. It loads the samples, owns the undo history,
 // draws the live preview, and wires every control. The editor is three
-// numbered steps (1 add photos, 2 pick a layout, 3 export) and one big
-// pink EXPORT PNG button.
+// numbered steps — 1 add photos, 2 pick a layout, 3 export — and one
+// big pink EXPORT PNG button that writes the cover at its exact size.
 //
-// Whole faces: Strip Five keeps its faces whole by construction — the
-// dividers in state.stripDividers come from faces.js (wholeFaceDividers
-// first, stripDividers as the fallback), and the renderer clamps each
-// strip's window onto its face span, so a dragged focus point cannot
-// push a cheek or an ear out of the strip. When the divider rule holds,
-// a small "Faces whole" chip appears in the layout row; when it falls
-// back, the chip says "Faces kept, window narrow" instead, so the
-// editor never claims a guarantee it did not keep.
+// Whole faces: Strip Five keeps its faces whole by construction. The
+// dividers in state.stripDividers come from faces.js (the whole-face
+// search first, face-aware dividers as the fallback), and the renderer
+// clamps each strip's window onto its face span, so a dragged focus
+// point cannot push a cheek or an ear out of its strip. A chip in the
+// layout row reports which rule is in force for the current photo —
+// "Faces whole in every strip" when the guarantee holds, "Faces kept,
+// window narrow" when it falls back — so the editor never claims a
+// guarantee it did not keep.
 
 import { loadSamples, filesToPhotos, hydrateUpload } from './photos.js';
 import { createState, assignPhotos, setLayout, swapPanelPhoto, createHistory } from './state.js';
 import { renderToCanvas, EXPORT_SIZES, panelWindow } from './render.js';
 import { layoutById, panelsFor, LAYOUTS } from './layouts.js';
-import { GRADES, gradeById } from './grades.js';
+import { GRADES } from './grades.js';
 import { PRESETS, presetById, applyPreset } from './presets.js';
 
 const $ = (id) => document.getElementById(id);
@@ -29,18 +30,19 @@ let selectedSize = 'wide';
 let autoFillOn = true;
 let lastSnapshot = JSON.stringify(state);
 
-function stateChanged() {
+// Record the state in the undo history, once per change.
+function noteChange() {
   const s = JSON.stringify(state);
   if (s === lastSnapshot) return;
   history.commit(state);
   lastSnapshot = s;
 }
 
-function restore(snap) {
+function restoreSnapshot(snap) {
   state = snap;
   lastSnapshot = JSON.stringify(state);
   renderAll();
-  updateButtons();
+  refreshUndoRedo();
 }
 
 function photoById(id) {
@@ -51,6 +53,8 @@ function sizeFor() {
   return EXPORT_SIZES.find((s) => s.id === selectedSize) || EXPORT_SIZES[2];
 }
 
+// Paint the preview canvas at the chosen export size, scaled to the
+// preview width. The preview shows the same pixels an export writes.
 function drawPreview() {
   const canvas = $('preview');
   const size = sizeFor();
@@ -64,37 +68,7 @@ function drawPreview() {
   canvas.dataset.h = size.h;
 }
 
-function renderAll() {
-  drawPreview();
-  renderTray();
-  renderPanelChips();
-  renderStripChip();
-  $('titleInput').value = state.title;
-  $('subtitleInput').value = state.subtitle;
-  $('taglineInput').value = state.tagline;
-  $('gradeRow').querySelectorAll('.chip').forEach((c) => {
-    c.classList.toggle('active', c.dataset.grade === state.grade);
-  });
-  $('inkToggle').checked = state.ink.on;
-  $('inkSlider').value = Math.round(state.ink.strength * 100);
-  $('inkValue').textContent = `${Math.round(state.ink.strength * 100)}%`;
-  $('layoutRow').querySelectorAll('.tile').forEach((t) => {
-    t.classList.toggle('active', t.dataset.layout === state.layout);
-  });
-  $('presetRow').querySelectorAll('.chip').forEach((c) => {
-    c.classList.toggle('active', c.dataset.preset === currentPreset());
-  });
-  document.querySelectorAll('.size-chip').forEach((c) => {
-    c.classList.toggle('active', c.dataset.size === selectedSize);
-  });
-  $('undoBtn').disabled = !history.canUndo();
-  $('redoBtn').disabled = !history.canRedo();
-  $('autoFill').checked = autoFillOn;
-}
-
-// Strip Five keeps faces whole by construction (see the module header),
-// and this chip reports which rule is in force for the current photo,
-// so the editor never claims a guarantee it did not keep.
+// The chip that reports Strip Five's face rule for the current photo.
 function renderStripChip() {
   const chip = $('stripChip');
   if (state.layout !== 'strip') {
@@ -111,7 +85,7 @@ function renderStripChip() {
   }
 }
 
-function currentPreset() {
+function currentPresetId() {
   const p = PRESETS.find(
     (x) =>
       x.layout === state.layout &&
@@ -145,7 +119,7 @@ function renderTray() {
       swapPanelPhoto(state, state.selected, photo.id);
       if (state.layout === 'strip') state.leadPhotoId = photo.id;
       assignPhotos(state, library);
-      stateChanged();
+      noteChange();
       renderAll();
     });
     tray.appendChild(item);
@@ -178,11 +152,39 @@ function renderPanelChips() {
   }
 }
 
-function updateButtons() {
+function refreshUndoRedo() {
   $('undoBtn').disabled = !history.canUndo();
   $('redoBtn').disabled = !history.canRedo();
 }
 
+function renderAll() {
+  drawPreview();
+  renderTray();
+  renderPanelChips();
+  renderStripChip();
+  $('titleInput').value = state.title;
+  $('subtitleInput').value = state.subtitle;
+  $('taglineInput').value = state.tagline;
+  $('gradeRow').querySelectorAll('.chip').forEach((c) => {
+    c.classList.toggle('active', c.dataset.grade === state.grade);
+  });
+  $('inkToggle').checked = state.ink.on;
+  $('inkSlider').value = Math.round(state.ink.strength * 100);
+  $('inkValue').textContent = `${Math.round(state.ink.strength * 100)}%`;
+  $('layoutRow').querySelectorAll('.tile').forEach((t) => {
+    t.classList.toggle('active', t.dataset.layout === state.layout);
+  });
+  $('presetRow').querySelectorAll('.chip').forEach((c) => {
+    c.classList.toggle('active', c.dataset.preset === currentPresetId());
+  });
+  document.querySelectorAll('.size-chip').forEach((c) => {
+    c.classList.toggle('active', c.dataset.size === selectedSize);
+  });
+  refreshUndoRedo();
+  $('autoFill').checked = autoFillOn;
+}
+
+// Download one rendered cover as a PNG at its exact export size.
 function exportOne(size) {
   const canvas = renderToCanvas(size.w, size.h, state, library);
   const a = document.createElement('a');
@@ -192,26 +194,28 @@ function exportOne(size) {
   a.click();
 }
 
-async function shuffle() {
+// Re-deal the library into the panels, keeping each photo's own crop.
+function shufflePhotos() {
   const photos = [...library];
   for (let i = photos.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
     [photos[i], photos[j]] = [photos[j], photos[i]];
   }
   assignPhotos(state, photos);
-  stateChanged();
+  noteChange();
   renderAll();
 }
 
 function autoFill() {
   if (!autoFillOn) return;
   assignPhotos(state, library);
-  stateChanged();
+  noteChange();
   renderAll();
 }
 
 // Drag-to-reframe on the preview: a pointer move turns into a
-// photo-space pan through the panel's window scale.
+// photo-space pan through the panel's window scale. For a strip panel
+// the focus moves inside its slice; for a normal panel the crop pans.
 function wirePreviewDrag() {
   const canvas = $('preview');
   let dragging = false;
@@ -259,7 +263,7 @@ function wirePreviewDrag() {
   canvas.addEventListener('pointerup', () => {
     if (!dragging) return;
     dragging = false;
-    stateChanged();
+    noteChange();
     renderAll();
   });
   canvas.addEventListener('wheel', (e) => {
@@ -268,7 +272,7 @@ function wirePreviewDrag() {
     if (!panel) return;
     const factor = e.deltaY < 0 ? 1.1 : 0.9;
     panel.zoom = Math.min(Math.max((panel.zoom || 1) * factor, 1), 4);
-    stateChanged();
+    noteChange();
     renderAll();
   }, { passive: false });
 }
@@ -283,22 +287,22 @@ function wireControls() {
   $('layoutRow').querySelectorAll('.tile').forEach((t) => {
     t.addEventListener('click', () => {
       setLayout(state, t.dataset.layout, library);
-      stateChanged();
+      noteChange();
       renderAll();
     });
   });
   $('gradeRow').querySelectorAll('.chip').forEach((c) => {
     c.addEventListener('click', () => {
       state.grade = c.dataset.grade;
-      stateChanged();
+      noteChange();
       renderAll();
     });
   });
   $('presetRow').querySelectorAll('.chip').forEach((c) => {
     c.addEventListener('click', () => {
-      applyPreset(state, c.dataset.preset, library);
+      applyPreset(state, c.dataset.preset);
       assignPhotos(state, library);
-      stateChanged();
+      noteChange();
       renderAll();
     });
   });
@@ -307,7 +311,7 @@ function wireControls() {
     drawPreview();
   });
   $('titleInput').addEventListener('change', () => {
-    stateChanged();
+    noteChange();
     renderAll();
   });
   $('subtitleInput').addEventListener('input', (e) => {
@@ -315,7 +319,7 @@ function wireControls() {
     drawPreview();
   });
   $('subtitleInput').addEventListener('change', () => {
-    stateChanged();
+    noteChange();
     renderAll();
   });
   $('taglineInput').addEventListener('input', (e) => {
@@ -323,12 +327,12 @@ function wireControls() {
     drawPreview();
   });
   $('taglineInput').addEventListener('change', () => {
-    stateChanged();
+    noteChange();
     renderAll();
   });
   $('inkToggle').addEventListener('change', (e) => {
     state.ink.on = e.target.checked;
-    stateChanged();
+    noteChange();
     renderAll();
   });
   $('inkSlider').addEventListener('input', (e) => {
@@ -337,18 +341,18 @@ function wireControls() {
     drawPreview();
   });
   $('inkSlider').addEventListener('change', () => {
-    stateChanged();
+    noteChange();
     renderAll();
   });
   $('undoBtn').addEventListener('click', () => {
     const snap = history.undo();
-    if (snap) restore(snap);
+    if (snap) restoreSnapshot(snap);
   });
   $('redoBtn').addEventListener('click', () => {
     const snap = history.redo();
-    if (snap) restore(snap);
+    if (snap) restoreSnapshot(snap);
   });
-  $('shuffleBtn').addEventListener('click', shuffle);
+  $('shuffleBtn').addEventListener('click', shufflePhotos);
   $('autoFill').addEventListener('change', (e) => {
     autoFillOn = e.target.checked;
     if (autoFillOn) autoFill();
@@ -380,18 +384,18 @@ function wireControls() {
   $('leadPhoto').addEventListener('change', (e) => {
     state.leadPhotoId = e.target.value || null;
     assignPhotos(state, library);
-    stateChanged();
+    noteChange();
     renderAll();
   });
   window.addEventListener('keydown', (e) => {
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z' && !e.shiftKey) {
       e.preventDefault();
       const snap = history.undo();
-      if (snap) restore(snap);
+      if (snap) restoreSnapshot(snap);
     } else if ((e.ctrlKey || e.metaKey) && (e.key.toLowerCase() === 'y' || (e.key.toLowerCase() === 'z' && e.shiftKey))) {
       e.preventDefault();
       const snap = history.redo();
-      if (snap) restore(snap);
+      if (snap) restoreSnapshot(snap);
     }
   });
 }

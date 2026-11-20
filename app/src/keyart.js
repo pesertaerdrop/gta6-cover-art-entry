@@ -1,7 +1,8 @@
-// keyart.js — the title band's extras, all drawn in canvas code: a seeded
-// skyline strip, the HEAT star pill, the EST. 2026 badge, the diagonal
-// NOW SHOWING ribbon, and the FRESH INK starburst sticker. Each helper
-// takes explicit coordinates, so the renderer places them per size.
+// keyart.js — the title band's extras, all drawn in canvas code: a
+// seeded skyline strip, the HEAT star pill, the EST. 2026 badge, the
+// diagonal NOW SHOWING ribbon, and the FRESH INK starburst sticker.
+// Each helper takes explicit coordinates, so the renderer places them
+// per size.
 
 import { seededRandom } from './ink.js';
 
@@ -93,7 +94,7 @@ export function drawHeatPill(ctx, x, y, h, maxW) {
   const label = 'HEAT';
   const starR = h * 0.26;
   const gap = h * 0.16;
-  let fs = h * 0.42;
+  const fs = h * 0.42;
   ctx.font = `${fs}px Anton, sans-serif`;
   const labelW = ctx.measureText(label).width;
   const starsW = 5 * starR * 2 + 4 * gap;
@@ -151,13 +152,12 @@ export function drawEstBadge(ctx, cx, cy, r) {
 
 // The NOW SHOWING ribbon: a gold diagonal sash across the band's
 // top-right corner, on the 45-degree chord from the band's top edge to
-// its right edge, with the words set in dark Bebas along the sash.
-// The sash is a band of constant width (not a triangle), so the words
-// have the full chord to sit on and never straddle an edge: the font
-// shrinks until the words fit the chord, and caps at a size that
-// leaves a margin inside the band's width. If they cannot fit at the
-// smallest readable size, the ribbon draws nothing instead of a bare
-// triangle.
+// its right edge, with the words set in dark Bebas along the sash. The
+// sash is a band of constant width (not a triangle), so the words have
+// the full chord to sit on and never straddle an edge: the font shrinks
+// until the words fit the chord, and caps at a size that leaves a
+// margin inside the band's width. If they cannot fit at the smallest
+// readable size, the ribbon draws nothing instead of a bare triangle.
 export function drawRibbon(ctx, bandX, bandY, bandW, bandH) {
   const run = bandH * 0.5;
   const x0 = bandX + bandW - run;
@@ -176,9 +176,9 @@ export function drawRibbon(ctx, bandX, bandY, bandW, bandH) {
   }
   if (ctx.measureText(words).width > chord * 0.85) return;
   // The sash is a band of constant width along the chord, but
-  // asymmetric: it reaches far toward the corner and only just past
-  // the words on the badge side, so it never covers the EST. badge
-  // sitting below it. The words sit on the chord itself.
+  // asymmetric: it reaches far toward the corner and only just past the
+  // words on the badge side, so it never covers the EST. badge sitting
+  // below it. The words sit on the chord itself.
   const towardCorner = (sashW * 0.6) / Math.SQRT2;
   const towardBadge = fs * 0.65 + 2;
   const bx = towardBadge / Math.SQRT2;

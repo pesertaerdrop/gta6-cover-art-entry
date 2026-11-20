@@ -1,18 +1,22 @@
-// photos.js — the photo library: the 14 image-model sample photos, plus
-// uploads from the user's own machine. Every photo is an object with a
-// stable id, a label for the tray, and a loaded Image. Nothing here is a
-// photo of a real person: all 14 samples were made with an image model
-// for this entry, and uploads stay on the machine (object URLs only).
+// photos.js — the photo library for Afterglow Cover Studio.
 //
-// Each sample also carries `faces`: the horizontal span of each prominent
-// face, in photo fractions, measured by eye from the photo itself — ear
-// to ear, so the whole face (eyes, nose, mouth, chin, ears, hairline)
-// is inside the box, not just the skin. Strip Five reads this data (see
+// The 14 sample photos are image-model originals made for this entry:
+// an invented duo (a woman with long braids in a teal jacket, a bearded
+// man in a grey beanie and grey tee) and the city around them. No photo
+// shows a real person, and no photo carries a logo, wordmark or console
+// mark. Uploads come from the user's own machine and stay there — they
+// are object URLs, never uploaded anywhere.
+//
+// Every sample carries `faces`: the horizontal span of each prominent
+// face, ear to ear, in photo fractions, measured by eye from the photo
+// itself at full size, with zoomed crops for the small ones. A face box
+// holds the whole head at face height — eyes, nose, mouth, chin, ears,
+// hairline — not just the skin. Strip Five reads these boxes (see
 // faces.js) and places its dividers so no divider ever crosses a face
-// and each face-bearing strip is wide enough to show its face whole.
-// Photos whose people are tiny or distant list no faces: at that size a
-// divider crossing a figure is invisible, and claiming a box would be
-// guessing.
+// and, where the photo allows it, each face-bearing strip is wide
+// enough to show its face whole. Photos whose people are tiny or
+// distant list no faces: at that size a divider crossing a figure is
+// invisible, and a box there would be guessing.
 
 export const SAMPLE_PHOTOS = [
   { id: 'police-chase', file: 'samples/police-chase.jpg', label: 'Police chase', faces: [] },
@@ -21,46 +25,45 @@ export const SAMPLE_PHOTOS = [
     id: 'boat-party',
     file: 'samples/boat-party.jpg',
     label: 'Boat party',
-    // Six faces across the deck, left to right: the dancer in pink, the
-    // curly-haired man, the laughing woman behind, the blonde in
-    // sunglasses, the man in the white cap, the woman at the stern.
+    // Four friends laughing on the deck, left to right: the woman in
+    // black, the man in the tan cap, the woman with the cocktail, the
+    // curly-haired man with the raised fist.
     faces: [
-      [0.29, 0.38],
-      [0.47, 0.54],
-      [0.55, 0.61],
-      [0.6, 0.67],
-      [0.7, 0.76],
-      [0.79, 0.86],
+      [0.15, 0.23],
+      [0.37, 0.44],
+      [0.54, 0.62],
+      [0.74, 0.82],
     ],
   },
   {
     id: 'hero-duo',
     file: 'samples/hero-duo.jpg',
     label: 'Hero duo',
-    // The cover's lead pair, re-measured twice from the photo at full
-    // size, including a second pass after the first render: her left
-    // ear (hoop earring) starts at 0.215 — the outer helix, not the
-    // cheek — and her jawline ends at 0.46; his beard starts at 0.54
-    // and the rightmost edge of his head (beard, with the small ear
-    // tucked under the beanie at ~0.75) ends at 0.78. The v7 boxes
-    // ([0.27, 0.46] and [0.55, 0.76]) missed both outer ears, which is
-    // why the v7 strips cut them. These boxes hold the whole head at
-    // face height, ear to ear, with a little air to spare.
+    // The cover's lead pair, facing the camera against the sunset
+    // skyline. Her left ear (hoop earring) starts at 0.288 and her jaw
+    // ends at 0.489; his beard starts at 0.503 and the right edge of his
+    // head ends at 0.71. The two faces nearly touch, so their blocked
+    // zones merge into one — the whole-face search gives one wide
+    // middle strip holding both faces, plus thin sky slivers at the
+    // edges. The guarantee still holds; it is checked numerically in
+    // the build verification.
     faces: [
-      [0.215, 0.46],
-      [0.54, 0.78],
+      [0.288, 0.489],
+      [0.503, 0.71],
     ],
   },
   {
     id: 'convertible-duo',
     file: 'samples/convertible-duo.jpg',
     label: 'Convertible duo',
-    // Two faces nearly touching: hers 0.33–0.49, his 0.50–0.63. The
-    // margin merges them into one blocked zone, so the dividers go
-    // around the pair instead of between them.
+    // The same pair in profile in the purple convertible, facing right.
+    // Hers is narrow — a profile face: her ear sits at 0.355, her nose
+    // tip at 0.415. His beard runs 0.53 to 0.64, ear under the beanie to
+    // nose tip. Measured from zoomed crops, twice, after the first
+    // full-photo read put both faces too far right.
     faces: [
-      [0.33, 0.49],
-      [0.5, 0.63],
+      [0.355, 0.415],
+      [0.53, 0.64],
     ],
   },
   { id: 'yacht-blimp', file: 'samples/yacht-blimp.jpg', label: 'Yacht + blimp', faces: [] },
@@ -70,45 +73,51 @@ export const SAMPLE_PHOTOS = [
     id: 'dj-neon',
     file: 'samples/dj-neon.jpg',
     label: 'Neon DJ',
-    // One face, purple hair included at face height.
-    faces: [[0.38, 0.6]],
+    // One face, purple hair included at face height: the hair mass
+    // starts at 0.24 and the last wisp ends at 0.43.
+    faces: [[0.24, 0.43]],
   },
   {
     id: 'skater-boy',
     file: 'samples/skater-boy.jpg',
     label: 'Skate park',
-    // Small face, cap and braids flying; the box covers the face itself.
-    faces: [[0.42, 0.52]],
+    // Small face under the cap, braids flying; the box covers the face
+    // itself, ear to nose tip.
+    faces: [[0.5, 0.55]],
   },
   {
     id: 'chef-grill',
     file: 'samples/chef-grill.jpg',
     label: 'Street grill',
-    faces: [[0.38, 0.52]],
+    // Five faces: the chef in profile at the grill, then the four
+    // friends laughing behind him, left to right.
+    faces: [
+      [0.3, 0.45],
+      [0.48, 0.55],
+      [0.6, 0.67],
+      [0.75, 0.82],
+      [0.9, 0.96],
+    ],
   },
   {
     id: 'cowboy-gas',
     file: 'samples/cowboy-gas.jpg',
     label: 'Desert gas stop',
-    // Profile face under the hat brim.
-    faces: [[0.42, 0.53]],
+    // Profile face under the hat brim: ear at 0.32, nose tip at 0.39.
+    faces: [[0.32, 0.39]],
   },
   {
     id: 'sax-corner',
     file: 'samples/sax-corner.jpg',
     label: 'Sax at midnight',
-    faces: [[0.43, 0.57]],
+    // Profile face, eyes closed at the mouthpiece: nose tip at 0.59,
+    // earring at 0.74.
+    faces: [[0.59, 0.74]],
   },
-  {
-    id: 'surfer-dawn',
-    file: 'samples/surfer-dawn.jpg',
-    label: 'Surfer at dawn',
-    // Profile face, blond hair to the left of it.
-    faces: [[0.45, 0.56]],
-  },
+  { id: 'surfer-dawn', file: 'samples/surfer-dawn.jpg', label: 'Surfer at dawn', faces: [] },
 ];
 
-// Load one image from a URL; resolves with the HTMLImageElement.
+// Load one image; resolves with the HTMLImageElement.
 export function loadImage(src) {
   return new Promise((resolve, reject) => {
     const img = new Image();
@@ -118,9 +127,10 @@ export function loadImage(src) {
   });
 }
 
-// Load every sample photo. Returns an array of photo records
-// { id, label, src, img, uploaded: false, faces } in SAMPLE_PHOTOS
-// order. A sample that fails to load is skipped, never fatal.
+// Load every sample photo, in SAMPLE_PHOTOS order. Each record is
+// { id, label, src, img, uploaded: false, faces }. A sample that fails
+// to load is skipped — the tray just shows fewer photos, the editor
+// never blocks on one bad file.
 export async function loadSamples() {
   const out = [];
   for (const s of SAMPLE_PHOTOS) {
@@ -128,16 +138,15 @@ export async function loadSamples() {
       const img = await loadImage(s.file);
       out.push({ id: s.id, label: s.label, src: s.file, img, uploaded: false, faces: s.faces });
     } catch {
-      // A missing sample never blocks the editor; the tray just shows fewer.
+      // Skip, never fatal.
     }
   }
   return out;
 }
 
-// Turn user-chosen File objects into photo records with the same shape
-// as samples, backed by object URLs (the bytes never leave the machine).
-// Uploads carry no face data, so Strip Five falls back to equal
-// dividers for them.
+// Turn user-chosen files into photo records with the same shape as the
+// samples, backed by object URLs. Uploads carry no face data, so Strip
+// Five falls back to equal dividers for them.
 export function filesToPhotos(files) {
   const out = [];
   for (const f of files) {
@@ -149,7 +158,7 @@ export function filesToPhotos(files) {
   return out;
 }
 
-// Finish loading the image of an uploaded photo record, in place.
+// Finish loading an uploaded photo's image, in place.
 export async function hydrateUpload(photo) {
   if (photo.img) return photo;
   photo.img = await loadImage(photo.src);

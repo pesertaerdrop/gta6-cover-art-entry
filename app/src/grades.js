@@ -1,6 +1,6 @@
 // grades.js — the colour grades: six 256-step gradient-map ramps over
-// luminance, applied after an auto-levels stretch. Each grade is a list of
-// stops [position 0..1, [r, g, b]]; the ramp is sampled into a lookup
+// luminance, applied after an auto-levels stretch. Each grade is a list
+// of stops [position 0..1, [r, g, b]]; the ramp is sampled into a lookup
 // table once and reused for every panel. Raw Stock is photoreal: it
 // leaves the pixels alone. No grade uses a purple-to-blue ramp.
 

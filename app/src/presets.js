@@ -1,5 +1,7 @@
-// presets.js — the four cover presets, one click each: a layout, a
-// grade, an ink strength, and copy that fits the art.
+// presets.js — four one-click covers. A preset is a layout, a grade,
+// an ink setting, and copy that fits the art. Applying one re-assigns
+// the photos for its layout; the undo history still records it like
+// any other change, so a preset is never a trap.
 
 export const PRESETS = [
   {
@@ -48,8 +50,9 @@ export function presetById(id) {
   return PRESETS.find((p) => p.id === id) || PRESETS[0];
 }
 
-// Apply a preset to a state (the layout change re-assigns the photos).
-export function applyPreset(state, presetId, photos) {
+// Copy a preset's fields onto a state. The caller re-assigns the
+// photos afterwards, because the layout change needs the library.
+export function applyPreset(state, presetId) {
   const p = presetById(presetId);
   state.title = p.title;
   state.subtitle = p.subtitle;

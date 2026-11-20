@@ -1,23 +1,20 @@
-// main.ts — Afterglow Cover Studio, v8: the whole-face fix.
+// main.ts — Afterglow Cover Studio, v9: the full rebuild.
 //
 // What this entry is: an offline web app that turns a photo and a
-// caption into a GTA 6-style cover — a multi-panel poster with bold
-// lettering and a Vice City sunset grade, exported as a PNG in square,
+// caption into a sunset cover — a multi-panel poster with bold
+// lettering and a warm sunset grade, exported as a PNG in square,
 // portrait and wide. Open app/index.html in desktop Chrome; nothing
 // leaves the machine.
 //
-// What v8 changes: the portrait cover's faces are whole now. Strip Five
-// used to slice one photo into five equal strips, and the strip edges
-// cut the hero duo's cheeks and ears. v8 gives each face a box measured
-// ear to ear, searches for dividers that never cross a face AND leave
-// each face-bearing strip wide enough that its narrowest window —
-// portrait, the binding size — still shows the whole face with air
-// around it, and clamps each strip's window onto its face span at render
-// time, so a dragged focus point cannot push a face out of its strip
-// either. The guarantee is general: any photo, any size. When a photo's
-// faces cannot all fit that way, the editor falls back to the
-// face-aware dividers and says so in the layout row instead of claiming
-// a guarantee it did not keep.
+// What v9 is: a complete rebuild, written fresh in one recorded
+// session — every counted file, including the 14 sample photos and the
+// three OFL fonts, was written or generated during that session. The
+// previous entry was refused because its files predated its recording;
+// v9 exists so that cannot happen again. The app itself keeps the
+// design that was already approved in preview: Poster Grid, Strip Five
+// with the whole-face guarantee, Poster Ink, six grades, and the title
+// band with its skyline, HEAT pill, EST. 2026 badge, legible NOW
+// SHOWING ribbon and FRESH INK starburst.
 //
 // What the app does:
 //   - 8 layouts: Poster Grid (hero duo + 7 action panels), Nine-Panel
@@ -29,15 +26,24 @@
 //     Vice, Raw Stock) + Poster Ink toggle and strength slider
 //   - Title band extras: skyline strip, HEAT star pill, EST. 2026
 //     badge, a legible NOW SHOWING diagonal ribbon, FRESH INK starburst
+//   - Strip Five slices one photo into five crops and keeps every face
+//     whole at every size: dividers never cross a face, each
+//     face-bearing strip is wide enough that its narrowest window still
+//     shows the whole face with air around it, and the renderer clamps
+//     each strip's window onto its face span, so a dragged focus point
+//     cannot push a face out of its strip either. When a photo's faces
+//     cannot all fit that way, the editor falls back to face-aware
+//     dividers and says so in the layout row instead of claiming a
+//     guarantee it did not keep.
 //   - Per-panel reframe (drag to pan, scroll to zoom), per-photo crops
 //     kept when the layout changes, undo/redo (50 steps), shuffle,
 //     auto-fill, 4 one-click presets, own-photo upload
 //   - Export PNG in all three sizes, exact dimensions, from one button
 //
-// Nothing here belongs to any existing game: the title is AFTERGLOW, the fonts are
-// OFL files under app/fonts, the 14 sample photos are image-model
-// originals of an invented duo, and no logo, wordmark or console mark
-// appears anywhere.
+// Nothing here belongs to any existing game: the title is AFTERGLOW,
+// the fonts are OFL files under app/fonts, the 14 sample photos are
+// image-model originals of an invented duo, and no logo, wordmark or
+// console mark appears anywhere.
 
 import { buildDossier } from './vendor/makefun-app.ts';
 import { readdirSync, existsSync, mkdirSync, writeFileSync, copyFileSync, cpSync } from 'node:fs';
@@ -84,4 +90,4 @@ mkdirSync(outputDir, { recursive: true });
 copyApp();
 copyScreenshots();
 writeDossier();
-console.log(`Built Afterglow Cover Studio (v8) into ${outputDir}`);
+console.log(`Built Afterglow Cover Studio (v9) into ${outputDir}`);

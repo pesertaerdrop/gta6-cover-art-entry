@@ -3,14 +3,14 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Afterglow Cover Studio — GTA 6-style cover art, offline</title>
+<title>Afterglow Cover Studio — sunset cover art, offline</title>
 <link rel="stylesheet" href="style.css" />
 </head>
 <body>
 <header class="app-header">
   <div class="brand">
     <h1>Afterglow <span>Cover Studio</span></h1>
-    <p>Turn a photo and a caption into a GTA 6-style cover. Offline, in your browser.</p>
+    <p>Turn a photo and a caption into a sunset cover. Offline, in your browser.</p>
   </div>
   <div class="header-actions">
     <button id="undoBtn" type="button" class="ghost-btn" disabled>Undo</button>
@@ -90,10 +90,17 @@
   const shotId = params.get('shot');
   if (shotId) {
     // Screenshot mode: render one deterministic scene and signal
-    // readiness, so the screenshot runner never has to guess.
+    // readiness, so the screenshot runner never has to guess. The
+    // fonts are loaded first, so the title band never renders in a
+    // fallback face.
     const shot = SHOTS.find((s) => s.id === shotId);
     if (shot) {
       document.body.classList.add('shot-mode');
+      await Promise.all([
+        document.fonts.load('100px Anton'),
+        document.fonts.load('100px "Bebas Neue"'),
+        document.fonts.load('100px "Kaushan Script"'),
+      ]).catch(() => {});
       if (shotId === 'editor') {
         await import('./src/main.js');
         window.__shotReady = true;

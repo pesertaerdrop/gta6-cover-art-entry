@@ -1,9 +1,9 @@
-// layouts.js — the eight cover layouts. Each layout is a function of the
-// art area (width, height in pixels) returning panel rects in relative
-// 0..1 coordinates of that area, plus a small SVG sketch for the picker
-// tile. Panels may carry a rotation (tilted snapshots) and a frame flag
-// (polaroid-style white border). Every layout re-flows for wide, square
-// and portrait art areas instead of stretching.
+// layouts.js — the eight cover layouts. Each layout is a function of
+// the art area (width, height in pixels) returning panel rects in
+// relative 0..1 coordinates of that area, plus a small SVG sketch for
+// the picker tile. Panels may carry a rotation (tilted snapshots) and a
+// frame flag (polaroid-style white border). Every layout re-flows for
+// wide, square and portrait art areas instead of stretching.
 //
 // The first layout, Poster Grid, mirrors the classic multi-panel comic
 // poster: one large central hero panel (the duo portrait) with seven

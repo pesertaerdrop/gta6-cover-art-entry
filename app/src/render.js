@@ -98,8 +98,7 @@ export function panelWindow(photo, rectW, rectH, panel) {
   if (panel.slice) {
     return sliceWindow(photo.img, rectW, rectH, panel.slice, panel.y, panel.zoom);
   }
-  const win = cropWindow(photo.img, rectW, rectH, panel);
-  return win;
+  return cropWindow(photo.img, rectW, rectH, panel);
 }
 
 // Draw one photo into one panel (offscreen, at panel pixels).
@@ -180,10 +179,7 @@ export function renderCover(ctx, W, H, state, library) {
   ctx.fillRect(0, bandY, W, bandH);
   drawSkyline(ctx, 0, bandY, W, bandH * 0.26, 7);
 
-  const titleSize = drawTitle(
-    ctx, state.title, W * 0.03, bandY + bandH * 0.56, W * 0.58, H * 0.115,
-  );
-  void titleSize;
+  drawTitle(ctx, state.title, W * 0.03, bandY + bandH * 0.56, W * 0.58, H * 0.115);
 
   // HEAT pill + EST badge on the band's right side.
   const badgeR = bandH * 0.17;

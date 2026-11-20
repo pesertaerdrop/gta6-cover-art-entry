@@ -6,7 +6,7 @@
 // Strip Five panels are different: a panel is { photoId, slice, y,
 // zoom } where slice is { x0, x1, fx, face } — the span of the lead
 // photo the strip shows, the focus point inside it, and the span of the
-// faces in that slice (null when it holds no face). The spans come from
+// faces in that slice (null when it holds none). The spans come from
 // faces.js: the dividers never cross a face, and — where the photo's
 // faces allow it — each face-bearing slice is wide enough that its
 // narrowest window shows its face whole, with air around it. The state
