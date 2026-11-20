@@ -175,7 +175,10 @@ export function drawFinishLayer(ctx, doc, W, H, accent) {
   drawBarcode(ctx, W - barW - Math.round(W * 0.03), sealR * 2 + Math.round(H * 0.04), barW, barH, barcodeNumber(doc.title.length * 7919 + doc.panels.length * 131));
   // Billing block: one centred line under the top row, between the volume
   // tag and the seal, so the bottom band stays free for the callout tags.
-  drawBillingLine(ctx, W * 0.12, H * 0.082, W * 0.66, doc.billing, Math.round(H * 0.014));
+  // The box runs 0.10W..0.82W: its right edge stays clear of the barcode
+  // (which starts at 0.84W) and its left edge stays clear of the volume
+  // tag, while the extra width gives the billing room to fit whole.
+  drawBillingLine(ctx, W * 0.10, H * 0.082, W * 0.72, doc.billing, Math.round(H * 0.014));
   // Coming soon, centred above the quote bar.
   if (doc.comingSoon) drawComingSoon(ctx, 0, H * 0.858, W, Math.round(H * 0.02));
   // Five-star review-quote bar along the bottom edge.

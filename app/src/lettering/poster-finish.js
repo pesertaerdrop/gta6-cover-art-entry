@@ -109,20 +109,38 @@ export function drawQuoteBar(ctx, x, y, w, quote, outlet, fontSize) {
 }
 
 export function drawBillingLine(ctx, x, y, w, text, fontSize) {
+  const full = text.toUpperCase();
+  // Shrink the line until the whole billing fits inside its box, measuring
+  // with whatever font is actually live at draw time: Oswald can still be
+  // loading when a capture draws, and the fallback then measures far wider
+  // than Oswald, so a size picked from Oswald's metrics alone would not
+  // fit. Never cut the text: a billing that ends in "..." reads as a
+  // broken poster. Returns the font size the billing was drawn at.
+  const floor = Math.max(8, Math.round(fontSize * 0.55));
+  let size = fontSize;
   ctx.save();
-  ctx.font = `${fontSize}px Oswald, sans-serif`;
+  ctx.font = `${size}px Oswald, sans-serif`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  let shown = text.toUpperCase();
-  while (ctx.measureText(shown).width > w && shown.length > 12) {
-    shown = shown.slice(0, -1);
+  while (ctx.measureText(full).width > w && size > floor) {
+    const next = Math.max(floor, Math.round(size * 0.92));
+    if (next >= size) break;
+    size = next;
+    ctx.font = `${size}px Oswald, sans-serif`;
   }
-  if (shown.length < text.length) shown = `${shown.trim()}...`;
+  if (ctx.measureText(full).width > w) {
+    // Even at the floor the line does not fit: wrap it over two lines,
+    // centred on the same y, instead of dropping any of it.
+    ctx.restore();
+    drawBillingBlock(ctx, x, y - size * 1.15, w, text, size);
+    return size;
+  }
   ctx.shadowColor = 'rgba(0, 0, 0, 0.85)';
-  ctx.shadowBlur = Math.round(fontSize * 0.4);
+  ctx.shadowBlur = Math.round(size * 0.4);
   ctx.fillStyle = '#fff';
-  ctx.fillText(shown, x + w / 2, y);
+  ctx.fillText(full, x + w / 2, y);
   ctx.restore();
+  return size;
 }
 
 export function drawBillingBlock(ctx, x, y, w, text, fontSize) {
