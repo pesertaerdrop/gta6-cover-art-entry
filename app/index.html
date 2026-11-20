@@ -1,122 +1,101 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Afterglow Cover Studio — sunset cover art, offline</title>
-<link rel="stylesheet" href="style.css" />
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sunset Strip Studio — turn a photo into a sunset-strip cover</title>
+<link rel="stylesheet" href="style.css">
 </head>
 <body>
-<header class="app-header">
+<header class="top">
   <div class="brand">
-    <h1>Afterglow <span>Cover Studio</span></h1>
-    <p>Turn a photo and a caption into a sunset cover. Offline, in your browser.</p>
+    <h1>Sunset Strip <span>Studio</span></h1>
+    <p>Turn a photo and a caption into a sunset-strip cover. Offline, in your browser.</p>
   </div>
-  <div class="header-actions">
-    <button id="undoBtn" type="button" class="ghost-btn" disabled>Undo</button>
-    <button id="redoBtn" type="button" class="ghost-btn" disabled>Redo</button>
-    <button id="shuffleBtn" type="button" class="ghost-btn">Shuffle photos</button>
-    <button id="exportBtn" type="button" class="export-btn">EXPORT PNG</button>
+  <div class="steps">1 Add photos &middot; 2 Pick a layout &middot; 3 Export</div>
+  <div class="top-actions">
+    <button id="undoBtn" type="button">Undo</button>
+    <button id="redoBtn" type="button">Redo</button>
+    <button id="exportBtn" type="button" class="export">EXPORT PNG</button>
   </div>
 </header>
 
-<main class="editor">
+<main class="workbench">
   <section class="preview-col">
-    <div class="size-row" role="group" aria-label="Cover size">
-      <button class="size-chip" type="button" data-size="square">Square 1080&times;1080</button>
-      <button class="size-chip" type="button" data-size="portrait">Portrait 1080&times;1350</button>
-      <button class="size-chip active" type="button" data-size="wide">Wide 1920&times;1080</button>
-    </div>
+    <div class="size-row" id="sizeChips"></div>
     <div class="preview-wrap">
-      <canvas id="preview" width="480" height="270"></canvas>
+      <canvas id="previewCanvas" width="920" height="518"></canvas>
     </div>
-    <p id="panelHint" class="panel-hint"></p>
-    <div id="panelRow" class="panel-row"></div>
+    <p class="hint">Drag on the preview to reframe the pink panel. Scroll to zoom. Click another panel to select it.</p>
+    <div class="panel-tools">
+      <button id="zoomOutBtn" type="button">&minus; Zoom</button>
+      <button id="zoomInBtn" type="button">+ Zoom</button>
+      <button id="resetCropBtn" type="button">Reset crop</button>
+    </div>
     <div class="export-row">
-      <button id="exportAllBtn" type="button" class="secondary-btn">Export all 3 sizes</button>
-      <span class="export-note">PNG, exact cover size. No upload, no account.</span>
+      <button id="exportAllBtn" type="button">Export all 3 sizes</button>
+      <span>PNG, exact cover size. No upload, no account.</span>
     </div>
+    <p class="ready" id="readyLine"></p>
   </section>
 
-  <section class="controls-col">
-    <div class="step">
-      <h2><span class="step-num">1</span> Add photos</h2>
-      <p class="step-blurb">Pick a sample, or add your own photos. Everything stays on this machine.</p>
-      <div class="upload-row">
-        <button id="uploadBtn" type="button" class="secondary-btn">Add my photos</button>
-        <input id="fileInput" type="file" accept="image/*" multiple hidden />
-        <label class="check"><input id="autoFill" type="checkbox" checked /> Auto-fill panels</label>
+  <aside class="rail">
+    <section class="card">
+      <h2><span class="num">1</span> Add photos</h2>
+      <p>Pick a sample, or add your own photos. Everything stays on this machine.</p>
+      <div class="btn-row">
+        <button id="addPhotosBtn" type="button">Add my photos</button>
+        <button id="loadSamplesBtn" type="button">Load samples</button>
       </div>
-      <div id="tray" class="tray"></div>
-      <label class="field-label" for="leadPhoto">Strip Five lead photo</label>
-      <select id="leadPhoto" class="select"></select>
-    </div>
-
-    <div class="step">
-      <h2><span class="step-num">2</span> Pick a layout</h2>
-      <p class="step-blurb">Eight layouts. Strip Five slices one photo into five crops — and keeps every face whole, at every size.</p>
-      <div id="layoutRow" class="layout-row"></div>
-      <p id="stripChip" class="strip-chip" hidden></p>
-      <label class="field-label">Presets</label>
-      <div id="presetRow" class="chip-row"></div>
-    </div>
-
-    <div class="step">
-      <h2><span class="step-num">3</span> Export</h2>
-      <p class="step-blurb">Write your title, pick a grade, then export. Three steps, one button.</p>
-      <label class="field-label" for="titleInput">Title</label>
-      <input id="titleInput" class="text-input" type="text" value="AFTERGLOW" maxlength="18" />
-      <label class="field-label" for="subtitleInput">Subtitle</label>
-      <input id="subtitleInput" class="text-input" type="text" value="one last sunset" maxlength="40" />
-      <label class="field-label" for="taglineInput">Tagline</label>
-      <input id="taglineInput" class="text-input" type="text" value="EIGHT SCENES, ONE CITY" maxlength="40" />
-      <label class="field-label">Grade</label>
-      <div id="gradeRow" class="chip-row"></div>
-      <div class="ink-row">
-        <label class="check"><input id="inkToggle" type="checkbox" checked /> Poster Ink</label>
-        <input id="inkSlider" type="range" min="0" max="100" value="80" />
-        <span id="inkValue">80%</span>
+      <div class="btn-row">
+        <button id="autoFillBtn" type="button">Auto-fill panels</button>
+        <button id="shuffleBtn" type="button">Shuffle photos</button>
       </div>
-      <p class="grade-note">Poster Ink prints the photos: posterised colour, halftone dots in the shadows, ink lines along the edges. Raw Stock leaves them as shot.</p>
-    </div>
-  </section>
+      <div class="tray" id="tray"></div>
+      <input type="file" id="fileInput" accept="image/*" multiple hidden>
+    </section>
+
+    <section class="card">
+      <h2><span class="num">2</span> Pick a layout</h2>
+      <div class="tiles" id="layoutTiles"></div>
+    </section>
+
+    <section class="card">
+      <h2>Grade</h2>
+      <div class="chips" id="gradeChips"></div>
+    </section>
+
+    <section class="card">
+      <h2>Sunset Tape</h2>
+      <p>The VHS golden-hour look: channel drift, scanlines, warm wash, grain.</p>
+      <label class="tape-row">
+        <input type="checkbox" id="tapeOn" checked>
+        <span>Sunset Tape on</span>
+        <input type="range" id="tapeStrength" min="0" max="100" value="70">
+        <span id="tapeValue">70%</span>
+      </label>
+    </section>
+
+    <section class="card">
+      <h2>Caption</h2>
+      <label class="field">Title
+        <input type="text" id="titleInput" value="SUNSET STRIP" maxlength="24">
+      </label>
+      <label class="field">Subtitle
+        <input type="text" id="subtitleInput" value="one last summer" maxlength="32">
+      </label>
+      <label class="field">Tagline
+        <input type="text" id="taglineInput" value="EIGHT SCENES, ONE BOULEVARD" maxlength="40">
+      </label>
+    </section>
+
+    <section class="card">
+      <h2>Presets</h2>
+      <div class="chips" id="presetChips"></div>
+    </section>
+  </aside>
 </main>
 
-<p id="status" class="status" role="status"></p>
-
-<script type="module">
-  import { renderShot, SHOTS } from './src/shots.js';
-  const params = new URLSearchParams(location.search);
-  const shotId = params.get('shot');
-  if (shotId) {
-    // Screenshot mode: render one deterministic scene and signal
-    // readiness, so the screenshot runner never has to guess. The
-    // fonts are loaded first, so the title band never renders in a
-    // fallback face.
-    const shot = SHOTS.find((s) => s.id === shotId);
-    if (shot) {
-      document.body.classList.add('shot-mode');
-      await Promise.all([
-        document.fonts.load('100px Anton'),
-        document.fonts.load('100px "Bebas Neue"'),
-        document.fonts.load('100px "Kaushan Script"'),
-      ]).catch(() => {});
-      if (shotId === 'editor') {
-        await import('./src/main.js');
-        window.__shotReady = true;
-      } else {
-        const canvas = await renderShot(shot);
-        document.body.innerHTML = '';
-        document.body.appendChild(canvas);
-        canvas.style.width = '100vw';
-        canvas.style.height = '100vh';
-        canvas.style.display = 'block';
-        window.__shotReady = true;
-      }
-    }
-  } else {
-    await import('./src/main.js');
-  }
-</script>
+<script type="module" src="main.js"></script>
 </body>
 </html>
