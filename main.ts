@@ -1,19 +1,19 @@
-// Sunset Strip Studio — the hand-in program for gta6-cover-art-01.
+// Saltline Cover Studio — a GTA-style cover art maker for gta6-cover-art-01.
+// The app (app/) turns any photo and a caption into a multi-panel poster:
+// seven layouts with live mini-drawings, six gradient-map grades, six chrome
+// title styles plus Auto, seven look sliders with draft-mode regrading, a
+// panel inspector with numbered badges and face marks, and a seven-element
+// poster finish on every cover (callout tags, seal, volume tag, five-star
+// review bar, billing block, generated barcode, coming soon). Fourteen
+// image-model sample photos follow one invented cast — Vera, Marcus, June
+// and Otis — so the callouts tell one story across three different covers.
+// Exports are PNGs in 1080x1080, 1080x1350 and 1920x1080, all offline.
 //
-// What it hands in: an offline web app that turns a photo and a caption
-// into a sunset-strip cover — seven layouts (Sun Disc, Boulevard,
-// Filmstrip, Postcards, Marquee, Horizon Split, Boardwalk), six grades,
-// the Sunset Tape effect (channel drift, scanlines, warm wash, seeded
-// grain), fourteen image-model sample photos of a new cast on a Florida
-// boulevard, undo/redo, and PNG export in 1080x1080, 1080x1350 and
-// 1920x1080. The program copies app/ and screenshots/ from beside this
-// file to /output and writes /output/dossier.json with the vendored
-// make.fun library, exactly as the kit's starter does. Node 22,
-// standard library only.
-//
-// Serve it locally with `node dev-server.ts`, then open
-// http://127.0.0.1:8472/app/index.html. Outside the grader's container,
-// MAKEFUN_OUTPUT_DIR stands in for /output:
+// This program (Node 22, standard library only) hands the app in: it copies
+// app/ and screenshots/ from beside this file to /output and writes
+// /output/dossier.json with the vendored make.fun library, exactly as the
+// kit starter does. Outside the grader, MAKEFUN_OUTPUT_DIR stands in for
+// /output:
 //   mkdir -p out && MAKEFUN_OUTPUT_DIR=out node main.ts
 
 import { cpSync, existsSync, mkdirSync, writeFileSync } from 'node:fs';
@@ -29,10 +29,11 @@ cpSync(join(here, 'app'), join(out, 'app'), { recursive: true });
 mkdirSync(join(out, 'screenshots'), { recursive: true });
 if (existsSync(join(here, 'screenshots'))) cpSync(join(here, 'screenshots'), join(out, 'screenshots'), { recursive: true });
 
-// The scorer's own caps (reference/gate.json): only text_max_bytes shapes the bytes; the others refuse an entry the
-// scorer would refuse (more than 4 screenshots or one over 256 KiB; more than 993 files in app/ or 48 MiB of app
-// files, in all, or a path under app/ over 1000 bytes: app/ counts beside /output's own 1000-entry cap, its
-// screenshots/ and dossier.json).
+// The scorer's own caps (reference/gate.json): only text_max_bytes shapes the
+// bytes; the others refuse an entry the scorer would refuse (more than 4
+// screenshots or one over 256 KiB; more than 993 files in app/ or 48 MiB of
+// app files, in all, or a path under app/ over 1000 bytes: app/ counts
+// beside /output's own 1000-entry cap, its screenshots/ and dossier.json).
 writeFileSync(
   join(out, 'dossier.json'),
   buildDossier(out, {

@@ -1,65 +1,60 @@
-# Sunset Strip Studio
+# Saltline Cover Studio
 
-[![gta6-cover-art-01](https://make.fun/badge/gta6-cover-art-01.svg)](https://make.fun/c/gta6-cover-art-01)
-[![rank](https://make.fun/badge/gta6-cover-art-01/pesertaerdrop/gta6-cover-art-entry/rank.svg)](https://make.fun/c/gta6-cover-art-01)
-[![reward](https://make.fun/badge/gta6-cover-art-01/pesertaerdrop/gta6-cover-art-entry/reward.svg)](https://make.fun/c/gta6-cover-art-01)
+Turn any photo and a caption into GTA-style cover art: a multi-panel poster
+with bold chrome lettering, a Vice City sunset or neon grade, and a full
+poster finish — callout tags, a seal, a volume tag, a five-star review bar,
+a billing block, a generated barcode, and a coming-soon line. Exports PNGs
+in 1080×1080, 1080×1350, and 1920×1080, all offline in the browser. Your
+photos never leave the machine.
 
-Turn a photo and a caption into a sunset-strip cover — a 1980s Florida
-boulevard poster, made offline in your browser. Part of the
-[make.fun GTA 6 cover art bounty](https://make.fun/bounty/gta6-cover-art-01).
+## How it works
 
-## Three steps, one PNG
+1. **Add photos** — tap one of the 14 sample photos, drop your own in, or
+   paste from the clipboard. One invented cast (Vera, Marcus, June, Otis)
+   recurs across the covers, so the callout tags tell one story.
+2. **Caption** — title, script line, tagline ribbon, review quote and
+   outlet, billing block, volume tag. All editable.
+3. **Export PNG** — tick the sizes, hit Export all three.
 
-1. **Add photos** — pick one of the 14 samples, or add your own. Photos
-   never leave your machine; nothing is uploaded.
-2. **Pick a layout** — seven ways to hang the photos: Sun Disc, Boulevard,
-   Filmstrip, Postcards, Marquee, Horizon Split, Boardwalk.
-3. **Export** — one big pink button writes the PNG in 1080×1080,
-   1080×1350 and 1920×1080, all three at once.
+## The systems
 
-## What it does
-
-- **Sunset Tape** — the signature look: a VHS golden-hour treatment
-  (channel drift, scanlines, warm wash, seeded grain) with a strength
-  slider. Six grades beside it: Golden Hour, Neon Nights, Palm Shade,
-  Bubblegum, Silver Screen, Raw Stock.
-- **Any photo** — click a panel to select it, drag to reframe, scroll to
-  zoom. Faces are measured from the photos, so a crop centres on the
-  people, never cuts them. One photo can fill a whole cover; several
-  photos fill the panels.
-- **Lettering** — a big gradient title, a neon script subtitle, a
-  perforated ticket-stub tagline, a sunset clock badge set to 7:47 PM,
-  palm silhouettes and a sun disc. Title, subtitle and tagline are all
-  editable.
-- **Undo / redo**, three one-tap presets, auto-fill, shuffle, and a
-  readiness line that says what is set before you export.
-
-## The cast
-
-Fourteen photos, all made with an image model for this entry (no real
-people): Maya and Rico on a Florida boardwalk at golden hour, a purple
-lowrider, a roller rink, a beach bonfire, a speedboat, deco hotels, a
-ferris wheel, a taco truck, a convertible under neon, a lifeguard tower,
-a rooftop pool, a motorcycle at dusk, an ice-cream parlor, jet skis.
+- **7 layouts** (Hero Mosaic, Hero Plus Three, Six Grid, Diagonal Trio,
+  Seven Mosaic, Filmstrip, Postcards), drawn as live mini-tiles; changing
+  size re-matches photos so every panel stays filled.
+- **6 grades** (Sunset, Neon Night, Golden Hour, Tropic Teal, Heatwave,
+  Rose Dusk) as gradient-map LUTs with swatch chips.
+- **6 title styles plus Auto** (match grade), giant chrome title, neon
+  script overlapping the caps, tagline ribbon with side triangles.
+- **7 look sliders** — Paint, Grade, Halftone, Grain, Glow, Title size,
+  Title lift — with draft-mode regrading while dragging.
+- **Panel inspector** — 88×88 thumbnail, zoom slider 100–400%, Photo
+  prev/next, Reset / Flip / Swap / Face-mark, callout tag field; numbered
+  badges on panels, selected panel outlined with crosshair and zoom badge.
+- **Editor flow** — clickable 3-step header, Auto layout, Surprise me,
+  help dialog with the full shortcut list, undo/redo, per-size export
+  checkboxes, status line.
+- **Keyboard** — Tab/1–7 select, arrows pan, +/− zoom, [ ] photo, F flip,
+  R reset, M mark face, A auto layout, S surprise, E export.
 
 ## Run it
 
 ```sh
 node dev-server.ts
-# open http://127.0.0.1:8472/app/index.html
+# open http://localhost:8080
 ```
 
-Everything is static files under `app/`; the app makes no network
-request. Fonts (Bungee, Lilita One, Sacramento) are SIL Open Font
-License files under `app/fonts/`. Nothing here is a game studio's
-artwork, logo or font — the whole cover is original.
-
-## Build
+## Hand it in
 
 ```sh
 mkdir -p out && MAKEFUN_OUTPUT_DIR=out node main.ts
 ```
 
-`main.ts` (Node 22, standard library only) copies `app/` and
-`screenshots/` to the output directory and writes `dossier.json` with
-the kit's `vendor/makefun-app.ts`.
+## Licenses
+
+- Code: MIT (see LICENSE).
+- Fonts (under `app/fonts/`): SIL Open Font License 1.1 — Anton,
+  Archivo Black, Oswald, Mr Dafoe, Fascinate Inline. See `OFL.txt`.
+- Sample photos: made with an image model for this entry; the cast is
+  invented, no real people.
+
+No game-studio logo, artwork, or font is used anywhere in this entry.
