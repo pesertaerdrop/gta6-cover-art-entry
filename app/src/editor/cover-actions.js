@@ -1,12 +1,16 @@
-// The one-tap cover actions: Auto layout (picks the layout whose panel
-// count fits the photos best and re-matches them), Surprise me (a new
-// layout, a new grade and a new caption from the caption deck), and the
-// undo/redo buttons in the header.
+// The one-tap cover actions.
+//
+// Auto layout picks the layout whose panel count fits the photos best
+// (fewest panels wasted, ties broken by layout id) and re-matches the
+// panels to it. Surprise me rolls a new layout, a new grade and a new
+// caption from the deck, and fills the caption fields from it. The header
+// undo/redo buttons call the studio's undo and redo.
 import { CAPTION_DECK } from '../state/default-doc.js';
 import { LAYOUT_LIST, layoutPanelCount } from '../layouts/layout-presets.js';
 import { GRADES } from '../effects/grade-presets.js';
 import { rematchPanels } from '../layouts/plan-cover.js';
 
+// The layout whose panel count is closest to the document's panel count.
 export function pickAutoLayout(doc) {
   const scored = LAYOUT_LIST.map((layout) => ({
     layout,
@@ -24,6 +28,9 @@ export function applyAutoLayout(studio) {
   studio.commit('auto layout');
 }
 
+// A fresh cover: a random layout, a random grade, a random deck caption
+// (with its fields written into the document), title style back to Auto,
+// and the panels re-matched to the new layout.
 export function applySurpriseMe(studio) {
   const doc = studio.doc;
   const layout = LAYOUT_LIST[Math.floor(Math.random() * LAYOUT_LIST.length)];

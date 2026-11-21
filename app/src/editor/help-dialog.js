@@ -1,6 +1,9 @@
-// The help dialog: a plain list of every shortcut plus the three-step
-// flow, opened from the header Help button or the question-mark key, and
-// closed from its Close button or the dialog's own backdrop.
+// The help dialog.
+//
+// A plain list of every shortcut plus the three-step flow, opened from
+// the header Help button or the question-mark key, and closed from its
+// Close button or by clicking the dialog's own backdrop. The open function
+// is hung on the studio so the keyboard module can call it too.
 export function setupHelpDialog(studio) {
   const dialog = document.getElementById('helpDialog');
   const openBtn = document.getElementById('helpBtn');

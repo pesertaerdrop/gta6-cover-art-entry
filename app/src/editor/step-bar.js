@@ -1,6 +1,9 @@
-// The clickable three-step header: 1 Add photos, 2 Caption, 3 Export PNG.
-// Clicking a step moves focus to that part of the editor and marks it
-// current, so the path from a photo to a PNG is always visible.
+// The clickable three-step header.
+//
+// 1 Add photos, 2 Caption, 3 Export PNG. Clicking a step moves focus to
+// that part of the editor (the photo tray, the title field, or the export
+// button) and marks it current, so the path from a photo to a PNG is
+// always visible.
 export function setupStepBar(studio) {
   const bar = document.getElementById('stepbar');
   const targets = {
@@ -21,6 +24,7 @@ export function setupStepBar(studio) {
   });
 }
 
+// Mark one step current (aria-current="step") and clear the others.
 export function markStep(number) {
   const bar = document.getElementById('stepbar');
   bar.querySelectorAll('button[data-step]').forEach((button) => {

@@ -1,19 +1,26 @@
-// The photo tray: the 17 sample photos as a grid, an Add photos button
-// (file picker, drag-and-drop onto the dropzone, and paste from the
-// clipboard), and the count line. Tapping a sample fills the selected
-// panel with it; uploaded photos join the grid and stay on this machine.
+// The photo tray.
+//
+// The seventeen sample photos as a grid, an Add photos button (file
+// picker, drag-and-drop onto the dropzone, and paste from the clipboard),
+// and the count line. Tapping a sample fills the selected panel with it;
+// uploaded photos join the grid under their upload: key and stay on this
+// machine — nothing is ever sent anywhere.
 import { SAMPLE_PHOTOS } from '../photos/sample-photos.js';
+
+// The tray's items: the samples first, then the uploads, each with the
+// source to show and the label under it.
+function trayItems(studio) {
+  const samples = SAMPLE_PHOTOS.map((photo) => ({ src: photo.src, label: photo.scene, sample: true }));
+  const uploads = [...studio.uploaded.keys()].map((key) => ({ src: key, label: 'Uploaded', sample: false }));
+  return [...samples, ...uploads];
+}
 
 export function renderPhotoTray(studio) {
   const host = document.getElementById('photoTray');
   if (!host) return;
   host.innerHTML = '';
   const selected = studio.doc.panels[studio.doc.selected];
-  const all = [
-    ...SAMPLE_PHOTOS.map((photo) => ({ src: photo.src, label: photo.scene, sample: true })),
-    ...[...studio.uploaded.keys()].map((key) => ({ src: key, label: 'Uploaded', sample: false })),
-  ];
-  for (const item of all) {
+  for (const item of trayItems(studio)) {
     const figure = document.createElement('figure');
     if (selected && selected.photo === item.src) figure.className = 'picked';
     const img = document.createElement('img');
@@ -40,6 +47,8 @@ export function renderPhotoTray(studio) {
   }
 }
 
+// Wire the three ways in: the Add photos button opens the file picker,
+// the dropzone takes dragged files, and pasting an image anywhere adds it.
 export function setupPhotoInput(studio) {
   const addBtn = document.getElementById('addPhotosBtn');
   const input = document.getElementById('fileInput');

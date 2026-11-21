@@ -1,10 +1,19 @@
-// Turns a raw photo into a poster panel. The treatment is dials, not a
-// blanket: Paint posterizes lightly, the grade LUT tints by brightness,
-// Halftone prints a dot screen, Grain adds noise, Glow lifts the centre.
-// Draft mode skips the per-pixel pass so a slider drag stays live; the
-// full treatment lands on release and on export.
+// Turns a raw photo into a poster panel.
+//
+// The treatment is a set of dials, not a blanket filter: Paint posterizes
+// lightly, the grade lookup table tints by brightness, Halftone prints a
+// dot screen, Grain adds noise, Glow lifts the centre of the panel. Draft
+// mode skips the per-pixel pass so a slider drag stays live; the full
+// treatment lands when the drag ends and on export.
+//
+// The crop is face-safe: a cover-fit window into the photo, biased upward
+// when the panel's face is marked, because faces sit in the upper part of
+// a photo and a centred crop of a portrait photo into a landscape panel
+// would keep only the torso.
 import { buildLut, gradeById } from './grade-presets.js';
 
+// Posterize one channel value to a number of levels: quantize to the
+// step, then sit in the middle of the step so the bands read as print.
 function posterize(value, levels) {
   if (levels >= 256) return value;
   const step = 256 / levels;
@@ -12,31 +21,36 @@ function posterize(value, levels) {
 }
 
 // The source rectangle for a cover-fit draw of img into rect at the given
-// zoom and pan, biased upward when the panel's face is marked (faces sit
-// in the upper part of a photo, so the crop keeps them in frame).
+// zoom and pan. The window is the panel's shape scaled up by the zoom;
+// panning moves it across the photo, clamped so it never leaves the photo.
 function coverSource(img, rect, zoom, panX, panY, faceMarked) {
   const scale = Math.max(rect.w / img.width, rect.h / img.height) * zoom;
   const sw = rect.w / scale;
   const sh = rect.h / scale;
-  let sx = (img.width - sw) / 2 + (panX || 0) * (img.width - sw) / 2;
+  const slackX = img.width - sw;
+  const slackY = img.height - sh;
+  let sx = slackX / 2 + (panX || 0) * slackX / 2;
   let sy;
-  const portraitPhoto = img.height > img.width;
-  const landscapePanel = rect.w > rect.h;
-  if (portraitPhoto && landscapePanel) {
-    // Faces sit in the upper third of a portrait photo; a centred crop
-    // would keep only the torso. Start the crop near the top instead
-    // (higher still when the face is marked).
+  const tallPhoto = img.height > img.width;
+  const widePanel = rect.w > rect.h;
+  if (tallPhoto && widePanel) {
+    // A portrait photo into a landscape panel: the window is a horizontal
+    // slice, and a centred one would keep only the torso. Start it near
+    // the top instead (higher still when the face is marked).
     const topBias = faceMarked ? 0.08 : 0.15;
-    sy = (img.height - sh) * topBias + (panY || 0) * (img.height - sh) / 2;
+    sy = slackY * topBias + (panY || 0) * slackY / 2;
   } else {
-    sy = (img.height - sh) / 2 + (panY || 0) * (img.height - sh) / 2;
+    sy = slackY / 2 + (panY || 0) * slackY / 2;
     if (faceMarked) sy = Math.max(0, sy - sh * 0.12);
   }
-  sx = Math.max(0, Math.min(img.width - sw, sx));
-  sy = Math.max(0, Math.min(img.height - sh, sy));
+  sx = Math.max(0, Math.min(slackX, sx));
+  sy = Math.max(0, Math.min(slackY, sy));
   return { sx, sy, sw, sh };
 }
 
+// The per-pixel pass: grade lookup, then posterize, then grain. The
+// lookup maps each channel by its own brightness; posterize uses fewer
+// levels as Paint rises (16 levels at Paint 0, about 4 at Paint 20).
 function applyPixels(imageData, lut, paint, grain) {
   const data = imageData.data;
   const levels = Math.max(2, Math.round(16 - paint * 0.6));
@@ -60,6 +74,7 @@ function applyPixels(imageData, lut, paint, grain) {
   }
 }
 
+// A dot screen: black dots on a 6 px grid, darker as Halftone rises.
 function drawHalftone(ctx, rect, strength) {
   if (strength <= 0) return;
   const spacing = 6;
@@ -76,6 +91,8 @@ function drawHalftone(ctx, rect, strength) {
   ctx.restore();
 }
 
+// A soft white lift centred a third of the way down the panel, blended
+// in overlay mode so it brightens without washing out.
 function drawGlow(ctx, rect, strength) {
   if (strength <= 0) return;
   const cx = rect.x + rect.w / 2;
@@ -101,6 +118,8 @@ export function applyPosterPhoto(ctx, img, rect, opts = {}) {
   const flip = !!opts.flip;
   const src = coverSource(img, rect, zoom, opts.panX || 0, opts.panY || 0, !!opts.faceMarked);
 
+  // Draft: draw the cropped photo straight onto the canvas, clipped to
+  // the panel, with no per-pixel work.
   if (opts.draft) {
     ctx.save();
     ctx.beginPath();
@@ -117,6 +136,8 @@ export function applyPosterPhoto(ctx, img, rect, opts = {}) {
     return;
   }
 
+  // Full: draw the crop onto an offscreen canvas, run the per-pixel pass
+  // on it, add the dot screen and the glow, then stamp it onto the cover.
   const off = document.createElement('canvas');
   off.width = Math.max(1, Math.round(rect.w));
   off.height = Math.max(1, Math.round(rect.h));

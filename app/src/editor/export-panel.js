@@ -1,19 +1,24 @@
-// The export panel: per-size checkboxes for the three post sizes (1080 by
-// 1080, 1080 by 1350, 1920 by 1080), the big Export all three button, and
-// the status line. Each chosen size renders the cover at exactly those
-// pixels and downloads as a PNG.
+// The export panel.
+//
+// Per-size checkboxes for the three post sizes (1080 by 1080, 1080 by
+// 1350, 1920 by 1080), the big Export all three button, and the status
+// line. Each chosen size renders the cover at exactly those pixels and
+// downloads as a PNG named saltline-<size>.png.
 import { renderCoverToCanvas } from '../render/render-cover.js';
 
+// The three post sizes in export pixels.
 export const EXPORT_SIZES = {
   '1:1': { w: 1080, h: 1080, label: '1080 by 1080 square' },
   '4:5': { w: 1080, h: 1350, label: '1080 by 1350 portrait' },
   '16:9': { w: 1920, h: 1080, label: '1920 by 1080 wide' },
 };
 
+// The sizes whose checkboxes are ticked, in the order they appear.
 function checkedSizes() {
   return [...document.querySelectorAll('input[data-export-size]:checked')].map((input) => input.dataset.exportSize);
 }
 
+// Download a canvas as a PNG file, resolving true when the blob was made.
 function downloadPng(canvas, filename) {
   return new Promise((resolve) => {
     canvas.toBlob((blob) => {
@@ -31,6 +36,8 @@ function downloadPng(canvas, filename) {
   });
 }
 
+// Export every ticked size, one after another, and report how many
+// landed on the status line.
 export async function exportAllSizes(studio) {
   const status = document.getElementById('exportStatus');
   const sizes = checkedSizes();

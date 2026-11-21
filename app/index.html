@@ -1,4 +1,11 @@
 <!doctype html>
+<!-- Saltline Cover Studio — the editor shell.
+  Three columns: the photo rail (samples, layouts, grades, title styles),
+  the stage (live preview, caption fields), and the control rail (panel
+  inspector, look sliders, size, export). Every id below is a hook a module
+  in src/ binds to; the preview canvas is where render-cover draws the
+  cover, and the shot canvas is where a ?shot= scene draws one cover
+  full-frame for the screenshots. -->
 <html lang="en">
 <head>
 <meta charset="utf-8">
@@ -7,6 +14,7 @@
 <link rel="stylesheet" href="./style.css">
 </head>
 <body>
+<!-- Top bar: brand, the three-step path, and the global actions. -->
 <header class="topbar">
   <div class="brand">SALTLINE<em>cover studio</em></div>
   <nav class="stepbar" id="stepbar" aria-label="Three steps from photo to poster">
@@ -25,6 +33,7 @@
 </header>
 
 <main class="workbench">
+  <!-- Left rail: pick the photos, the layout, the grade, the title style. -->
   <div class="rail">
     <section class="card" aria-labelledby="photosHeading">
       <h2 id="photosHeading">Photos <span class="count" id="photoCount">17 samples</span></h2>
@@ -54,6 +63,7 @@
     </section>
   </div>
 
+  <!-- Stage: the live preview, then the caption fields. -->
   <div class="stage">
     <div class="preview-wrap">
       <canvas id="preview" width="1280" height="720" aria-label="Live cover preview"></canvas>
@@ -97,6 +107,8 @@
     </section>
   </div>
 
+  <!-- Right rail: inspect the selected panel, tune the look, pick a size,
+    export the PNGs. -->
   <div class="rail">
     <section class="card" aria-labelledby="inspectorHeading">
       <h2 id="inspectorHeading">Panel inspector</h2>
@@ -132,8 +144,11 @@
   </div>
 </main>
 
+<!-- Shot stage: hidden in the editor, shown when a ?shot= scene draws one
+  cover full-frame for the screenshots. -->
 <div class="shot-stage"><canvas id="shotCanvas" width="1280" height="720"></canvas></div>
 
+<!-- Help: every shortcut and the three-step flow. -->
 <dialog id="helpDialog" aria-labelledby="helpTitle">
   <h2 id="helpTitle">Saltline shortcuts</h2>
   <p>Three steps: add photos, caption the cover, export the PNG. Everything below works with mouse or keyboard.</p>

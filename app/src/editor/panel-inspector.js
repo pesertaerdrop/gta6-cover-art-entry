@@ -1,11 +1,23 @@
-// The panel inspector card: an 88x88 thumbnail of the selected panel's
-// photo, the panel's title and a "smart crop, faces kept whole" note, a zoom
-// slider from 100 to 400 percent, Photo previous/next buttons, Reset, Flip,
-// Swap and Face-mark buttons, and the callout tag field. Every control acts
-// on the selected panel and commits so undo can step back.
+// The panel inspector card.
+//
+// For the selected panel it shows an 88x88 thumbnail of the panel's photo
+// (drawn with the same poster treatment as the cover), the panel's title
+// and a "smart crop, faces kept whole" note, a zoom slider from 100 to
+// 400 percent, Photo previous/next buttons, Reset, Flip, Swap and
+// Face-mark buttons, and the callout tag field. Every control acts on the
+// selected panel and commits, so undo can step back from it.
 import { drawPanelPhoto } from '../effects/poster-photo.js';
 import { zoomPanel, resetPanel, swapPanelPhotos } from './panel-gestures.js';
 import { nextSamplePhoto, labelOf } from '../photos/sample-photos.js';
+
+// A small button in a row, wired to a handler.
+function rowButton(label, onClick) {
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.textContent = label;
+  btn.addEventListener('click', onClick);
+  return btn;
+}
 
 export function renderInspector(studio) {
   const host = document.getElementById('inspectorBody');
@@ -19,6 +31,7 @@ export function renderInspector(studio) {
   }
   const img = studio.images.get(panel.photo);
 
+  // Head: the thumbnail and the panel's name.
   const head = document.createElement('div');
   head.className = 'inspector-thumb';
   const thumb = document.createElement('canvas');
@@ -40,6 +53,8 @@ export function renderInspector(studio) {
   head.appendChild(who);
   host.appendChild(head);
 
+  // Zoom: a slider from 100 to 400 percent with a live value. Dragging
+  // re-renders in draft; releasing commits.
   const zoomRow = document.createElement('div');
   zoomRow.className = 'slider-row';
   const zoomLabel = document.createElement('label');
@@ -65,54 +80,38 @@ export function renderInspector(studio) {
   zoomRow.appendChild(zoomOut);
   host.appendChild(zoomRow);
 
+  // Photo: step to the previous or next sample photo in the library.
   const photoRow = document.createElement('div');
   photoRow.className = 'btn-row';
-  const prevBtn = document.createElement('button');
-  prevBtn.type = 'button';
-  prevBtn.textContent = '← Photo';
-  prevBtn.addEventListener('click', () => {
+  photoRow.appendChild(rowButton('← Photo', () => {
     panel.photo = nextSamplePhoto(panel.photo, -1).src;
     studio.commit('previous photo');
-  });
-  const nextBtn = document.createElement('button');
-  nextBtn.type = 'button';
-  nextBtn.textContent = 'Photo →';
-  nextBtn.addEventListener('click', () => {
+  }));
+  photoRow.appendChild(rowButton('Photo →', () => {
     panel.photo = nextSamplePhoto(panel.photo, 1).src;
     studio.commit('next photo');
-  });
-  photoRow.appendChild(prevBtn);
-  photoRow.appendChild(nextBtn);
+  }));
   host.appendChild(photoRow);
 
+  // Actions: reset the crop, flip the photo, swap with the next panel,
+  // and mark (or unmark) the face so the crop keeps it whole.
   const actionRow = document.createElement('div');
   actionRow.className = 'btn-row';
-  const resetBtn = document.createElement('button');
-  resetBtn.type = 'button';
-  resetBtn.textContent = 'Reset';
-  resetBtn.addEventListener('click', () => { resetPanel(panel); studio.commit('reset panel'); });
-  const flipBtn = document.createElement('button');
-  flipBtn.type = 'button';
-  flipBtn.textContent = 'Flip';
-  flipBtn.addEventListener('click', () => { panel.flip = !panel.flip; studio.commit('flip panel'); });
-  const swapBtn = document.createElement('button');
-  swapBtn.type = 'button';
-  swapBtn.textContent = 'Swap';
-  swapBtn.addEventListener('click', () => {
+  actionRow.appendChild(rowButton('Reset', () => { resetPanel(panel); studio.commit('reset panel'); }));
+  actionRow.appendChild(rowButton('Flip', () => { panel.flip = !panel.flip; studio.commit('flip panel'); }));
+  actionRow.appendChild(rowButton('Swap', () => {
     const other = (doc.selected + 1) % doc.panels.length;
     swapPanelPhotos(doc, doc.selected, other);
     studio.commit('swap panels');
-  });
-  const faceBtn = document.createElement('button');
-  faceBtn.type = 'button';
-  faceBtn.textContent = panel.faceMarked ? 'Face marked ✓' : 'Mark face';
-  faceBtn.addEventListener('click', () => { panel.faceMarked = !panel.faceMarked; studio.commit('mark face'); });
-  actionRow.appendChild(resetBtn);
-  actionRow.appendChild(flipBtn);
-  actionRow.appendChild(swapBtn);
-  actionRow.appendChild(faceBtn);
+  }));
+  actionRow.appendChild(rowButton(panel.faceMarked ? 'Face marked ✓' : 'Mark face', () => {
+    panel.faceMarked = !panel.faceMarked;
+    studio.commit('mark face');
+  }));
   host.appendChild(actionRow);
 
+  // Callout tag: free text, uppercased, at most 16 characters. Typing
+  // re-renders live; leaving the field commits.
   const tagField = document.createElement('div');
   tagField.className = 'field';
   const tagLabel = document.createElement('label');

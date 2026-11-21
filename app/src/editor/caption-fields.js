@@ -1,7 +1,10 @@
-// Binds the seven caption fields (title, script line, tagline ribbon,
-// review quote, review outlet, billing block, volume tag) to the document.
-// Typing re-renders the preview live; leaving a field commits the change
-// so undo can step back to the earlier caption.
+// Binds the seven caption fields to the document.
+//
+// Title, script line, tagline ribbon, review quote, review outlet,
+// billing block, volume tag. Typing re-renders the preview live (the
+// title, tagline and billing fields are uppercased as they are typed);
+// leaving a field commits the change so undo can step back to the
+// earlier caption.
 export const CAPTION_FIELDS = [
   { id: 'titleInput', key: 'title', upper: true },
   { id: 'scriptInput', key: 'script', upper: false },
@@ -24,6 +27,7 @@ export function setupCaptionFields(studio) {
   }
 }
 
+// Fill the fields from a document (after undo, redo, or a scene load).
 export function syncCaptionFields(doc) {
   for (const field of CAPTION_FIELDS) {
     const input = document.getElementById(field.id);

@@ -1,8 +1,11 @@
-// The live preview: renders the cover onto #preview (with the editor
-// overlay — numbered badges, a pink outline plus crosshair plus zoom badge
-// on the selected panel) and owns the pointer listeners: click to select,
-// drag to pan, wheel to zoom, double-click to reset, Shift-drag to swap.
-// It also keeps the size label and the readiness line up to date.
+// The live preview.
+//
+// Renders the cover onto #preview (with the editor overlay — numbered
+// badges on every panel, an accent outline plus crosshair plus zoom badge
+// on the selected one) and owns the pointer listeners: click to select a
+// panel, drag to pan it, wheel to zoom it, double-click to reset it,
+// Shift-drag to swap it with another. It also keeps the size label and
+// the readiness line up to date.
 import { renderCover } from '../render/render-cover.js';
 import { planCover } from '../layouts/plan-cover.js';
 import {
@@ -15,6 +18,7 @@ import {
   resetPanel,
 } from './panel-gestures.js';
 
+// What the size label says for each cover size, in export pixels.
 const EXPORT_LABEL = {
   '16:9': '16:9 wide, 1920 by 1080 export',
   '4:5': '4:5 portrait, 1080 by 1350 export',
@@ -26,6 +30,8 @@ export function setupPreviewCanvas(studio) {
   let drag = null;
   let draftTimer = null;
 
+  // Draw the cover onto the canvas (resizing the canvas to the plan when
+  // the size changed), then refresh the labels. draft draws in fast mode.
   function draw(draft) {
     const plan = planCover(studio.doc);
     if (canvas.width !== plan.w || canvas.height !== plan.h) {
@@ -38,6 +44,8 @@ export function setupPreviewCanvas(studio) {
     return plan;
   }
 
+  // The size label and the readiness line under the preview: how many
+  // panels hold a photo, and how many faces are marked.
   function updateReadiness(studio, plan) {
     const sizeLabel = document.getElementById('sizeLabel');
     if (sizeLabel) sizeLabel.textContent = EXPORT_LABEL[studio.doc.size] || studio.doc.size;
@@ -49,6 +57,7 @@ export function setupPreviewCanvas(studio) {
     }
   }
 
+  // Press: pick up the panel under the pointer and select it.
   canvas.addEventListener('pointerdown', (event) => {
     const plan = planCover(studio.doc);
     const point = pointToCanvas(canvas, event.clientX, event.clientY);
@@ -60,6 +69,7 @@ export function setupPreviewCanvas(studio) {
     }
   });
 
+  // Move: pan the dragged panel (clamped to the photo) in draft mode.
   canvas.addEventListener('pointermove', (event) => {
     if (!drag) return;
     const plan = planCover(studio.doc);
@@ -72,6 +82,8 @@ export function setupPreviewCanvas(studio) {
     studio.renderPreviewDraft();
   });
 
+  // Release: a Shift-drag onto another panel swaps the two photos; a
+  // plain drag that moved commits the pan.
   canvas.addEventListener('pointerup', (event) => {
     if (!drag) return;
     const plan = planCover(studio.doc);
@@ -86,6 +98,8 @@ export function setupPreviewCanvas(studio) {
     drag = null;
   });
 
+  // Wheel: zoom the selected panel in draft, and commit 400 ms after the
+  // last wheel tick so a flurry of ticks becomes one undo step.
   canvas.addEventListener('wheel', (event) => {
     event.preventDefault();
     const slot = studio.selectedSlot();
@@ -96,6 +110,7 @@ export function setupPreviewCanvas(studio) {
     draftTimer = setTimeout(() => studio.commit('zoom panel'), 400);
   }, { passive: false });
 
+  // Double-click: reset the panel under the pointer.
   canvas.addEventListener('dblclick', (event) => {
     const plan = planCover(studio.doc);
     const point = pointToCanvas(canvas, event.clientX, event.clientY);

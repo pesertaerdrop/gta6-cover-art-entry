@@ -1,8 +1,10 @@
-// The seven look sliders: Paint, Grade, Halftone, Grain, Glow, Title size
-// (60 to 130) and Title lift (minus 40 to 40). Each row shows the name, the
-// slider and the current value; dragging regrades in fast draft mode and
-// settles to full quality when the slider is released, and the release
-// commits the change so undo can step back.
+// The seven look sliders.
+//
+// Paint, Grade, Halftone, Grain, Glow, Title size (60 to 130) and Title
+// lift (minus 40 to 40). Each row shows the name, the slider and the
+// current value; dragging regrades in fast draft mode and settles to full
+// quality when the slider is released, and the release commits the change
+// so undo can step back.
 const SLIDERS = [
   { key: 'paint', label: 'Paint', min: 0, max: 20, step: 1 },
   { key: 'grade', label: 'Grade', min: 0, max: 100, step: 1 },

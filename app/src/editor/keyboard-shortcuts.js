@@ -1,7 +1,10 @@
-// The keyboard map, listed in full in the help dialog: Tab or 1-7 selects
-// a panel, arrows pan, plus and minus zoom, brackets change the photo, F
-// flips, R resets, M marks the face, A runs auto layout, S surprises, E
-// exports, ? opens help, and Ctrl+Z / Ctrl+Y undo and redo.
+// The keyboard map, listed in full in the help dialog.
+//
+// Tab or 1–7 selects a panel, arrows pan it, plus and minus zoom it,
+// brackets change its photo, F flips it, R resets it, M marks its face,
+// A runs auto layout, S surprises, E exports, ? opens help, and Ctrl+Z /
+// Ctrl+Y undo and redo. Keys do nothing while the user is typing in a
+// field, so a caption can hold any of these letters.
 import { zoomPanel, resetPanel } from './panel-gestures.js';
 import { nextSamplePhoto } from '../photos/sample-photos.js';
 

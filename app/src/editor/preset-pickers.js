@@ -1,12 +1,20 @@
-// The preset pickers. Layout tiles are live mini-drawings of the layout's
-// real panels for the current size; grade chips show the gradient ramp as a
-// swatch; title chips show the style's own gradient on the word "Aa"; the
-// size buttons switch the cover size. Picking one commits immediately.
+// The preset pickers.
+//
+// Layout tiles are live mini-drawings of the layout's real panels for the
+// current size (the same fractions plan-cover uses, painted in seven flat
+// colours). Grade chips show the grade's gradient ramp as a swatch. Title
+// chips show the style's own gradient on the word "Aa". The size buttons
+// switch the cover size. Picking one commits immediately, so undo can
+// step back to the earlier choice.
 import { LAYOUT_LIST, rectsForLayout } from '../layouts/layout-presets.js';
 import { GRADE_LIST, gradeRampCss } from '../effects/grade-presets.js';
 import { TITLE_STYLES, titleStyleCss } from '../lettering/title-styles.js';
 import { rematchPanels } from '../layouts/plan-cover.js';
 
+// The seven flat colours the layout minis cycle through, one per panel.
+const MINI_COLORS = ['#e8531f', '#2f7fb8', '#e8a317', '#0f7a6e', '#e84a7a', '#7a5fd0', '#3a352f'];
+
+// Paint a layout's panels as flat rectangles on a small canvas.
 export function drawLayoutMini(canvas, layoutId) {
   const ctx = canvas.getContext('2d');
   const W = canvas.width;
@@ -15,9 +23,24 @@ export function drawLayoutMini(canvas, layoutId) {
   ctx.fillRect(0, 0, W, H);
   const fractions = rectsForLayout(layoutId, W, H);
   fractions.forEach((f, i) => {
-    ctx.fillStyle = ['#e8531f', '#2f7fb8', '#e8a317', '#0f7a6e', '#e84a7a', '#7a5fd0', '#3a352f'][i % 7];
+    ctx.fillStyle = MINI_COLORS[i % MINI_COLORS.length];
     ctx.fillRect(f[0] * W + 1, f[1] * H + 1, f[2] * W - 2, f[3] * H - 2);
   });
+}
+
+// One picker button: the pressed state, a label, and a click handler.
+function pickButton(host, pressed, label, onPick) {
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'pick';
+  btn.setAttribute('aria-pressed', String(pressed));
+  const name = document.createElement('span');
+  name.className = 'pick-name';
+  name.textContent = label;
+  btn.appendChild(name);
+  btn.addEventListener('click', onPick);
+  host.appendChild(btn);
+  return btn;
 }
 
 export function renderLayoutPicker(studio) {
@@ -74,6 +97,8 @@ export function renderGradePicker(studio) {
   }
 }
 
+// The title picker: an Auto button first (the style follows the grade),
+// then one button per style, each showing its gradient on "Aa".
 export function renderTitlePicker(studio) {
   const host = document.getElementById('titlePicker');
   if (!host) return;
@@ -120,6 +145,8 @@ export function renderTitlePicker(studio) {
   }
 }
 
+// The size buttons live in the HTML; this only marks the active one and
+// wires the click (changing size re-matches the panels to the layout).
 export function renderSizePicker(studio) {
   const host = document.getElementById('sizePicker');
   if (!host) return;

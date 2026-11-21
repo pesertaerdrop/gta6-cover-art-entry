@@ -1,10 +1,17 @@
-// Saltline Cover Studio entry point. Builds the studio object (the
-// document, its history, the loaded photos, and the render/commit verbs
-// every editor module shares), wires all the modules, preloads the sample
-// photos, and applies a ?shot= scene when one is requested.
+// Saltline Cover Studio — entry point.
+//
+// The studio object is the one thing every editor module shares: the
+// document (doc), its undo history, the loaded photos (images, keyed by
+// source), the uploaded photos (uploaded), the last plan the preview drew
+// (currentPlan), the preview's draw handle, and the verbs render / commit /
+// undo / redo that every module calls. boot() wires the modules, preloads
+// the seventeen sample photos, and either draws a ?shot= cover scene
+// full-frame (for the screenshots) or opens the editor.
+//
 // Saltline Cover Studio: turn any photo and a caption into GTA-style cover
 // art — multi-panel posters with callout tags, a seal, a review bar, a
-// barcode and a giant chrome title — and export the PNG in three post sizes.
+// barcode and a giant chrome title on its own dark band — and export the
+// PNG in three post sizes (1080x1080, 1080x1350, 1920x1080).
 import { defaultDoc } from './state/default-doc.js';
 import { createUndoHistory } from './state/undo-history.js';
 import { SAMPLE_PHOTOS } from './photos/sample-photos.js';
@@ -23,9 +30,11 @@ import { setupHelpDialog } from './editor/help-dialog.js';
 import { setupCaptionFields, syncCaptionFields } from './editor/caption-fields.js';
 import { sceneFromUrl, sceneMode } from './shot/shot-scenes.js';
 
+// The studio: one object, built up below, so the modules never import
+// each other — they all take `studio` and call its verbs.
 const studio = {
   doc: defaultDoc(),
-  history: null,
+  history: createUndoHistory(),
   images: new Map(),
   uploaded: new Map(),
   currentPlan: null,
@@ -34,8 +43,8 @@ const studio = {
   openHelp: () => {},
 };
 
-studio.history = createUndoHistory();
-
+// Load one image by source, resolving to null (never rejecting) so a
+// missing file cannot stop the preload.
 function loadImage(src) {
   return new Promise((resolve) => {
     const img = new Image();
@@ -45,6 +54,7 @@ function loadImage(src) {
   });
 }
 
+// Preload every sample photo in parallel, keeping the ones that load.
 async function preloadSamples() {
   const jobs = SAMPLE_PHOTOS.map(async (photo) => {
     const img = await loadImage(`./${photo.src}`);
@@ -53,10 +63,14 @@ async function preloadSamples() {
   await Promise.all(jobs);
 }
 
+// The selected panel's slot, or null when nothing is selected.
 studio.selectedSlot = () => studio.doc.panels[studio.doc.selected] ?? null;
 
 studio.uploadedCount = () => studio.uploaded.size;
 
+// Take files the user added (picker, drop, paste): keep the images, put
+// each one in the tray under an upload: key, and fill the selected panel
+// with the last one. Nothing leaves the machine.
 studio.addUploadedFiles = async (files) => {
   const list = [...files].filter((file) => file.type.startsWith('image/'));
   for (const file of list) {
@@ -72,6 +86,8 @@ studio.addUploadedFiles = async (files) => {
   studio.commit('add photos');
 };
 
+// Re-render the preview only (full quality), in draft (fast, per-pixel
+// pass skipped) for a drag, or just the panels when the selection moves.
 studio.renderPreviewOnly = () => {
   if (studio.preview) studio.currentPlan = studio.preview.draw(false);
 };
@@ -85,6 +101,8 @@ studio.renderPanelsOnly = () => {
   renderInspector(studio);
 };
 
+// Re-render everything: the preview and every picker, inspector, slider
+// and caption field, and the undo/redo buttons' disabled state.
 studio.render = () => {
   studio.currentPlan = planCover(studio.doc);
   studio.renderPreviewOnly();
@@ -101,6 +119,8 @@ studio.render = () => {
   if (redoBtn) redoBtn.disabled = !studio.history.canRedo();
 };
 
+// Commit the document as it stands (push the pre-change snapshot with a
+// label) and re-render, so undo can step back to it.
 studio.commit = (label) => {
   studio.history.push(studio.doc, label, studio.doc.size);
   studio.render();
@@ -123,6 +143,9 @@ studio.autoLayout = () => applyAutoLayout(studio);
 studio.surpriseMe = () => applySurpriseMe(studio);
 studio.syncCaptionFields = () => syncCaptionFields(studio.doc);
 
+// Boot: apply a ?shot= scene if one is named, preload the samples, wait
+// for the fonts (fallbacks cover a failure), then either draw the cover
+// scene full-frame for a screenshot or open the editor.
 async function boot() {
   const scene = sceneFromUrl();
   if (scene) applyShotScene(studio.doc, scene);
