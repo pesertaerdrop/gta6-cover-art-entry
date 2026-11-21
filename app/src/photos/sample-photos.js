@@ -2,7 +2,8 @@
 // Mira, long silver-lilac hair, and Suki, a short teal bob — a Vice City
 // duo around one pink classic convertible. Every photo carries its scene,
 // its cast and its default callout tag; the helpers below serve the
-// editor's sample strip and the cover renderer.
+// editor's sample strip and the cover renderer. Every photo was generated
+// with the faces fully inside the frame, so no crop ever has to cut one.
 export const CAST = [
   { id: 'mira', name: 'Mira', role: 'long silver-lilac hair' },
   { id: 'suki', name: 'Suki', role: 'short teal bob' },

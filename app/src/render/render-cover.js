@@ -1,198 +1,369 @@
-// Draws a whole cover onto a canvas from a document and a map of loaded
-// photos. One function, renderCover, owns the full stack: white panel
-// borders, treated photos, the title band, the giant chrome title with
-// its neon script, the tagline ribbon, the script line, and the seven
-// poster-finish elements. Editor overlays (selection outline, crosshair,
-// zoom badge) come from opts.editor.
+// Draws a cover onto a canvas context.
 //
-// The title band is the fix for the giant title: after the panels are
-// painted and before the title is drawn, a solid dark strip is painted
-// across the title band (plan.titleBand, y 0.60h–0.84h) with thin accent
-// rules top and bottom. The title, its script line and its ribbon all
-// live inside that band, so no panel photo can ever touch a letter and
-// the title reads as a clean billboard at any size, down to 300 px.
-import { planCover } from '../layouts/plan-cover.js';
+// The frame is split in two: the mosaic region (the top 62%) holds the
+// panels, and the title field (the bottom 38%) holds the title cluster —
+// the script line, the giant chrome title, the tagline ribbon, the
+// five-star review bar and the billing line — on a designed gradient with
+// a palm, grid or skyline motif. Nothing is painted over a photo: the
+// field is its own surface, so a title can never cover a face and a panel
+// can never run under a letter. The seven-element poster finish is split
+// between the two regions: callout tags on the panels, the seal and
+// COMING SOON on the mosaic corners, the volume tag at the mosaic foot,
+// and the review bar, billing and barcode inside the field.
+//
+// opts: { editor (draw the editor overlay), draft (fast photo pass),
+// size (override the cover size, used by the export panel) }.
+import { planCover, BORDER } from '../layouts/plan-cover.js';
 import { drawPanelPhoto } from '../effects/poster-photo.js';
+import { gradeById } from '../effects/grade-presets.js';
 import { gradientFor } from '../lettering/title-styles.js';
-import { drawPosterFinish } from '../lettering/poster-finish.js';
+import {
+  drawBillingLine,
+  drawBarcode,
+  drawSeal,
+  drawVolTag,
+  drawComingSoon,
+} from '../lettering/poster-finish.js';
 
-export const ACCENT_BY_GRADE = {
-  sunset: '#ff6b35',
-  'neon-night': '#7fe7ff',
-  'golden-hour': '#ffd166',
-  'tropic-teal': '#7fe7c8',
-  'ember-blaze': '#f05a28',
-  'rose-dusk': '#ff7ae0',
+// The title font per style: the chrome ramp carries the colour, the font
+// carries the shape. Two heavy grotesques plus the inline display face
+// for the pink-neon style.
+const TITLE_FONTS = {
+  'dusk-chrome': '"Archivo Black", sans-serif',
+  'glacier-neon': '"Anton", sans-serif',
+  'brass-gold': '"Archivo Black", sans-serif',
+  'magma-edge': '"Anton", sans-serif',
+  'steel-chrome': '"Anton", sans-serif',
+  'pink-neon': '"Fascinate Inline", "Archivo Black", sans-serif',
 };
 
-export function accentForGrade(grade) {
-  return ACCENT_BY_GRADE[grade] || ACCENT_BY_GRADE.sunset;
+// A small deterministic hash of a string, for the skyline motif, so the
+// same title always draws the same skyline.
+function hashString(text) {
+  let hash = 2166136261;
+  for (let i = 0; i < text.length; i++) {
+    hash ^= text.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  return hash >>> 0;
 }
 
-// Paint the title band: a solid dark strip across the title's clear zone,
-// with thin accent rules top and bottom, so the title sits on a clean
-// billboard instead of over busy photos.
-export function drawTitleBand(ctx, plan, doc) {
-  const band = plan.titleBand;
-  if (!band) return;
-  const accent = accentForGrade(doc.grade);
+function mulberry32(seed) {
+  let a = seed;
+  return () => {
+    a |= 0;
+    a = (a + 0x6d2b79f5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+// One palm silhouette: a leaning trunk and six drooping fronds, drawn in
+// near-black so it reads as a cut-out against the field gradient.
+function drawPalm(ctx, x, baseY, height, lean, alpha) {
   ctx.save();
-  ctx.fillStyle = 'rgba(10,8,14,0.94)';
-  ctx.fillRect(band.x, band.y, band.w, band.h);
-  ctx.fillStyle = accent;
-  ctx.fillRect(band.x, band.y, band.w, 2);
-  ctx.fillRect(band.x, band.y + band.h - 2, band.w, 2);
+  ctx.strokeStyle = `rgba(0,0,0,${alpha})`;
+  ctx.lineCap = 'round';
+  ctx.lineWidth = Math.max(2, height * 0.028);
+  ctx.beginPath();
+  ctx.moveTo(x, baseY);
+  ctx.quadraticCurveTo(x + lean * 0.3, baseY - height * 0.6, x + lean, baseY - height);
+  ctx.stroke();
+  const crownX = x + lean;
+  const crownY = baseY - height;
+  ctx.lineWidth = Math.max(1.5, height * 0.02);
+  const angles = [-2.79, -2.27, -1.75, -1.22, -0.7, -0.17];
+  for (let i = 0; i < angles.length; i++) {
+    const len = height * (0.34 + (i % 2) * 0.09);
+    const tipX = crownX + Math.cos(angles[i]) * len;
+    const tipY = crownY + Math.sin(angles[i]) * len * 0.75 + height * 0.14;
+    ctx.beginPath();
+    ctx.moveTo(crownX, crownY);
+    ctx.quadraticCurveTo(
+      crownX + Math.cos(angles[i]) * len * 0.55,
+      crownY + Math.sin(angles[i]) * len * 0.55 - height * 0.06,
+      tipX,
+      tipY,
+    );
+    ctx.stroke();
+  }
   ctx.restore();
 }
 
-// Fit the title text to the title rectangle, shrinking the font until it
-// fits, then draw it with its chrome gradient, stroke and shadow, with the
-// neon script overlapping the caps.
-export function drawTitle(ctx, plan, doc) {
-  const { titleRect, titleStyle, titleSize, titleLift, titleText } = plan;
-  if (!titleText) return;
-  let size = titleSize;
-  ctx.save();
-  ctx.font = `${size}px Anton, 'Archivo Black', sans-serif`;
-  while (size > 24 && ctx.measureText(titleText).width > titleRect.w) {
-    size *= 0.94;
-    ctx.font = `${size}px Anton, 'Archivo Black', sans-serif`;
+// The field's designed surface: a grade-tinted gradient, an accent rule
+// along its top edge, and one of three motifs — palms at the edges, a
+// retro perspective grid, or a skyline along the foot.
+function drawTitleField(ctx, plan, doc) {
+  const { x, y, w, h } = plan.titleField;
+  const grade = gradeById(doc.grade);
+  const [sr, sg, sb] = grade.shadow;
+  const top = `rgb(${Math.round(sr * 0.75)},${Math.round(sg * 0.75)},${Math.round(sb * 0.75)})`;
+  const gradient = ctx.createLinearGradient(0, y, 0, y + h);
+  gradient.addColorStop(0, top);
+  gradient.addColorStop(0.55, '#14101e');
+  gradient.addColorStop(1, '#0a0810');
+  ctx.fillStyle = gradient;
+  ctx.fillRect(x, y, w, h);
+  // The accent rule that separates the field from the mosaic.
+  ctx.fillStyle = `rgba(${grade.mid[0]},${grade.mid[1]},${grade.mid[2]},0.9)`;
+  ctx.fillRect(x, y, w, Math.max(2, h * 0.008));
+  const motif = plan.titleFieldMotif;
+  if (motif === 'palms') {
+    drawPalm(ctx, x + w * 0.015, y + h * 0.98, h * 0.92, w * 0.03, 0.5);
+    drawPalm(ctx, x + w * 0.985, y + h * 0.98, h * 0.8, -w * 0.025, 0.45);
+  } else if (motif === 'grid') {
+    ctx.save();
+    ctx.strokeStyle = `rgba(${grade.mid[0]},${grade.mid[1]},${grade.mid[2]},0.16)`;
+    ctx.lineWidth = 1;
+    for (let i = 1; i <= 4; i++) {
+      const yy = y + (h * i) / 5;
+      ctx.beginPath();
+      ctx.moveTo(x, yy);
+      ctx.lineTo(x + w, yy);
+      ctx.stroke();
+    }
+    for (let i = -6; i <= 6; i++) {
+      ctx.beginPath();
+      ctx.moveTo(w / 2 + i * w * 0.02, y);
+      ctx.lineTo(w / 2 + i * w * 0.13, y + h);
+      ctx.stroke();
+    }
+    ctx.restore();
+  } else {
+    // Skyline: dark buildings along the foot, a few lit windows.
+    const rng = mulberry32(hashString(plan.titleText || 'saltline'));
+    let bx = x;
+    while (bx < x + w) {
+      const bw = w * (0.045 + rng() * 0.06);
+      const bh = h * (0.22 + rng() * 0.42);
+      ctx.fillStyle = 'rgba(0,0,0,0.4)';
+      ctx.fillRect(bx, y + h - bh, bw, bh);
+      if (rng() > 0.5) {
+        ctx.fillStyle = `rgba(${grade.light[0]},${grade.light[1]},${grade.light[2]},0.5)`;
+        ctx.fillRect(bx + bw * 0.3, y + h - bh * 0.7, Math.max(2, bw * 0.12), Math.max(2, bh * 0.08));
+      }
+      bx += bw + w * 0.012;
+    }
   }
-  const x = titleRect.x + titleRect.w / 2;
-  const y = titleRect.y + titleRect.h / 2 - titleLift;
+}
+
+// The chrome title, centred in the title rect, shrunk until it fits the
+// cover width. The script line sits just above the caps, overlapping them
+// slightly, the way a poster script does.
+function drawTitle(ctx, plan, doc) {
+  const style = plan.titleStyle;
+  const titleText = (plan.titleText || '').toUpperCase();
+  if (!titleText) return;
+  const centerX = plan.w / 2;
+  const centerY = plan.titleRect.y + plan.titleRect.h / 2 + plan.titleLift;
+  const font = TITLE_FONTS[style.id] || '"Anton", sans-serif';
+  let size = plan.titleSize;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.shadowColor = titleStyle.shadow;
-  ctx.shadowBlur = size * 0.22;
-  ctx.shadowOffsetY = size * 0.03;
-  ctx.lineWidth = Math.max(2, size * 0.08);
-  ctx.strokeStyle = titleStyle.stroke;
-  ctx.lineJoin = 'round';
-  ctx.fillStyle = gradientFor(ctx, titleStyle, { x: titleRect.x, y: y - size / 2, w: titleRect.w, h: size });
-  ctx.strokeText(titleText, x, y);
-  ctx.fillText(titleText, x, y);
+  ctx.font = `${size}px ${font}`;
+  let width = ctx.measureText(titleText).width;
+  while (width > plan.w * 0.92 && size > 40) {
+    size *= 0.95;
+    ctx.font = `${size}px ${font}`;
+    width = ctx.measureText(titleText).width;
+  }
+  // Chrome caps with a glow, then a crisp stroke on top.
+  ctx.save();
+  ctx.font = `${size}px ${font}`;
+  ctx.shadowColor = style.shadow;
+  ctx.shadowBlur = size * 0.16;
+  ctx.fillStyle = gradientFor(ctx, style, { x: 0, y: centerY - size / 2, w: plan.w, h: size });
+  ctx.fillText(titleText, centerX, centerY);
+  ctx.shadowBlur = 0;
+  ctx.lineWidth = Math.max(2, size * 0.028);
+  ctx.strokeStyle = style.stroke;
+  ctx.strokeText(titleText, centerX, centerY);
   ctx.restore();
-  // The neon script, overlapping the caps.
+  // Script line, overlapping the caps, drawn last so it sits on top of
+  // the title's glow, with a dark outline so it reads on any field.
   const script = doc.script || plan.caption.script;
   if (script) {
+    const scriptSize = size * 0.42;
     ctx.save();
-    ctx.translate(x, y - size * 0.55);
-    ctx.rotate(-0.03);
-    ctx.font = `${Math.round(size * 0.42)}px 'Mr Dafoe', cursive`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.shadowColor = 'rgba(255,255,255,0.7)';
-    ctx.shadowBlur = size * 0.1;
-    ctx.fillStyle = '#fff';
+    ctx.translate(centerX, centerY - size * 0.55);
+    ctx.rotate(-0.05);
+    ctx.font = `${scriptSize}px "Mr Dafoe", cursive`;
+    ctx.fillStyle = style.stops[1][1];
+    ctx.lineWidth = Math.max(2, scriptSize * 0.1);
+    ctx.strokeStyle = 'rgba(10,8,16,0.85)';
+    ctx.lineJoin = 'round';
+    ctx.strokeText(script, 0, 0);
+    ctx.shadowColor = style.shadow;
+    ctx.shadowBlur = size * 0.08;
     ctx.fillText(script, 0, 0);
     ctx.restore();
   }
 }
 
-// The tagline ribbon: a coloured band with side triangles, centred under
-// the title.
-export function drawTaglineRibbon(ctx, plan, doc) {
-  const tagline = doc.tagline || plan.caption.tagline;
+// The tagline ribbon: a gold band with dark text, shrunk to fit.
+function drawRibbon(ctx, plan, doc) {
+  const r = plan.ribbonRect;
+  const tagline = (doc.tagline || plan.caption.tagline || '').toUpperCase();
   if (!tagline) return;
-  const { w, h } = plan;
-  const accent = accentForGrade(doc.grade);
-  const bandH = Math.round(h * 0.032);
-  const bandY = plan.titleRect.y + plan.titleRect.h * 0.8;
-  const bandX = 0.12 * w;
-  const bandW = 0.76 * w;
-  ctx.save();
-  ctx.font = `700 ${Math.round(bandH * 0.62)}px Oswald, sans-serif`;
-  const textW = ctx.measureText(tagline).width + 28;
-  const cx = w / 2;
-  const x0 = cx - textW / 2;
-  ctx.fillStyle = accent;
-  ctx.beginPath();
-  ctx.moveTo(x0 - bandH * 0.5, bandY);
-  ctx.lineTo(x0, bandY);
-  ctx.lineTo(x0, bandY + bandH);
-  ctx.lineTo(x0 - bandH * 0.5, bandY + bandH);
-  ctx.closePath();
-  ctx.fill();
-  ctx.beginPath();
-  ctx.moveTo(x0 + textW + bandH * 0.5, bandY);
-  ctx.lineTo(x0 + textW, bandY);
-  ctx.lineTo(x0 + textW, bandY + bandH);
-  ctx.lineTo(x0 + textW + bandH * 0.5, bandY + bandH);
-  ctx.closePath();
-  ctx.fill();
-  ctx.fillRect(x0, bandY, textW, bandH);
-  ctx.fillStyle = '#111';
+  ctx.fillStyle = '#f5c542';
+  ctx.fillRect(r.x, r.y, r.w, r.h);
+  ctx.fillStyle = '#1a0b2e';
+  ctx.fillRect(r.x, r.y, r.w, Math.max(1, r.h * 0.06));
+  ctx.fillRect(r.x, r.y + r.h - Math.max(1, r.h * 0.06), r.w, Math.max(1, r.h * 0.06));
+  let fontSize = r.h * 0.55;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillText(tagline, cx, bandY + bandH / 2 + 0.5);
-  ctx.restore();
+  ctx.font = `bold ${fontSize}px "Oswald", sans-serif`;
+  let width = ctx.measureText(tagline).width;
+  while (width > r.w - 16 && fontSize > 8) {
+    fontSize *= 0.92;
+    ctx.font = `bold ${fontSize}px "Oswald", sans-serif`;
+    width = ctx.measureText(tagline).width;
+  }
+  ctx.fillStyle = '#1a0b2e';
+  ctx.fillText(tagline, r.x + r.w / 2, r.y + r.h / 2);
 }
 
-function drawEditorOverlays(ctx, plan, doc) {
-  const accent = accentForGrade(doc.grade);
-  plan.panels.forEach((panel, i) => {
-    const { x, y, w, h } = panel.rect;
-    // Numbered badge on every panel.
-    ctx.save();
-    ctx.fillStyle = '#111';
-    ctx.beginPath();
-    ctx.arc(x + 16, y + h - 16, 11, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = '#fff';
-    ctx.font = '700 13px Oswald, sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(String(i + 1), x + 16, y + h - 15.5);
-    ctx.restore();
-    if (i !== doc.selected) return;
-    // Selected panel: accent outline, crosshair, zoom badge.
-    ctx.save();
-    ctx.strokeStyle = accent;
-    ctx.lineWidth = 3;
-    ctx.strokeRect(x + 1.5, y + 1.5, w - 3, h - 3);
-    ctx.beginPath();
-    ctx.moveTo(x + w / 2, y + 6);
-    ctx.lineTo(x + w / 2, y + h - 6);
-    ctx.moveTo(x + 6, y + h / 2);
-    ctx.lineTo(x + w - 6, y + h / 2);
-    ctx.strokeStyle = 'rgba(255,255,255,0.85)';
-    ctx.lineWidth = 1;
-    ctx.stroke();
-    const zoomText = `${Math.round((panel.zoom || 1) * 100)}%`;
-    ctx.font = '700 13px Oswald, sans-serif';
-    const zw = ctx.measureText(zoomText).width + 14;
-    ctx.fillStyle = accent;
-    ctx.fillRect(x + w - zw - 8, y + 8, zw, 22);
-    ctx.fillStyle = '#111';
-    ctx.textAlign = 'left';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(zoomText, x + w - zw - 1, y + 19.5);
-    ctx.restore();
-  });
+// The five-star review bar: gold stars, the quote in white, the outlet
+// in gold, all on one centred line, shrunk to fit.
+function drawReviewBar(ctx, plan, doc) {
+  const q = plan.quoteRect;
+  const quote = doc.quote || plan.caption.quote;
+  const outlet = doc.outlet || plan.caption.outlet;
+  if (!quote) return;
+  let fontSize = q.h * 0.62;
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'middle';
+  const parts = [
+    { text: '★★★★★ ', color: '#f5c542' },
+    { text: `"${quote}" `, color: '#ffffff' },
+    { text: `— ${outlet}`, color: '#f5c542' },
+  ];
+  const measure = (size) => {
+    ctx.font = `bold ${size}px "Oswald", sans-serif`;
+    return parts.reduce((sum, part) => sum + ctx.measureText(part.text).width, 0);
+  };
+  let total = measure(fontSize);
+  while (total > q.w && fontSize > 8) {
+    fontSize *= 0.92;
+    total = measure(fontSize);
+  }
+  ctx.font = `bold ${fontSize}px "Oswald", sans-serif`;
+  let x = q.x + (q.w - total) / 2;
+  const y = q.y + q.h / 2;
+  for (const part of parts) {
+    ctx.fillStyle = part.color;
+    ctx.fillText(part.text, x, y);
+    x += ctx.measureText(part.text).width;
+  }
 }
 
 export function renderCover(ctx, doc, images, opts = {}) {
   const plan = planCover(doc, opts.size);
-  ctx.save();
-  ctx.fillStyle = '#111';
+  ctx.fillStyle = '#0a0810';
   ctx.fillRect(0, 0, plan.w, plan.h);
-  for (const panel of plan.panels) {
-    ctx.fillStyle = '#fff';
-    ctx.fillRect(panel.rect.x, panel.rect.y, panel.rect.w, panel.rect.h);
+  drawTitleField(ctx, plan, doc);
+
+  // Panels: the photo, a white border, the callout tag, and (in the
+  // editor) the numbered badge, selection outline, crosshair and zoom
+  // badge. The hero panel's tag drops below COMING SOON so the two never
+  // collide.
+  for (let i = 0; i < plan.panels.length; i++) {
+    const panel = plan.panels[i];
     const img = images.get ? images.get(panel.photo) : images[panel.photo];
     if (img) {
       drawPanelPhoto(ctx, img, panel.inner, panel, doc.look, doc.grade);
     } else {
-      ctx.fillStyle = '#222';
+      ctx.fillStyle = '#1c1626';
       ctx.fillRect(panel.inner.x, panel.inner.y, panel.inner.w, panel.inner.h);
     }
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = BORDER;
+    ctx.strokeRect(panel.rect.x + BORDER / 2, panel.rect.y + BORDER / 2, panel.rect.w - BORDER, panel.rect.h - BORDER);
+    if (panel.tagOn && panel.tag) {
+      const tagSize = Math.max(11, plan.w * 0.014);
+      ctx.font = `bold ${tagSize}px "Oswald", sans-serif`;
+      const pad = tagSize * 0.55;
+      const textW = ctx.measureText(panel.tag.toUpperCase()).width;
+      const tagW = textW + pad * 2;
+      const tagH = tagSize * 1.7;
+      const tx = panel.rect.x + 8;
+      const ty = i === 0 ? panel.rect.y + 38 : panel.rect.y + 8;
+      ctx.fillStyle = 'rgba(10,8,16,0.85)';
+      ctx.fillRect(tx, ty, tagW, tagH);
+      ctx.fillStyle = '#f5c542';
+      ctx.fillRect(tx, ty, Math.max(3, tagSize * 0.25), tagH);
+      ctx.fillStyle = '#ffffff';
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(panel.tag.toUpperCase(), tx + pad + Math.max(3, tagSize * 0.25), ty + tagH / 2);
+    }
+    if (opts.editor) {
+      const badgeR = Math.max(11, plan.w * 0.012);
+      const bx = panel.rect.x + panel.rect.w - badgeR - 6;
+      const by = panel.rect.y + 6;
+      ctx.fillStyle = i === doc.selected ? '#f5c542' : 'rgba(10,8,16,0.8)';
+      ctx.beginPath();
+      ctx.arc(bx + badgeR, by + badgeR, badgeR, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = i === doc.selected ? '#1a0b2e' : '#ffffff';
+      ctx.font = `bold ${badgeR}px "Oswald", sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(String(i + 1), bx + badgeR, by + badgeR + 1);
+      if (i === doc.selected) {
+        ctx.strokeStyle = '#f5c542';
+        ctx.lineWidth = 3;
+        ctx.strokeRect(panel.rect.x + 1.5, panel.rect.y + 1.5, panel.rect.w - 3, panel.rect.h - 3);
+        const cx = panel.rect.x + panel.rect.w / 2;
+        const cy = panel.rect.y + panel.rect.h / 2;
+        ctx.beginPath();
+        ctx.moveTo(cx - 12, cy);
+        ctx.lineTo(cx + 12, cy);
+        ctx.moveTo(cx, cy - 12);
+        ctx.lineTo(cx, cy + 12);
+        ctx.stroke();
+        const zoomText = `${Math.round((panel.zoom || 1) * 100)}%`;
+        ctx.font = `bold ${Math.max(11, plan.w * 0.012)}px "Oswald", sans-serif`;
+        const zw = ctx.measureText(zoomText).width + 12;
+        ctx.fillStyle = '#f5c542';
+        ctx.fillRect(cx - zw / 2, panel.rect.y + panel.rect.h - 24, zw, 20);
+        ctx.fillStyle = '#1a0b2e';
+        ctx.textAlign = 'center';
+        ctx.fillText(zoomText, cx, panel.rect.y + panel.rect.h - 14);
+      }
+      if (panel.faceMarked) {
+        ctx.fillStyle = '#7fe7ff';
+        ctx.font = `bold ${Math.max(11, plan.w * 0.013)}px "Oswald", sans-serif`;
+        ctx.textAlign = 'right';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('FACE ✓', panel.rect.x + panel.rect.w - 8, panel.rect.y + panel.rect.h - 12);
+      }
+    }
   }
-  drawTitleBand(ctx, plan, doc);
+
+  // Finish elements on the mosaic corners: COMING SOON top-left, the
+  // seal top-right, the volume tag at the mosaic foot.
+  drawComingSoon(ctx, 12, 12, plan.w);
+  const sealSize = plan.w * 0.07;
+  drawSeal(ctx, plan.w - sealSize - 12, 12, sealSize);
+  drawVolTag(ctx, 12, plan.titleField.y - 40, doc.vol || plan.caption.vol);
+
+  // The title cluster inside the field.
   drawTitle(ctx, plan, doc);
-  drawTaglineRibbon(ctx, plan, doc);
-  drawPosterFinish(ctx, plan, doc);
-  if (opts.editor) drawEditorOverlays(ctx, plan, doc);
-  ctx.restore();
+  drawRibbon(ctx, plan, doc);
+  drawReviewBar(ctx, plan, doc);
+  drawBillingLine(ctx, plan.billingRect, doc.billing || plan.caption.billing);
+  const barcodeW = plan.w * 0.12;
+  drawBarcode(
+    ctx,
+    plan.w - barcodeW - plan.w * 0.02,
+    plan.titleField.y + plan.titleField.h * 0.06,
+    barcodeW,
+    plan.titleField.h * 0.16,
+    plan.titleText || 'SALTLINE',
+  );
   return plan;
 }
 

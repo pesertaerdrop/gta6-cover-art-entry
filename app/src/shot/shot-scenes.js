@@ -2,11 +2,19 @@
 // scenes draw one cover full-frame (the app itself drawing it), and the
 // editor scene shows the editor with a photo loaded and a panel selected.
 // Photo indices point into SAMPLE_PHOTOS. The scout and runner panels
-// are tuned to the regenerated photos so faces stay whole: the scout
-// panels centre both faces (the neon sign reads as a backdrop behind
-// them), and the runner panels are face close-ups (zoom 1.5, panned to
-// centre Suki's face and shift it up) so her face stays whole and the
-// cut signs stay out of frame.
+// are tuned so faces stay whole: the scout panels centre both faces (the
+// neon sign reads as a backdrop behind them), and the runner panels are
+// face close-ups (zoom 1.5, panned to centre Suki's face) so her face
+// stays whole and the cut signs stay out of frame.
+//
+// Cover 1 — TIDELINE, 16:9, hero mosaic. The duo on the pink convertible
+// is the hero; the scout (neon door) and the runner (diner) are panels 2
+// and 5.
+// Cover 3 — EMBER COAST, 4:5, hero mosaic. The scout opens the cover and
+// the runner follows; the motel scout and the club runner close it.
+// Cover 4 — SALTWATER, 1:1, seven mosaic. The boardwalk duo opens it and
+// the convertible duo is the second panel; the rider, the pier and the
+// garage fill the foot.
 export const SHOT_SCENES = {
   cover1: {
     id: 'cover1',
@@ -15,13 +23,10 @@ export const SHOT_SCENES = {
     grade: 'sunset',
     titleStyle: 'auto',
     caption: 0,
-    photos: [0, 1, 2, 3, 4],
-    // Scout panel centres both faces (zoom 1.0, no pan): the neon sign
-    // reads as a backdrop. The runner panel (behind the title band) pans
-    // down so the strip below the band shows Suki's chin and jacket, not
-    // the cut sign.
-    panelZooms: [1.15, 1.0, 1.15, 1.15, 1.0],
-    panelPans: [[0, 0], [0, 0], [0, 0], [0, 0], [0, 0.85]],
+    photos: [0, 1, 2, 6, 4, 5],
+    tags: ['THE ACE', 'THE SCOUT', 'THE CREW', 'THE LOOKOUT', 'THE RUNNER', 'THE GETAWAY'],
+    panelZooms: [1.15, 1.2, 1.15, 1.0, 1.5, 1.15],
+    panelPans: [[0, 0], [-0.2, 0], [0, -0.45], [0, -0.79], [0.3, 0.1], [0, 0]],
     faceMarked: [1, 4],
   },
   editor: {
@@ -37,33 +42,28 @@ export const SHOT_SCENES = {
   cover3: {
     id: 'cover3',
     size: '4:5',
-    layout: 'six-grid',
-    grade: 'golden-hour',
+    layout: 'hero-mosaic',
+    grade: 'neon-night',
     titleStyle: 'auto',
     caption: 2,
-    photos: [1, 4, 8, 5, 6, 3],
-    // Scout panel centres both faces (zoom 1.0, panned slightly right so
-    // Suki's face clears the panel edge); the runner panel is a face
-    // close-up (zoom 1.5, panned left and up) so Suki's face stays whole
-    // and the cut signs stay out of frame.
-    panelZooms: [1.0, 1.5, 1.15, 1.15, 1.15, 1.15],
-    panelPans: [[0.1, 0], [-0.05, -0.3], [0, 0], [0, 0], [0, 0], [0, 0]],
-    faceMarked: [0, 1],
+    photos: [1, 4, 13, 16, 8, 11],
+    tags: ['THE SCOUT', 'THE RUNNER', 'THE SCOUT', 'THE RUNNER', 'THE BONFIRE', 'THE CHASE'],
+    panelZooms: [1.2, 1.5, 1.15, 1.5, 1.15, 1.15],
+    panelPans: [[-0.2, 0], [0.3, 0.1], [0, 0], [0.3, 0.1], [0, 0], [0, 0]],
+    faceMarked: [0, 1, 2, 3],
   },
   cover4: {
     id: 'cover4',
     size: '1:1',
     layout: 'seven-mosaic',
-    grade: 'tropic-teal',
+    grade: 'ember-blaze',
     titleStyle: 'auto',
     caption: 3,
-    photos: [2, 6, 11, 9, 15, 0, 4],
-    // Runner panel is a face close-up (zoom 1.5, panned left and up):
-    // a landscape panel on a portrait photo would otherwise show only
-    // the neon signs above Suki's face.
-    panelZooms: [1.15, 1.15, 1.15, 1.15, 1.15, 1.15, 1.5],
-    panelPans: [[0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [-0.05, -0.3]],
-    faceMarked: [6],
+    photos: [2, 0, 6, 10, 12, 14, 15],
+    tags: ['THE CREW', 'THE ACE', 'THE HARBOR', 'THE RIDER', 'THE PIER', 'THE WALK', 'THE GARAGE'],
+    panelZooms: [1.15, 1.15, 1.15, 1.15, 1.15, 1.15, 1.15],
+    panelPans: [[0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0]],
+    faceMarked: [1],
   },
 };
 

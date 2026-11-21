@@ -10,8 +10,9 @@
 //
 // Saltline Cover Studio: turn any photo and a caption into GTA-style cover
 // art — multi-panel posters with callout tags, a seal, a review bar, a
-// barcode and a giant chrome title on its own dark band — and export the
-// PNG in three post sizes (1080x1080, 1080x1350, 1920x1080).
+// barcode and a giant chrome title in its own title field along the foot
+// of the cover — and export the PNG in three post sizes (1080x1080,
+// 1080x1350, 1920x1080).
 import { defaultDoc } from './state/default-doc.js';
 import { createUndoHistory } from './state/undo-history.js';
 import { SAMPLE_PHOTOS } from './photos/sample-photos.js';

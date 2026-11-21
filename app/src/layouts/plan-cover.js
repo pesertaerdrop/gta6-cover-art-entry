@@ -1,16 +1,17 @@
 // Turns a document into a concrete cover plan: pixel rectangles for every
-// panel (with gutters and white borders), the title and script rectangles,
-// the title band, the resolved title style, and the panels the document
-// describes. Also the caption lookup, the shot-scene applier, and the
-// auto-layout picker.
+// panel (with gutters and white borders), the title field and every
+// rectangle inside it, the resolved title style, and the panels the
+// document describes. Also the caption lookup, the shot-scene applier, and
+// the auto-layout picker.
 //
-// The title band is the fix for the giant title: the title, its script
-// line and its tagline ribbon all live inside one band (y 0.60h–0.84h)
-// that the renderer paints as a solid dark strip over the panels before
-// drawing the title. No panel photo can ever touch a letter, and the
-// title reads as a clean billboard at any size, down to 300 px. The
-// billing strip in poster-finish.js does the same job for the billing
-// line at the foot of the cover.
+// The title field is the cover's own ground: the bottom 38% of the frame
+// belongs to the title cluster — the script line, the giant chrome title,
+// the tagline ribbon, the review bar and the billing line. The mosaic
+// layouts are compressed into the top 62%, so a panel can never run under
+// a letter and a title can never cover a face. The field is a designed
+// surface (a grade-tinted gradient with a palm, grid or skyline motif),
+// not a strip painted over photos: nothing is hidden behind it, because
+// nothing was ever drawn there.
 import { CAPTION_DECK } from '../state/default-doc.js';
 import { rectsForLayout, layoutPanelCount } from './layout-presets.js';
 import { resolveTitleStyle } from '../lettering/title-styles.js';
@@ -25,10 +26,19 @@ export const SIZES = {
 export const GUTTER = 10;
 export const BORDER = 6;
 
+// The share of the cover height the title field takes, along the foot.
+// The mosaic region is everything above it.
+export const FIELD_H = 0.38;
+
 export function planCover(doc, overrideSize) {
   const size = overrideSize || SIZES[doc.size] || SIZES['16:9'];
   const { w, h } = size;
-  const rects = rectsForLayout(doc.layout, w, h);
+  const mosaicH = 1 - FIELD_H;
+  // Every layout rect is compressed into the mosaic region: its y and
+  // height scale by the mosaic share, its x and width stay as drawn.
+  const rects = rectsForLayout(doc.layout, w, h).map(([fx, fy, fw, fh]) => [
+    fx, fy * mosaicH, fw, fh * mosaicH,
+  ]);
   const panels = rects.map((frac, i) => {
     const panel = doc.panels[i] || {};
     const x = Math.round(frac[0] * w) + (i === 0 ? 0 : GUTTER);
@@ -52,21 +62,26 @@ export function planCover(doc, overrideSize) {
   const titleText = doc.title && doc.title.trim()
     ? doc.title
     : (CAPTION_DECK[doc.caption]?.title || '');
+  const caption = CAPTION_DECK[doc.caption] || CAPTION_DECK[0];
+  // The title field and the cluster inside it, as fractions of the field.
+  const fieldY = Math.round(mosaicH * h);
+  const fieldH = h - fieldY;
+  const titleSize = Math.min(w * 0.11, fieldH * 0.44) * (doc.look.titleSize / 100);
   return {
     w,
     h,
     panels,
-    titleRect: { x: 0.04 * w, y: 0.58 * h, w: 0.92 * w, h: 0.26 * h },
-    // The title band: the clear zone for the whole title cluster, full
-    // width, from just above the script line to just below the ribbon.
-    // The renderer paints this band as a solid dark strip over the panels,
-    // then draws the title on top of it.
-    titleBand: { x: 0, y: Math.round(0.60 * h), w, h: Math.round(0.24 * h) },
-    scriptRect: { x: 0.05 * w, y: 0.9 * h, w: 0.9 * w, h: 0.05 * h },
+    titleField: { x: 0, y: fieldY, w, h: fieldH },
+    titleFieldMotif: caption.field || 'palms',
+    titleRect: { x: 0.04 * w, y: fieldY + fieldH * 0.20, w: 0.92 * w, h: fieldH * 0.40 },
+    scriptRect: { x: 0.05 * w, y: fieldY + fieldH * 0.02, w: 0.9 * w, h: fieldH * 0.14 },
+    ribbonRect: { x: 0.12 * w, y: fieldY + fieldH * 0.64, w: 0.76 * w, h: fieldH * 0.09 },
+    quoteRect: { x: 0.04 * w, y: fieldY + fieldH * 0.76, w: 0.92 * w, h: fieldH * 0.10 },
+    billingRect: { x: 0.10 * w, y: fieldY + fieldH * 0.90, w: 0.80 * w, h: fieldH * 0.08 },
     titleStyle: resolveTitleStyle(doc.titleStyle, doc.grade),
-    titleSize: w * 0.075 * (doc.look.titleSize / 100),
+    titleSize,
     titleLift: h * 0.03 * (doc.look.titleLift / 100),
-    caption: CAPTION_DECK[doc.caption] || CAPTION_DECK[0],
+    caption,
     titleText,
   };
 }
@@ -109,15 +124,15 @@ export function applyShotScene(doc, scene) {
 }
 
 // The layout that fits a panel count: three panels get the diagonal trio,
-// four get hero plus three, five get the filmstrip on wide covers and the
-// hero mosaic on tall ones, six get the six grid on wide and postcards on
-// tall, seven get the seven mosaic; anything else falls back to hero mosaic.
+// four get hero plus three, five get the filmstrip, six get the six grid
+// on wide covers and postcards on tall ones, seven get the seven mosaic;
+// anything else falls back to hero mosaic.
 export function autoLayoutFor(doc) {
   const count = doc.panels.length;
   const wide = (SIZES[doc.size] || SIZES['16:9']).w > (SIZES[doc.size] || SIZES['16:9']).h;
   if (count === 3) return 'diagonal-trio';
   if (count === 4) return 'hero-plus-three';
-  if (count === 5) return wide ? 'filmstrip' : 'hero-mosaic';
+  if (count === 5) return 'filmstrip';
   if (count === 6) return wide ? 'six-grid' : 'postcards';
   if (count === 7) return 'seven-mosaic';
   return 'hero-mosaic';

@@ -2,7 +2,8 @@
 // ready-made captions; every cover draws its title, script line, tagline,
 // review quote and outlet, billing line, volume tag and coming-soon line
 // from the deck entry its caption index points at. Anything the user types
-// by hand wins over the deck entry.
+// by hand wins over the deck entry. The `field` key picks the title-field
+// motif for the cover: palms, a retro grid floor, or a skyline silhouette.
 import { SAMPLE_PHOTOS } from '../photos/sample-photos.js';
 
 export const CAPTION_DECK = [
@@ -16,6 +17,7 @@ export const CAPTION_DECK = [
     billing: 'A Saltline Pictures production, starring Mira and Suki, shot on the coast, graded by hand',
     vol: 'VOL. 1',
     comingSoon: 'COMING SOON',
+    field: 'palms',
   },
   {
     id: 'midnight-tide',
@@ -27,6 +29,7 @@ export const CAPTION_DECK = [
     billing: 'A Saltline Pictures production, starring Mira and Suki, shot on the coast, graded by hand',
     vol: 'VOL. 2',
     comingSoon: 'COMING SOON',
+    field: 'grid',
   },
   {
     id: 'ember-coast',
@@ -38,17 +41,19 @@ export const CAPTION_DECK = [
     billing: 'A Saltline Pictures production, starring Mira and Suki, shot on the coast, graded by hand',
     vol: 'VOL. 3',
     comingSoon: 'COMING SOON',
+    field: 'grid',
   },
   {
     id: 'saltwater',
     title: 'SALTWATER',
     script: 'The truth lies beneath',
-    tagline: 'SEASON ONE',
+    tagline: 'THE TIDE ALWAYS RETURNS',
     quote: 'Raw, real, and beautifully shot',
     outlet: 'COASTLINE REVIEW',
     billing: 'A Saltline Pictures production, starring Mira and Suki, shot on the coast, graded by hand',
     vol: 'VOL. 4',
     comingSoon: 'COMING SOON',
+    field: 'skyline',
   },
   {
     id: 'palm-light',
@@ -60,6 +65,7 @@ export const CAPTION_DECK = [
     billing: 'A Saltline Pictures production, starring Mira and Suki, shot on the coast, graded by hand',
     vol: 'VOL. 5',
     comingSoon: 'COMING SOON',
+    field: 'palms',
   },
   {
     id: 'night-market',
@@ -71,6 +77,7 @@ export const CAPTION_DECK = [
     billing: 'A Saltline Pictures production, starring Mira and Suki, shot on the coast, graded by hand',
     vol: 'VOL. 6',
     comingSoon: 'COMING SOON',
+    field: 'skyline',
   },
 ];
 
