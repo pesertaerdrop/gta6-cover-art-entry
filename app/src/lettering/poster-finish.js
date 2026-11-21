@@ -109,28 +109,29 @@ export function drawQuoteBar(ctx, x, y, w, quote, outlet, fontSize) {
 }
 
 export function drawBillingLine(ctx, x, y, w, text, fontSize) {
-  const full = text.toUpperCase();
-  // Shrink the line until the whole billing fits inside its box, measuring
-  // with whatever font is actually live at draw time: Oswald can still be
-  // loading when a capture draws, and the fallback then measures far wider
-  // than Oswald, so a size picked from Oswald's metrics alone would not
-  // fit. Never cut the text: a billing that ends in "..." reads as a
-  // broken poster. Returns the font size the billing was drawn at.
-  const floor = Math.max(8, Math.round(fontSize * 0.55));
+  const line = text.toUpperCase();
+  // A billing line is never allowed to run off its box: shrink it step by
+  // step until it fits, measuring against the font that is really in use
+  // right now. While a webfont is still loading, the fallback face measures
+  // much wider than the real one, so a size chosen from the real face's
+  // metrics alone can still overflow on a capture. If even the smallest
+  // size is too wide, fall through to the two-line wrapped block instead
+  // of trimming a single letter. Returns the size the line was drawn at.
+  const minSize = Math.max(8, Math.round(fontSize * 0.55));
   let size = fontSize;
   ctx.save();
-  ctx.font = `${size}px Oswald, sans-serif`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  while (ctx.measureText(full).width > w && size > floor) {
-    const next = Math.max(floor, Math.round(size * 0.92));
-    if (next >= size) break;
+  const fits = () => ctx.measureText(line).width <= w;
+  const setSize = (next) => {
     size = next;
     ctx.font = `${size}px Oswald, sans-serif`;
+  };
+  setSize(size);
+  while (!fits() && size > minSize) {
+    setSize(Math.max(minSize, Math.round(size * 0.92)));
   }
-  if (ctx.measureText(full).width > w) {
-    // Even at the floor the line does not fit: wrap it over two lines,
-    // centred on the same y, instead of dropping any of it.
+  if (!fits()) {
     ctx.restore();
     drawBillingBlock(ctx, x, y - size * 1.15, w, text, size);
     return size;
@@ -138,7 +139,7 @@ export function drawBillingLine(ctx, x, y, w, text, fontSize) {
   ctx.shadowColor = 'rgba(0, 0, 0, 0.85)';
   ctx.shadowBlur = Math.round(size * 0.4);
   ctx.fillStyle = '#fff';
-  ctx.fillText(full, x + w / 2, y);
+  ctx.fillText(line, x + w / 2, y);
   ctx.restore();
   return size;
 }

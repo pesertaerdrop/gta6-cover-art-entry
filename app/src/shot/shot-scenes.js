@@ -14,7 +14,7 @@ export const SHOT_SCENES = {
     layout: 'hero-mosaic',
     grade: 'sunset',
     caption: 0,
-    photos: [0, 1, 2, 3, 4],
+    photos: [14, 1, 2, 3, 4],
   },
   editor: {
     mode: 'editor',
@@ -31,7 +31,7 @@ export const SHOT_SCENES = {
     layout: 'six-grid',
     grade: 'golden-hour',
     caption: 2,
-    photos: [12, 5, 9, 6, 7, 4],
+    photos: [15, 5, 9, 6, 7, 4],
   },
   cover4: {
     mode: 'cover',
@@ -39,7 +39,7 @@ export const SHOT_SCENES = {
     layout: 'seven-mosaic',
     grade: 'tropic-teal',
     caption: 3,
-    photos: [4, 0, 5, 8, 11, 1, 3],
+    photos: [16, 0, 5, 8, 11, 1, 3],
   },
 };
 

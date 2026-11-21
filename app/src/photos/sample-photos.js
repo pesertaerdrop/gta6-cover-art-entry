@@ -1,4 +1,4 @@
-// sample-photos.js — the 14 image-model sample photos and the invented cast
+// sample-photos.js — the 17 image-model sample photos and the invented cast
 // who recurs across every cover. Vera, Marcus, June and Otis are invented
 // people; their names feed the callout tags so the covers tell one story.
 // Every file is a photograph with no text and no logos in it.
@@ -7,6 +7,8 @@ export const CAST = [
   { name: 'Marcus', note: '30s, short beard, floral shirt, gold chain' },
   { name: 'June', note: 'early 20s, dark bob' },
   { name: 'Otis', note: '50s, bucket hat, white tank top' },
+  { name: 'Mira', note: '20s, long silver-lilac hair, white top' },
+  { name: 'Suki', note: '20s, short teal bob, burgundy tank top' },
 ];
 
 export const SAMPLE_PHOTOS = [
@@ -24,6 +26,9 @@ export const SAMPLE_PHOTOS = [
   { file: 'samples/marcus-rider.jpg', cast: 'Marcus', scene: 'motorcycle at sunset' },
   { file: 'samples/crew-bonfire.jpg', cast: 'Vera, Marcus, June and Otis', scene: 'beach bonfire at dusk' },
   { file: 'samples/otis-garage.jpg', cast: 'Otis', scene: 'polishing the classic car' },
+  { file: 'samples/vice-duo-convertible.jpg', cast: 'Mira and Suki', scene: 'pink convertible at purple dusk' },
+  { file: 'samples/vice-duo-neon.jpg', cast: 'Mira and Suki', scene: 'pink car door under the neon signs' },
+  { file: 'samples/vice-duo-boardwalk.jpg', cast: 'Mira and Suki', scene: 'boardwalk at sunset, pink car behind' },
 ];
 
 export const DEFAULT_TAGS = [

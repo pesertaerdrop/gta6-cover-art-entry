@@ -51,7 +51,7 @@ export function defaultDoc() {
     look: { ...DEFAULT_LOOK },
     selected: 0,
     panels: [
-      makePanel(0, 'THE ACE'),
+      makePanel(14, 'THE ACE'),
       makePanel(1, 'THE SCOUT'),
       makePanel(2, 'THE PILOT'),
       makePanel(3, 'THE HOST'),

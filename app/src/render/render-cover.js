@@ -173,11 +173,11 @@ export function drawFinishLayer(ctx, doc, W, H, accent) {
   const barW = Math.round(W * 0.13);
   const barH = Math.round(H * 0.045);
   drawBarcode(ctx, W - barW - Math.round(W * 0.03), sealR * 2 + Math.round(H * 0.04), barW, barH, barcodeNumber(doc.title.length * 7919 + doc.panels.length * 131));
-  // Billing block: one centred line under the top row, between the volume
-  // tag and the seal, so the bottom band stays free for the callout tags.
-  // The box runs 0.10W..0.82W: its right edge stays clear of the barcode
-  // (which starts at 0.84W) and its left edge stays clear of the volume
-  // tag, while the extra width gives the billing room to fit whole.
+  // Billing: a single centred line tucked under the top row, between the
+  // volume tag on the left and the seal on the right, leaving the bottom
+  // band open for the callout tags. The box spans 0.10W to 0.82W, so it
+  // ends before the barcode (which begins at 0.84W) and clears the volume
+  // tag on the other side, with enough width for the line to fit whole.
   drawBillingLine(ctx, W * 0.10, H * 0.082, W * 0.72, doc.billing, Math.round(H * 0.014));
   // Coming soon, centred above the quote bar.
   if (doc.comingSoon) drawComingSoon(ctx, 0, H * 0.858, W, Math.round(H * 0.02));
