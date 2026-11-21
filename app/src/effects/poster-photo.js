@@ -1,135 +1,147 @@
-// The poster photo pipeline: how a sample photo becomes a panel. Every
-// panel is drawn cover-fit (the photo fills the panel, cropped to its
-// aspect), then graded, posterised, halftoned and grained on an offscreen
-// canvas before it lands on the cover. All randomness is seeded from the
-// photo and the panel, so the same document always draws the same pixels.
+// Drawing a photo into a panel, poster-style.
+//
+// A panel photo is the photo cover-fitted into its rectangle at the
+// panel's zoom and pan, then graded and finished: the grade's colour
+// map, a posterize pass, a halftone dot screen, seeded grain, and a
+// soft glow. The grain is seeded from the photo and the panel, never
+// from Math.random, so the same document always renders the same
+// bytes — the determinism check depends on it.
 import { buildLut } from './grade-presets.js';
 
-// A tiny seeded PRNG (mulberry32) fed by a string hash: stable per panel.
+// A small string hash (FNV-1a) for seeding the grain.
 function hashSeed(str) {
-  let h = 2166136261;
+  let hash = 0x811c9dc5;
   for (let i = 0; i < str.length; i++) {
-    h ^= str.charCodeAt(i);
-    h = Math.imul(h, 16777619);
+    hash ^= str.charCodeAt(i);
+    hash = Math.imul(hash, 0x01000193);
   }
-  return h >>> 0;
+  return hash >>> 0;
 }
 
+// A seeded pseudo-random generator: the same seed always gives the
+// same numbers, so the grain never changes between runs.
 function mulberry32(seed) {
-  let a = seed >>> 0;
+  let state = seed >>> 0;
   return () => {
-    a = (a + 0x6d2b79f5) | 0;
-    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    state = (state + 0x6d2b79f5) | 0;
+    let t = Math.imul(state ^ (state >>> 15), 1 | state);
     t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
   };
 }
 
-// The source rectangle of a cover-fit draw: the photo is scaled so its
-// smaller side covers the panel, then zoomed and panned. Pan is in
-// fractions of the panel (0 keeps the centre, ±1 moves a full panel).
+// The source rectangle of the photo that cover-fits `rect` at the
+// given zoom and pan. Pan moves the crop window: panX -1 is all the
+// way left, +1 all the way right; panY -1 is up, +1 is down.
 function coverSource(img, rect, zoom, panX, panY) {
-  const iw = img.naturalWidth || img.width;
-  const ih = img.naturalHeight || img.height;
-  const scale = Math.max(rect.w / iw, rect.h / ih) * zoom;
-  const dw = iw * scale;
-  const dh = ih * scale;
-  const sx = (dw - rect.w) / 2 / scale - (panX * rect.w) / 2 / scale;
-  const sy = (dh - rect.h) / 2 / scale - (panY * rect.h) / 2 / scale;
-  return { sx: Math.max(0, Math.min(iw - rect.w / scale, sx)), sy: Math.max(0, Math.min(ih - rect.h / scale, sy)), sw: rect.w / scale, sh: rect.h / scale };
+  const scale = Math.max(rect.w / img.naturalWidth, rect.h / img.naturalHeight) * zoom;
+  const sw = rect.w / scale;
+  const sh = rect.h / scale;
+  const maxX = img.naturalWidth - sw;
+  const maxY = img.naturalHeight - sh;
+  const sx = Math.max(0, Math.min(maxX, maxX / 2 + (panX || 0) * maxX / 2));
+  const sy = Math.max(0, Math.min(maxY, maxY / 2 + (panY || 0) * maxY / 2));
+  return { sx, sy, sw, sh };
 }
 
-// Draw an image into a rect with the poster treatment. opts: { zoom,
-// panX, panY, flip, look, grade, seed }. look carries paint (posterise),
-// grade (ramp strength), halftone (dot overlay), grain (noise) and glow
-// (highlight lift). Pass a grade object from gradeById, or null for none.
+// Draw the image into `rect` with the look applied. `opts` carries
+// the grade object, the look sliders, and a seed string for the grain.
 export function applyPosterPhoto(ctx, img, rect, opts = {}) {
   const look = opts.look || {};
-  const zoom = opts.zoom || 1;
-  const panX = opts.panX || 0;
-  const panY = opts.panY || 0;
-  const w = Math.max(2, Math.round(rect.w));
-  const h = Math.max(2, Math.round(rect.h));
-  const off = document.createElement('canvas');
-  off.width = w;
-  off.height = h;
-  const octx = off.getContext('2d');
-  const src = coverSource(img, { w, h }, zoom, panX, panY);
+  const w = Math.max(1, Math.round(rect.w));
+  const h = Math.max(1, Math.round(rect.h));
+  const scratch = document.createElement('canvas');
+  scratch.width = w;
+  scratch.height = h;
+  const sctx = scratch.getContext('2d');
+  const src = coverSource(img, rect, opts.zoom || 1, opts.panX || 0, opts.panY || 0);
   if (opts.flip) {
-    octx.save();
-    octx.translate(w, 0);
-    octx.scale(-1, 1);
-    octx.drawImage(img, src.sx, src.sy, src.sw, src.sh, 0, 0, w, h);
-    octx.restore();
+    sctx.save();
+    sctx.translate(w, 0);
+    sctx.scale(-1, 1);
+    sctx.drawImage(img, src.sx, src.sy, src.sw, src.sh, 0, 0, w, h);
+    sctx.restore();
   } else {
-    octx.drawImage(img, src.sx, src.sy, src.sw, src.sh, 0, 0, w, h);
+    sctx.drawImage(img, src.sx, src.sy, src.sw, src.sh, 0, 0, w, h);
   }
-  const imageData = octx.getImageData(0, 0, w, h);
-  const data = imageData.data;
-  const lut = opts.grade ? buildLut(opts.grade, look.grade ?? 60) : null;
+  // Grade + paint: remap every pixel through the grade table, then
+  // posterize when the paint slider is up.
+  const gradeStrength = look.grade ?? 62;
   const paint = look.paint ?? 10;
-  const steps = Math.max(3, Math.round(16 - paint * 0.13));
-  const stepSize = 255 / (steps - 1);
-  const grainAmt = (look.grain ?? 22) * 0.45;
-  const glowAmt = (look.glow ?? 26) / 100;
-  const rand = mulberry32(hashSeed(`${opts.seed || img.src || 'panel'}`));
-  for (let i = 0; i < data.length; i += 4) {
-    let r = data[i];
-    let g = data[i + 1];
-    let b = data[i + 2];
-    if (lut) {
-      r = lut[r * 3];
-      g = lut[g * 3 + 1];
-      b = lut[b * 3 + 2];
+  if (opts.grade && gradeStrength > 0) {
+    const lut = buildLut(opts.grade, gradeStrength);
+    const data = sctx.getImageData(0, 0, w, h);
+    const px = data.data;
+    const steps = paint > 0 ? Math.max(2, Math.round(16 - paint / 8)) : 0;
+    for (let i = 0; i < px.length; i += 4) {
+      const r = px[i];
+      const g = px[i + 1];
+      const b = px[i + 2];
+      // Each channel runs through the grade's curve on its own, so the
+      // photo keeps its colours while taking on the grade's palette.
+      // (A single brightness remap would wash everything monochrome.)
+      let nr = lut[r * 3];
+      let ng = lut[g * 3 + 1];
+      let nb = lut[b * 3 + 2];
+      if (steps > 0) {
+        nr = Math.round(nr / 255 * steps) / steps * 255;
+        ng = Math.round(ng / 255 * steps) / steps * 255;
+        nb = Math.round(nb / 255 * steps) / steps * 255;
+      }
+      px[i] = nr;
+      px[i + 1] = ng;
+      px[i + 2] = nb;
     }
-    if (paint > 0) {
-      r = Math.round(r / stepSize) * stepSize;
-      g = Math.round(g / stepSize) * stepSize;
-      b = Math.round(b / stepSize) * stepSize;
-    }
-    if (glowAmt > 0) {
-      const lift = (r / 255) * (r / 255) * glowAmt * 40;
-      r = Math.min(255, r + lift);
-      g = Math.min(255, g + lift * 0.9);
-      b = Math.min(255, b + lift * 0.8);
-    }
-    if (grainAmt > 0) {
-      const n = (rand() - 0.5) * 2 * grainAmt;
-      r = Math.max(0, Math.min(255, r + n));
-      g = Math.max(0, Math.min(255, g + n));
-      b = Math.max(0, Math.min(255, b + n));
-    }
-    data[i] = r;
-    data[i + 1] = g;
-    data[i + 2] = b;
+    sctx.putImageData(data, 0, 0);
   }
-  octx.putImageData(imageData, 0, 0);
-  // Halftone: a faint grid of dots, stronger where the look asks for it.
+  // Halftone: a screen of dots, denser in the shadows.
   const halftone = look.halftone ?? 20;
   if (halftone > 0) {
     const gap = 7;
-    octx.fillStyle = `rgba(10, 8, 12, ${0.05 + (halftone / 100) * 0.16})`;
+    sctx.fillStyle = `rgba(20, 18, 16, ${halftone / 220})`;
     for (let y = gap / 2; y < h; y += gap) {
       for (let x = gap / 2; x < w; x += gap) {
-        octx.beginPath();
-        octx.arc(x, y, 1.1, 0, Math.PI * 2);
-        octx.fill();
+        sctx.beginPath();
+        sctx.arc(x, y, 1.1, 0, Math.PI * 2);
+        sctx.fill();
       }
     }
   }
-  ctx.drawImage(off, rect.x, rect.y, rect.w, rect.h);
+  // Grain: seeded speckles, the same every render.
+  const grain = look.grain ?? 22;
+  if (grain > 0) {
+    const rand = mulberry32(hashSeed(opts.seed || 'saltline'));
+    const count = Math.floor((w * h * grain) / 9000);
+    sctx.fillStyle = 'rgba(255, 250, 240, 0.5)';
+    for (let i = 0; i < count; i++) {
+      sctx.fillRect(Math.floor(rand() * w), Math.floor(rand() * h), 1, 1);
+    }
+    sctx.fillStyle = 'rgba(10, 8, 6, 0.5)';
+    for (let i = 0; i < count; i++) {
+      sctx.fillRect(Math.floor(rand() * w), Math.floor(rand() * h), 1, 1);
+    }
+  }
+  // Glow: a warm wash from the top, strongest at the edges.
+  const glow = look.glow ?? 26;
+  if (glow > 0) {
+    const wash = sctx.createLinearGradient(0, 0, 0, h);
+    wash.addColorStop(0, `rgba(255, 190, 110, ${glow / 320})`);
+    wash.addColorStop(1, 'rgba(255, 190, 110, 0)');
+    sctx.fillStyle = wash;
+    sctx.fillRect(0, 0, w, h);
+  }
+  ctx.drawImage(scratch, rect.x, rect.y, rect.w, rect.h);
 }
 
-// Draw one panel's photo: cover-fit with the panel's zoom, pan and flip,
-// graded by the cover's grade, seeded by the panel's photo and index.
+// Draw one panel's photo: the panel's crop, its flip, and the look.
 export function drawPanelPhoto(ctx, img, rect, panel, look, grade) {
   applyPosterPhoto(ctx, img, rect, {
-    zoom: panel.zoom ?? 1.15,
-    panX: panel.panX ?? 0,
-    panY: panel.panY ?? 0,
-    flip: !!panel.flip,
+    zoom: panel.zoom,
+    panX: panel.panX,
+    panY: panel.panY,
+    flip: panel.flip,
     look,
     grade,
-    seed: `${img.src || ''}#${panel.index ?? 0}`,
+    seed: (panel.photo || '') + ':' + (panel.index ?? 0),
   });
 }

@@ -1,121 +1,91 @@
-// The panel inspector: the right-rail card for the selected panel. It
-// shows a thumbnail of the panel's photo, the panel's name and note, a
-// zoom slider, photo stepping, and the framing buttons (reset, flip,
-// swap with the next panel, mark face) plus the callout tag field. Every
-// control commits through the studio, so each change is undoable. Sliders
-// and the tag field checkpoint when the user grabs them, so one drag or
-// one edit is one undo step even though the preview moves live.
-import { drawPanelPhoto } from '../effects/poster-photo.js';
-import { nextSamplePhoto, labelOf } from '../photos/sample-photos.js';
+// The panel inspector: the card that edits the selected panel.
+//
+// It shows the panel's photo as a thumbnail, names the panel and its
+// photo, and offers the per-panel controls: zoom, previous and next
+// photo, reset, flip, swap with the next panel, mark the face (which
+// keeps the crop honest), and the callout tag text. The controls are
+// wired once; every render after that only updates their values.
+import { labelOf, nextSamplePhoto } from '../photos/sample-photos.js';
 import { resetPanel } from './panel-gestures.js';
 
-function thumbOf(studio, panel) {
-  const canvas = document.createElement('canvas');
-  canvas.width = 176;
-  canvas.height = 176;
-  const img = studio.images.get(panel.photo);
-  const grade = studio.plan ? studio.plan.grade : null;
-  if (img) {
-    const ctx = canvas.getContext('2d');
-    drawPanelPhoto(ctx, img, { x: 0, y: 0, w: 176, h: 176 }, panel, studio.doc.look, grade);
-  }
-  return canvas;
-}
-
 export function renderInspector(studio) {
-  const body = document.getElementById('inspectorBody');
-  if (!body) return;
   const doc = studio.doc;
   const panel = doc.panels[doc.selected] || doc.panels[0];
-  const index = doc.panels.indexOf(panel);
-  body.innerHTML = '';
-  const wrap = document.createElement('div');
-  wrap.className = 'inspector-thumb';
-  wrap.appendChild(thumbOf(studio, panel));
-  const who = document.createElement('div');
-  who.className = 'who';
-  who.textContent = `Panel ${index + 1} \u2014 ${labelOf(panel.photo)}`;
-  const note = document.createElement('small');
-  note.textContent = 'Smart crop, faces kept whole';
-  who.appendChild(note);
-  wrap.appendChild(who);
-  body.appendChild(wrap);
-
-  const zoomRow = document.createElement('div');
-  zoomRow.className = 'slider-row';
-  const zoomLabel = document.createElement('label');
-  zoomLabel.textContent = 'Zoom';
-  const zoom = document.createElement('input');
-  zoom.type = 'range';
-  zoom.min = '60';
-  zoom.max = '300';
-  zoom.value = String(Math.round((panel.zoom || 1.15) * 100));
-  const zoomOut = document.createElement('output');
-  zoomOut.textContent = `${Math.round((panel.zoom || 1.15) * 100)}%`;
-  zoom.addEventListener('pointerdown', () => studio.checkpoint());
-  zoom.addEventListener('input', () => {
-    panel.zoom = Number(zoom.value) / 100;
-    zoomOut.textContent = `${zoom.value}%`;
-    studio.drawPreview();
-  });
-  zoom.addEventListener('change', () => studio.drawPreview());
-  zoomRow.append(zoomLabel, zoom, zoomOut);
-  body.appendChild(zoomRow);
-
-  const stepRow = document.createElement('div');
-  stepRow.className = 'btn-row';
-  const prev = document.createElement('button');
-  prev.type = 'button';
-  prev.textContent = '\u2190 Photo';
-  prev.addEventListener('click', () => studio.commit(() => { panel.photo = nextSamplePhoto(panel.photo, -1); }));
-  const next = document.createElement('button');
-  next.type = 'button';
-  next.textContent = 'Photo \u2192';
-  next.addEventListener('click', () => studio.commit(() => { panel.photo = nextSamplePhoto(panel.photo, 1); }));
-  stepRow.append(prev, next);
-  body.appendChild(stepRow);
-
-  const frameRow = document.createElement('div');
-  frameRow.className = 'btn-row';
-  const mkBtn = (text, fn) => {
-    const b = document.createElement('button');
-    b.type = 'button';
-    b.textContent = text;
-    b.addEventListener('click', () => studio.commit(fn));
-    return b;
-  };
-  frameRow.append(
-    mkBtn('Reset', () => resetPanel(panel)),
-    mkBtn('Flip', () => { panel.flip = !panel.flip; }),
-    mkBtn('Swap', () => {
-      const j = (index + 1) % doc.panels.length;
-      const a = doc.panels[index];
-      const b = doc.panels[j];
+  if (!panel) return;
+  const thumb = document.getElementById('inspector-thumb');
+  if (thumb) {
+    const img = studio.images.get ? studio.images.get(panel.photo) : studio.images[panel.photo];
+    const tctx = thumb.getContext('2d');
+    if (img && img.naturalWidth > 0) {
+      const scale = Math.max(thumb.width / img.naturalWidth, thumb.height / img.naturalHeight);
+      const sw = thumb.width / scale;
+      const sh = thumb.height / scale;
+      tctx.drawImage(img, (img.naturalWidth - sw) / 2, (img.naturalHeight - sh) / 2, sw, sh, 0, 0, thumb.width, thumb.height);
+    } else {
+      tctx.fillStyle = '#2a2521';
+      tctx.fillRect(0, 0, thumb.width, thumb.height);
+    }
+  }
+  const who = document.getElementById('inspector-who');
+  if (who) who.textContent = `Panel ${doc.selected + 1} — ${labelOf(panel.photo) || 'Your photo'}`;
+  const note = document.getElementById('inspector-note');
+  if (note) note.textContent = panel.faceMarked ? 'Face marked — crop keeps it whole' : 'Smart crop, faces kept whole';
+  const zoom = document.getElementById('inspector-zoom');
+  const zoomValue = document.getElementById('inspector-zoom-value');
+  if (zoom) {
+    if (document.activeElement !== zoom) zoom.value = String(Math.round(panel.zoom * 100));
+    if (zoomValue) zoomValue.textContent = `${Math.round(panel.zoom * 100)}%`;
+  }
+  const tag = document.getElementById('panel-tag');
+  if (tag && document.activeElement !== tag) tag.value = panel.tag || '';
+  if (thumb && !thumb.dataset.wired) {
+    thumb.dataset.wired = '1';
+    const wire = (id, fn) => {
+      const el = document.getElementById(id);
+      if (el) el.addEventListener('click', fn);
+    };
+    wire('photo-prev', () => {
+      const prev = nextSamplePhoto(panel.photo, -1);
+      panel.photo = prev.src;
+      panel.tag = prev.tag;
+      studio.commit();
+      studio.render();
+    });
+    wire('photo-next', () => {
+      const next = nextSamplePhoto(panel.photo, 1);
+      panel.photo = next.src;
+      panel.tag = next.tag;
+      studio.commit();
+      studio.render();
+    });
+    wire('panel-reset', () => { resetPanel(panel); studio.commit(); studio.render(); });
+    wire('panel-flip', () => { panel.flip = !panel.flip; studio.commit(); studio.render(); });
+    wire('panel-swap', () => {
+      const other = (doc.selected + 1) % doc.panels.length;
+      const a = doc.panels[doc.selected];
+      const b = doc.panels[other];
       const photo = a.photo;
-      const tag = a.tag;
-      a.photo = b.photo;
-      a.tag = b.tag;
-      b.photo = photo;
-      b.tag = tag;
-    }),
-    mkBtn('Mark face', () => { panel.faceMarked = !panel.faceMarked; }),
-  );
-  body.appendChild(frameRow);
-
-  const tagField = document.createElement('div');
-  tagField.className = 'field';
-  const tagLabel = document.createElement('label');
-  tagLabel.textContent = 'Callout tag';
-  const tagInput = document.createElement('input');
-  tagInput.type = 'text';
-  tagInput.value = panel.tag || '';
-  tagInput.maxLength = 24;
-  tagInput.addEventListener('focus', () => studio.checkpoint());
-  tagInput.addEventListener('input', () => {
-    panel.tag = tagInput.value.toUpperCase();
-    studio.drawPreview();
-  });
-  tagInput.addEventListener('change', () => studio.drawPreview());
-  tagField.append(tagLabel, tagInput);
-  body.appendChild(tagField);
+      const tagText = a.tag;
+      a.photo = b.photo; a.tag = b.tag;
+      b.photo = photo; b.tag = tagText;
+      studio.commit();
+      studio.render();
+    });
+    wire('panel-mark-face', () => { panel.faceMarked = !panel.faceMarked; studio.commit(); studio.render(); });
+    if (zoom) {
+      zoom.addEventListener('input', () => {
+        panel.zoom = Math.max(1, Math.min(3, Number(zoom.value) / 100));
+        if (zoomValue) zoomValue.textContent = `${zoom.value}%`;
+        studio.render();
+      });
+      zoom.addEventListener('change', () => studio.commit());
+    }
+    if (tag) {
+      tag.addEventListener('input', () => {
+        panel.tag = tag.value.toUpperCase();
+        studio.commit();
+        studio.render();
+      });
+    }
+  }
 }

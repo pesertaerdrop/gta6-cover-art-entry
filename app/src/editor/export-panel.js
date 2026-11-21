@@ -1,69 +1,43 @@
-// The export panel: three size checkboxes and the big export button.
-// Each checked size renders the cover at its post size and downloads it
-// as a PNG; the filenames name the cover and the size, so a shared file
-// is self-describing. Exports run one at a time and report each file as
-// it lands.
+// The export panel: the three post sizes and the big orange button.
+//
+// A cover exports as a PNG in the common post sizes — 1080 by 1080,
+// 1080 by 1350 and 1920 by 1080. Each size is rendered fresh from
+// the document at its own pixel size, so the PNG is the cover itself,
+// never a screenshot of the preview.
+import { SIZES } from '../layouts/plan-cover.js';
 import { renderCoverToCanvas } from '../render/render-cover.js';
-import { applyDocCaption } from '../layouts/plan-cover.js';
 
 export const EXPORT_SIZES = {
-  '16:9': { w: 1920, h: 1080, label: '1920 \u00d7 1080 (wide)' },
-  '4:5': { w: 1080, h: 1350, label: '1080 \u00d7 1350 (portrait)' },
-  '1:1': { w: 1080, h: 1080, label: '1080 \u00d7 1080 (square)' },
+  '16:9': { label: '1920 × 1080 (wide)', file: 'saltline-wide.png' },
+  '4:5': { label: '1080 × 1350 (portrait)', file: 'saltline-portrait.png' },
+  '1:1': { label: '1080 × 1080 (square)', file: 'saltline-square.png' },
 };
 
-function slug(text) {
-  return text.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'saltline';
-}
-
-function download(canvas, name) {
-  return new Promise((resolve) => {
-    canvas.toBlob((blob) => {
-      if (!blob) return resolve(false);
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = name;
-      a.click();
-      setTimeout(() => URL.revokeObjectURL(url), 5000);
-      resolve(true);
-    }, 'image/png');
-  });
-}
-
+// Render every checked size and download it as a PNG.
 export async function exportAllSizes(studio) {
-  const status = document.getElementById('exportStatus');
-  const title = slug(applyDocCaption(studio.doc).title);
-  const picked = [...document.querySelectorAll('.export-sizes input[type="checkbox"]:checked')]
-    .map((box) => box.value)
-    .filter((id) => EXPORT_SIZES[id]);
-  const sizes = picked.length ? picked : [studio.doc.size];
-  let done = 0;
-  for (const id of sizes) {
-    const size = EXPORT_SIZES[id];
-    const canvas = renderCoverToCanvas(studio.doc, studio.images, { size: id, width: size.w, height: size.h });
-    const ok = await download(canvas, `${title}-${id}.png`);
-    if (ok) done++;
-    if (status) status.textContent = `Exported ${done} of ${sizes.length} \u2014 ${size.label}.`;
+  const status = document.getElementById('export-status');
+  const sizes = Object.keys(EXPORT_SIZES).filter((size) => {
+    const box = document.getElementById('export-' + size);
+    return !box || box.checked;
+  });
+  const picked = sizes.length > 0 ? sizes : ['16:9'];
+  for (const size of picked) {
+    const canvas = renderCoverToCanvas(studio.doc, studio.images, { size });
+    const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/png'));
+    if (!blob) continue;
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = EXPORT_SIZES[size].file;
+    link.click();
+    setTimeout(() => URL.revokeObjectURL(link.href), 5000);
   }
-  if (status) status.textContent = done === sizes.length ? `Ready. Exported ${done} PNG${done === 1 ? '' : 's'}.` : `Exported ${done} of ${sizes.length}.`;
-  return done;
+  if (status) {
+    status.textContent = `Exported ${picked.length} PNG${picked.length > 1 ? 's' : ''} — ${SIZES[picked[0]].label}.`;
+    status.classList.add('ready');
+  }
 }
 
 export function setupExportPanel(studio) {
-  const host = document.querySelector('.export-sizes');
-  if (host) {
-    host.innerHTML = '';
-    for (const [id, size] of Object.entries(EXPORT_SIZES)) {
-      const label = document.createElement('label');
-      const box = document.createElement('input');
-      box.type = 'checkbox';
-      box.value = id;
-      box.checked = id === studio.doc.size;
-      label.append(box, document.createTextNode(` ${size.label}`));
-      host.appendChild(label);
-    }
-  }
-  const btn = document.getElementById('exportAllBtn');
-  if (btn) btn.addEventListener('click', () => exportAllSizes(studio));
+  const button = document.getElementById('export-all');
+  if (button) button.addEventListener('click', () => exportAllSizes(studio));
 }

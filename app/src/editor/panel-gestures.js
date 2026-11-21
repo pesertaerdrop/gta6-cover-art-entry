@@ -1,50 +1,59 @@
-// Panel gestures: the pointer maths behind dragging a panel. A point is
-// carried in cover coordinates (the preview scales client pixels into
-// them); a drag is either a pan (move the photo inside its panel) or a
-// swap (Shift-drag onto another panel drops the photo there). Pan amounts
-// are fractions of the panel, matching the panel's panX/panY fields.
+// Panel gestures: dragging, zooming and swapping on the preview.
+//
+// Drag a panel to pan its photo, wheel to zoom, Shift-drag onto
+// another panel to swap the two photos, double-click to reset the
+// crop. The functions here are pure — they take a plan and a point in
+// cover pixels and return what changed — so the preview canvas stays
+// thin and the logic stays testable.
 import { panelAtPoint } from '../layouts/plan-cover.js';
 
-// Client pixels on a canvas element into canvas pixels.
+// Convert a pointer event's client position into canvas pixels.
 export function pointToCanvas(canvas, clientX, clientY) {
-  const rect = canvas.getBoundingClientRect();
-  return {
-    x: (clientX - rect.left) * (canvas.width / rect.width),
-    y: (clientY - rect.top) * (canvas.height / rect.height),
-  };
+  const box = canvas.getBoundingClientRect();
+  const scaleX = canvas.width / box.width;
+  const scaleY = canvas.height / box.height;
+  return { x: (clientX - box.left) * scaleX, y: (clientY - box.top) * scaleY };
 }
 
-// The panel under a point in cover coordinates, or -1.
+// Which panel a point in cover pixels lands on, or -1.
 export function hitPanel(plan, point) {
   return panelAtPoint(plan, point.x, point.y);
 }
 
-// Begin a drag on a plan: which panel, where it started, and whether the
-// Shift key makes it a swap instead of a pan.
+// Begin a drag: returns the drag state, or null when the point hits
+// no panel. Shift means "swap" instead of "pan".
 export function startDrag(plan, point, shiftKey) {
   const index = hitPanel(plan, point);
-  if (index === -1) return null;
-  return { index, startX: point.x, startY: point.y, swap: !!shiftKey, over: index };
-}
-
-// How far a pan drag has moved, in panel fractions (x and y).
-export function dragPanDelta(drag, point, rect) {
+  if (index < 0) return null;
+  const panel = plan.panels[index];
   return {
-    dx: ((point.x - drag.startX) / rect.w) * 2,
-    dy: ((point.y - drag.startY) / rect.h) * 2,
+    index,
+    mode: shiftKey ? 'swap' : 'pan',
+    startX: point.x,
+    startY: point.y,
+    panX: panel.panX,
+    panY: panel.panY,
   };
 }
 
-// Finish a swap drag: which panels trade photos, or null when the pointer
-// never left its panel.
-export function endDragSwap(plan, drag, point) {
-  if (!drag.swap) return null;
-  const over = hitPanel(plan, point);
-  if (over === -1 || over === drag.index) return null;
-  return { from: drag.index, to: over };
+// The pan for a drag in progress, in crop units (-1 to 1).
+export function dragPanDelta(drag, point, rect) {
+  const dx = (point.x - drag.startX) / Math.max(1, rect.w);
+  const dy = (point.y - drag.startY) / Math.max(1, rect.h);
+  return {
+    panX: Math.max(-1, Math.min(1, drag.panX - dx * 2)),
+    panY: Math.max(-1, Math.min(1, drag.panY - dy * 2)),
+  };
 }
 
-// Trade two panels' photos (and their tags) in a document.
+// The panel a swap drag ends on, or -1 when it ends where it began.
+export function endDragSwap(plan, drag, point) {
+  if (drag.mode !== 'swap') return -1;
+  const target = hitPanel(plan, point);
+  return target === drag.index ? -1 : target;
+}
+
+// Swap the photos (and their tags) of two panels.
 export function swapPanelPhotos(doc, a, b) {
   const pa = doc.panels[a];
   const pb = doc.panels[b];
@@ -57,12 +66,12 @@ export function swapPanelPhotos(doc, a, b) {
   pb.tag = tag;
 }
 
-// Zoom a panel, clamped so a photo never shrinks below its frame.
+// Zoom a panel by a factor, clamped to the 1–3 range.
 export function zoomPanel(panel, factor) {
-  panel.zoom = Math.max(0.6, Math.min(3, (panel.zoom || 1.15) * factor));
+  panel.zoom = Math.max(1, Math.min(3, panel.zoom * factor));
 }
 
-// Put a panel back to its default framing.
+// Reset a panel's crop to the fresh values.
 export function resetPanel(panel) {
   panel.zoom = 1.15;
   panel.panX = 0;

@@ -1,16 +1,17 @@
-// The cover plan: where every panel and the title field sit, and which
-// caption the cover shows. A cover is two bands: the panel band on top
-// (62% of the height) and the title field below it (38%). The plan is a
-// plain object the renderer, the inspector and the gesture code all read:
-//   { size, w, h, panelArea, field, panels, caption, style, grade }
-// where panels carry both their rect and their document data (photo, tag,
-// zoom, pan, flip), merged so the renderer never looks the doc up again.
+// Turning a document into a cover plan.
+//
+// A plan is everything the renderer needs: the cover's pixel size, the
+// rectangle of every panel with the photo and crop it carries, the
+// title field below the panels, and the caption with the user's own
+// words winning over the deck. The panels take the top 62% of the
+// cover; the title field takes the bottom 38% and is a clean, dark
+// space of its own — no panel ever covers the title, and no title ever
+// covers a face.
 import { CAPTION_DECK } from '../state/default-doc.js';
 import { SAMPLE_PHOTOS } from '../photos/sample-photos.js';
 import { rectsForLayout, layoutPanelCount } from './layout-presets.js';
-import { gradeById } from '../effects/grade-presets.js';
-import { resolveTitleStyle } from '../lettering/title-styles.js';
 
+// The three export sizes: wide, portrait, square.
 export const SIZES = {
   '16:9': { w: 1920, h: 1080, label: '16:9 wide' },
   '4:5': { w: 1080, h: 1350, label: '4:5 portrait' },
@@ -21,13 +22,12 @@ export const GUTTER = 10;
 export const BORDER = 6;
 export const FIELD_H = 0.38;
 
-// Resolve the caption a document shows: the deck entry at doc.caption,
-// with any field the user typed by hand winning over the deck.
+// The caption a cover actually shows: the deck entry, with anything
+// the user typed by hand winning over it.
 export function applyDocCaption(doc) {
   const deck = CAPTION_DECK[doc.caption] || CAPTION_DECK[0];
   const pick = (key) => (doc[key] !== undefined && doc[key] !== '' ? doc[key] : deck[key]);
   return {
-    id: deck.id,
     title: pick('title'),
     script: pick('script'),
     tagline: pick('tagline'),
@@ -40,80 +40,88 @@ export function applyDocCaption(doc) {
   };
 }
 
-// Build the full plan for a document, optionally at another size.
+// Plan a cover from a document. `overrideSize` draws it at another
+// export size without changing the document.
 export function planCover(doc, overrideSize) {
   const size = SIZES[overrideSize || doc.size] || SIZES['16:9'];
   const w = size.w;
   const h = size.h;
   const panelH = Math.round(h * (1 - FIELD_H));
-  const panelArea = { x: 0, y: 0, w, h: panelH };
-  const field = { x: 0, y: panelH, w, h: h - panelH };
-  const rects = rectsForLayout(doc.layout, w, panelH);
-  const caption = applyDocCaption(doc);
+  const zone = { x: BORDER, y: BORDER, w: w - 2 * BORDER, h: panelH - BORDER };
+  const rects = rectsForLayout(doc.layout, zone.w, zone.h);
   const panels = rects.map((rect, i) => {
-    const data = doc.panels[i] || doc.panels[0];
-    return { ...data, rect, index: i };
+    const panel = doc.panels[i] || doc.panels[doc.panels.length - 1];
+    return {
+      ...panel,
+      rect: { x: rect.x + zone.x, y: rect.y + zone.y, w: rect.w, h: rect.h },
+      index: i,
+    };
   });
   return {
-    size, w, h, panelArea, field, panels, caption,
-    style: resolveTitleStyle(doc.titleStyle, doc.grade),
-    grade: gradeById(doc.grade),
+    w,
+    h,
+    size: doc.size,
+    layout: doc.layout,
+    caption: applyDocCaption(doc),
+    panels,
+    panelH,
+    field: { x: 0, y: panelH, w, h: h - panelH },
   };
 }
 
-// Apply a shot scene to a document in place: size, layout, grade,
-// caption, the scene's panels (photo, tag, zoom, pan) and selection.
+// Apply a shot scene to a document: its size, layout, grade, caption
+// and the photo, tag and crop of every panel.
 export function applyShotScene(doc, scene) {
-  if (!scene) return doc;
-  if (scene.size) doc.size = scene.size;
-  if (scene.layout) doc.layout = scene.layout;
-  if (scene.grade) doc.grade = scene.grade;
-  if (scene.titleStyle) doc.titleStyle = scene.titleStyle;
-  if (scene.caption !== undefined) doc.caption = scene.caption;
-  if (scene.panels) {
-    doc.panels = scene.panels.map((p) => ({
-      photo: p.photo,
-      tag: p.tag,
-      tagOn: p.tagOn !== false,
-      zoom: p.zoom ?? 1.15,
-      panX: p.panX ?? 0,
-      panY: p.panY ?? 0,
-      flip: !!p.flip,
-      faceMarked: !!p.faceMarked,
-    }));
-  }
-  if (scene.selected !== undefined) doc.selected = scene.selected;
-  return doc;
+  doc.size = scene.size;
+  doc.layout = scene.layout;
+  doc.grade = scene.grade;
+  doc.titleStyle = scene.titleStyle || 'auto';
+  doc.caption = scene.caption;
+  doc.panels = scene.panels.map((shot) => ({
+    photo: 'samples/' + shot.file,
+    tag: shot.tag,
+    tagOn: true,
+    zoom: shot.zoom ?? 1.15,
+    panX: shot.panX ?? 0,
+    panY: shot.panY ?? 0,
+    tagDy: shot.tagDy ?? 0,
+    flip: false,
+    faceMarked: false,
+  }));
+  doc.selected = 0;
 }
 
-// Pick the layout that fits a document's panel count.
+// Pick the layout that fits a panel count: two panels split, three go
+// diagonal, four grid, five strip, six hero, seven mosaic.
 export function autoLayoutFor(doc) {
-  const n = doc.panels.length;
-  if (n <= 2) return 'duo-split';
-  if (n === 3) return 'diagonal-trio';
-  if (n === 4) return 'quad-grid';
-  if (n === 5) return 'film-strip';
-  if (n === 6) return 'hero-mosaic';
-  return 'seven-mosaic';
+  const count = doc.panels.length;
+  if (count <= 2) return 'duo-split';
+  if (count === 3) return 'diagonal-trio';
+  if (count === 4) return 'quad-grid';
+  if (count === 5) return 'film-strip';
+  if (count >= 7) return 'seven-mosaic';
+  return 'hero-mosaic';
 }
 
-// The index of the panel under a point in cover coordinates, or -1.
+// Which panel, if any, holds the point (in cover pixels).
 export function panelAtPoint(plan, x, y) {
-  for (let i = 0; i < plan.panels.length; i++) {
-    const r = plan.panels[i].rect;
-    if (x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.h) return i;
+  for (const panel of plan.panels) {
+    const r = panel.rect;
+    if (x >= r.x && x <= r.x + r.w && y >= r.y && y <= r.y + r.h) return panel.index;
   }
   return -1;
 }
 
-// Resize a document's panels to a layout's panel count, keeping the
-// photos already placed and filling new slots from the samples.
+// Reshape a document's panels to a layout: keep the photos it has,
+// fill the rest from the sample set in order, trim the extras.
 export function rematchPanels(doc, layoutId) {
   const want = layoutPanelCount(layoutId);
-  const next = doc.panels.slice(0, want);
-  for (let i = next.length; i < want; i++) {
-    const photo = SAMPLE_PHOTOS[i % SAMPLE_PHOTOS.length];
-    next.push({
+  const kept = doc.panels.slice(0, want);
+  let next = 0;
+  while (kept.length < want) {
+    const photo = SAMPLE_PHOTOS[next % SAMPLE_PHOTOS.length];
+    next += 1;
+    kept.push({
       photo: photo.src,
       tag: photo.tag,
       tagOn: true,
@@ -124,8 +132,7 @@ export function rematchPanels(doc, layoutId) {
       faceMarked: false,
     });
   }
-  doc.panels = next;
+  doc.panels = kept;
   doc.layout = layoutId;
-  if (doc.selected >= want) doc.selected = 0;
-  return doc;
+  if (doc.selected >= kept.length) doc.selected = 0;
 }

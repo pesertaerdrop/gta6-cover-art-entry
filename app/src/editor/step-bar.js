@@ -1,31 +1,28 @@
-// The three-step bar in the top bar: 1 Add photos, 2 Caption, 3 Export
-// PNG. The steps are navigation, not a wizard: each jumps to the card it
-// names, and the current step is marked so the user always knows where
-// they are in the three moves from a photo to a poster.
-const STEP_TARGETS = {
-  1: 'photosHeading',
-  2: 'captionHeading',
-  3: 'exportHeading',
-};
-
+// The step bar: the three steps across the top of the studio.
+//
+// 1 Add photos, 2 Caption, 3 Export PNG. Clicking a step scrolls to
+// the part of the bench it names and marks it current; the studio
+// marks step 2 once the caption is touched and step 3 once an export
+// has run.
 export function setupStepBar(studio) {
-  const bar = document.getElementById('stepbar');
-  if (!bar) return;
-  for (const button of bar.querySelectorAll('button[data-step]')) {
+  const targets = { 1: 'photos-card', 2: 'caption-card', 3: 'export-card' };
+  for (const [number, id] of Object.entries(targets)) {
+    const button = document.getElementById('step-' + number);
+    if (!button) continue;
     button.addEventListener('click', () => {
-      const n = Number(button.dataset.step);
-      markStep(n);
-      const target = document.getElementById(STEP_TARGETS[n]);
-      if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      const card = document.getElementById(id);
+      if (card) card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      markStep(Number(number));
     });
   }
+  void studio;
 }
 
 export function markStep(number) {
-  const bar = document.getElementById('stepbar');
-  if (!bar) return;
-  for (const button of bar.querySelectorAll('button[data-step]')) {
-    const on = Number(button.dataset.step) === number;
-    button.setAttribute('aria-current', on ? 'step' : 'false');
+  for (let i = 1; i <= 3; i++) {
+    const button = document.getElementById('step-' + i);
+    if (!button) continue;
+    if (i === number) button.setAttribute('aria-current', 'step');
+    else button.removeAttribute('aria-current');
   }
 }

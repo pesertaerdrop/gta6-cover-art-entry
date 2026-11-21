@@ -1,31 +1,42 @@
-// The seven panel layouts. A layout is a tree of splits, not a table of
-// coordinates: each node cuts its rectangle either across (dir 'x', a
-// vertical cut) or down (dir 'y', a horizontal cut) at a fraction, and a
-// leaf is one panel. Reading the tree left to right, top to bottom gives
-// the panels their order. An optional inset shifts a leaf inside its slot
-// (the diagonal trio's bottom panel sits right of centre on purpose).
-// Rects come out in cover pixels; the gutter is applied by the resolver,
-// so every layout shares the same spacing.
-const SPLIT = (dir, at, first, second) => ({ dir, at, first, second });
-const LEAF = (inset) => ({ leaf: true, inset: inset || null });
+// The seven panel layouts.
+//
+// A layout is a split tree: a vertical cut divides a rectangle into a
+// left and a right part, a horizontal cut into a top and a bottom part,
+// and a leaf is one panel. The trees below are drawn from the covers
+// themselves — the hero mosaic's big ace panel beside a scout over a
+// thin crew strip, the seven mosaic's crew panel beside the ace over
+// the harbour and the rider. A cut leaves a gutter between its two
+// halves so no two panels ever touch.
+const GUT = 10;
+
+// A vertical cut at `at` (a fraction of the width): left, then right.
+const V = (at, a, b) => ({ kind: 'v', at, a, b });
+// A horizontal cut at `at` (a fraction of the height): top, then bottom.
+const H = (at, a, b) => ({ kind: 'h', at, a, b });
+// One panel.
+const LEAF = () => ({ kind: 'leaf' });
 
 const LAYOUT_TREES = {
-  'hero-mosaic': SPLIT('y', 0.58,
-    SPLIT('x', 0.62, LEAF(), SPLIT('y', 0.62, LEAF(), LEAF())),
-    SPLIT('x', 0.40, LEAF(), SPLIT('x', 0.38, LEAF(), LEAF()))),
-  'diagonal-trio': SPLIT('y', 0.55,
-    SPLIT('x', 0.55, LEAF(), LEAF()),
-    LEAF({ l: 0.20, t: 0, r: 0, b: 0 })),
-  'seven-mosaic': SPLIT('y', 0.48,
-    SPLIT('x', 0.50, LEAF(), SPLIT('y', 0.45, LEAF(), SPLIT('x', 0.50, LEAF(), LEAF()))),
-    SPLIT('x', 0.33, LEAF(), SPLIT('x', 0.50, LEAF(), LEAF()))),
-  'duo-split': SPLIT('x', 0.50, LEAF(), LEAF()),
-  triptych: SPLIT('x', 0.333, LEAF(), SPLIT('x', 0.50, LEAF(), LEAF())),
-  'quad-grid': SPLIT('y', 0.50,
-    SPLIT('x', 0.50, LEAF(), LEAF()),
-    SPLIT('x', 0.50, LEAF(), LEAF())),
-  'film-strip': SPLIT('x', 0.55, LEAF(),
-    SPLIT('y', 0.25, LEAF(), SPLIT('y', 0.333, LEAF(), SPLIT('y', 0.50, LEAF(), LEAF())))),
+  // Six panels: a big ace on the left, scout over a thin crew strip
+  // on the right, then lookout, a narrow runner, and the getaway.
+  'hero-mosaic': H(0.6,
+    V(0.56, LEAF(), H(0.62, LEAF(), LEAF())),
+    V(0.38, LEAF(), V(0.29, LEAF(), LEAF()))),
+  // Three panels: one tall artist on the left, ace over captain.
+  'diagonal-trio': V(0.55, LEAF(), H(0.5, LEAF(), LEAF())),
+  // Seven panels: crew on the left, ace over harbour and rider, then
+  // pier, walk and garage along the bottom.
+  'seven-mosaic': H(0.5,
+    V(0.5, LEAF(), H(0.48, LEAF(), V(0.5, LEAF(), LEAF()))),
+    V(0.34, LEAF(), V(0.5, LEAF(), LEAF()))),
+  // Two panels, side by side.
+  'duo-split': V(0.5, LEAF(), LEAF()),
+  // Three equal columns.
+  'triptych': V(0.34, LEAF(), V(0.5, LEAF(), LEAF())),
+  // A two-by-two grid.
+  'quad-grid': V(0.5, H(0.5, LEAF(), LEAF()), H(0.5, LEAF(), LEAF())),
+  // Five upright strips, like frames off a film roll.
+  'film-strip': V(0.2, LEAF(), V(0.25, LEAF(), V(0.33, LEAF(), V(0.5, LEAF(), LEAF())))),
 };
 
 export const LAYOUT_LIST = [
@@ -38,31 +49,25 @@ export const LAYOUT_LIST = [
   { id: 'film-strip', label: 'Film strip', panels: 5 },
 ];
 
-const GUT = 10;
-
+// Walk a tree into leaf rectangles inside `rect`. A cut splits the
+// rectangle and leaves half a gutter on each side of the seam.
 function walk(node, rect, out) {
-  if (node.leaf) {
-    const inset = node.inset || {};
-    const r = {
-      x: rect.x + rect.w * (inset.l || 0),
-      y: rect.y + rect.h * (inset.t || 0),
-      w: rect.w * (1 - (inset.l || 0) - (inset.r || 0)),
-      h: rect.h * (1 - (inset.t || 0) - (inset.b || 0)),
-    };
-    out.push({ x: r.x + GUT / 2, y: r.y + GUT / 2, w: r.w - GUT, h: r.h - GUT });
+  if (node.kind === 'leaf') {
+    out.push({ x: rect.x, y: rect.y, w: rect.w, h: rect.h });
     return;
   }
-  if (node.dir === 'x') {
+  if (node.kind === 'v') {
     const cut = rect.w * node.at;
-    walk(node.first, { x: rect.x, y: rect.y, w: cut, h: rect.h }, out);
-    walk(node.second, { x: rect.x + cut, y: rect.y, w: rect.w - cut, h: rect.h }, out);
+    walk(node.a, { x: rect.x, y: rect.y, w: cut - GUT / 2, h: rect.h }, out);
+    walk(node.b, { x: rect.x + cut + GUT / 2, y: rect.y, w: rect.w - cut - GUT / 2, h: rect.h }, out);
   } else {
     const cut = rect.h * node.at;
-    walk(node.first, { x: rect.x, y: rect.y, w: rect.w, h: cut }, out);
-    walk(node.second, { x: rect.x, y: rect.y + cut, w: rect.w, h: rect.h - cut }, out);
+    walk(node.a, { x: rect.x, y: rect.y, w: rect.w, h: cut - GUT / 2 }, out);
+    walk(node.b, { x: rect.x, y: rect.y + cut + GUT / 2, w: rect.w, h: rect.h - cut - GUT / 2 }, out);
   }
 }
 
+// The panel rectangles for a layout inside a w-by-h zone, in panel order.
 export function rectsForLayout(layoutId, w, h) {
   const tree = LAYOUT_TREES[layoutId] || LAYOUT_TREES['hero-mosaic'];
   const out = [];
@@ -71,11 +76,11 @@ export function rectsForLayout(layoutId, w, h) {
 }
 
 export function layoutPanelCount(layoutId) {
-  const found = LAYOUT_LIST.find((l) => l.id === layoutId);
+  const found = LAYOUT_LIST.find((entry) => entry.id === layoutId);
   return found ? found.panels : 6;
 }
 
 export function layoutLabel(layoutId) {
-  const found = LAYOUT_LIST.find((l) => l.id === layoutId);
+  const found = LAYOUT_LIST.find((entry) => entry.id === layoutId);
   return found ? found.label : 'Hero mosaic';
 }

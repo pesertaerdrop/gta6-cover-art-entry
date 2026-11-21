@@ -1,22 +1,15 @@
-// The screenshot scenes: the four views the capture script photographs.
-// Each scene is a full document preset — size, layout, grade, caption and
-// the exact panels (photo, tag, zoom, pan) — so the screenshots are
-// reproducible from the app alone. The editor scene shows the editor with
-// a photo loaded and a panel selected; the three cover scenes draw one
-// cover full-frame. A panel row is [photo file, tag, zoom, panX, panY].
-// Pans are tuned by eye: the crew strip on cover 1 pans up so both faces
-// sit inside the thin band, and the scout on cover 3 pans left so the
-// VICE CITY sign reads whole.
-const P = (file, tag, zoom = 1.15, panX = 0, panY = 0) => ({
-  photo: `./samples/${file}`,
-  tag,
-  tagOn: true,
-  zoom,
-  panX,
-  panY,
-  flip: false,
-  faceMarked: false,
-});
+// The screenshot scenes.
+//
+// A scene is a whole document in miniature: the size, the layout, the
+// grade, the caption, and the photo, tag and crop of every panel.
+// The four scenes are the four screenshots the kit asks for — three
+// exported covers and the editor with a photo loaded — so the shots
+// are reproducible from the app alone, and the app's own drawing is
+// what the screenshots show. Crops are face-safe: thin panels pan up
+// so the faces stay whole, and the scout's neon sign is panned left
+// so "VICE CITY" reads in full. `tagDy` drops a panel's tag below
+// something in the photo it would otherwise cover.
+const P = (file, tag, zoom = 1.15, panX = 0, panY = 0, tagDy = 0) => ({ file, tag, zoom, panX, panY, tagDy });
 
 export const SHOT_SCENES = {
   cover1: {
@@ -25,13 +18,13 @@ export const SHOT_SCENES = {
     size: '16:9',
     layout: 'hero-mosaic',
     grade: 'sunset',
+    titleStyle: 'auto',
     caption: 0,
-    selected: 0,
     panels: [
       P('mira-suki-convertible.jpg', 'THE ACE'),
       P('mira-suki-neon.jpg', 'THE SCOUT'),
-      P('mira-suki-boardwalk.jpg', 'THE CREW', 1.15, 0, 0.7),
-      P('mira-harbor.jpg', 'THE LOOKOUT'),
+      P('mira-suki-boardwalk.jpg', 'THE CREW', 1.0, 0, -0.45),
+      P('mira-harbor.jpg', 'THE LOOKOUT', 1.0, 0, -0.79),
       P('suki-diner.jpg', 'THE RUNNER'),
       P('mira-suki-pool.jpg', 'THE GETAWAY'),
     ],
@@ -41,9 +34,9 @@ export const SHOT_SCENES = {
     mode: 'editor',
     size: '16:9',
     layout: 'diagonal-trio',
-    grade: 'neon-night',
+    grade: 'sunset',
+    titleStyle: 'auto',
     caption: 1,
-    selected: 1,
     panels: [
       P('mira-neon.jpg', 'THE ARTIST'),
       P('mira-suki-convertible.jpg', 'THE ACE'),
@@ -56,10 +49,10 @@ export const SHOT_SCENES = {
     size: '4:5',
     layout: 'hero-mosaic',
     grade: 'neon-night',
+    titleStyle: 'auto',
     caption: 2,
-    selected: 0,
     panels: [
-      P('mira-suki-neon.jpg', 'THE SCOUT', 1.15, 0.3, 0),
+      P('mira-suki-neon.jpg', 'THE SCOUT', 1.0, -0.7, 0, 130),
       P('suki-diner.jpg', 'THE RUNNER'),
       P('mira-suki-motel.jpg', 'THE SCOUT'),
       P('mira-suki-club.jpg', 'THE RUNNER'),
@@ -73,12 +66,12 @@ export const SHOT_SCENES = {
     size: '1:1',
     layout: 'seven-mosaic',
     grade: 'ember-blaze',
+    titleStyle: 'auto',
     caption: 3,
-    selected: 0,
     panels: [
-      P('mira-suki-boardwalk.jpg', 'THE CREW'),
+      P('mira-suki-boardwalk.jpg', 'THE CREW', 1.0, 0, -0.45),
       P('mira-suki-convertible.jpg', 'THE ACE'),
-      P('mira-harbor.jpg', 'THE HARBOR'),
+      P('mira-harbor.jpg', 'THE HARBOR', 1.0, 0, -0.79),
       P('suki-rider.jpg', 'THE RIDER'),
       P('suki-pier.jpg', 'THE PIER'),
       P('mira-boardwalk.jpg', 'THE WALK'),
@@ -91,19 +84,14 @@ export function shotScene(id) {
   return SHOT_SCENES[id] || null;
 }
 
-// Read ?shot=<id> from the page URL, for the capture script and for
-// anyone opening a scene directly. Returns the scene or null for the
-// plain editor.
+// The scene the page's ?shot= parameter names, or null for the plain editor.
 export function sceneFromUrl() {
-  try {
-    const params = new URLSearchParams(window.location.search);
-    return shotScene(params.get('shot'));
-  } catch {
-    return null;
-  }
+  const params = new URLSearchParams(window.location.search);
+  const id = params.get('shot');
+  if (!id) return null;
+  return shotScene(id);
 }
 
-// 'cover' draws one cover full-frame; 'editor' shows the workbench.
 export function sceneMode(scene) {
-  return scene ? scene.mode || 'cover' : 'editor';
+  return scene && scene.mode ? scene.mode : 'cover';
 }

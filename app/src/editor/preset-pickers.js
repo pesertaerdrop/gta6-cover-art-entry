@@ -1,112 +1,101 @@
-// The preset pickers: layout, grade, title style and size. Each picker
-// is a grid of buttons in the left and right rails; the pressed one is
-// marked with aria-pressed. Layout tiles draw a live mini-map of the
-// layout, grade chips show the grade's ramp, title chips show the style's
-// gradient on the word Aa, and size buttons name the export shape.
+// The preset pickers: layout, grade, title style and size.
+//
+// Each picker is a row of two-across buttons. A layout tile is a live
+// mini-drawing of its panels, a grade chip is the grade's gradient
+// swatch, a title chip is the style's gradient on the word "Aa". The
+// pressed button wears the orange ring. The pickers are built once;
+// every render after that only moves the ring.
 import { LAYOUT_LIST, rectsForLayout } from '../layouts/layout-presets.js';
 import { GRADE_LIST, gradeRampCss } from '../effects/grade-presets.js';
 import { TITLE_STYLES, titleStyleCss } from '../lettering/title-styles.js';
 import { SIZES } from '../layouts/plan-cover.js';
 import { rematchPanels } from '../layouts/plan-cover.js';
 
-// A mini-map of a layout: the panel rects scaled into a small canvas.
+// A mini-drawing of a layout's panels, fitted into the tile canvas.
 export function drawLayoutMini(canvas, layoutId) {
   const ctx = canvas.getContext('2d');
   const w = canvas.width;
   const h = canvas.height;
-  ctx.fillStyle = '#141210';
+  ctx.fillStyle = '#1d1a16';
   ctx.fillRect(0, 0, w, h);
-  const rects = rectsForLayout(layoutId, 100, 62);
-  for (const r of rects) {
-    ctx.fillStyle = '#f6efe4';
-    ctx.fillRect((r.x / 100) * w + 1, (r.y / 62) * h + 1, (r.w / 100) * w - 2, (r.h / 62) * h - 2);
+  const rects = rectsForLayout(layoutId, w - 8, h - 8);
+  ctx.fillStyle = '#e8531f';
+  for (const rect of rects) {
+    ctx.fillRect(rect.x + 4, rect.y + 4, rect.w, rect.h);
   }
 }
 
-function pickButton(studio, pressed, label, onPick) {
-  const b = document.createElement('button');
-  b.type = 'button';
-  b.className = 'pick';
-  b.setAttribute('aria-pressed', pressed ? 'true' : 'false');
-  const name = document.createElement('span');
-  name.className = 'pick-name';
-  name.textContent = label;
-  b.appendChild(name);
-  b.addEventListener('click', () => studio.commit(onPick));
-  return b;
+function buildPicker(hostId, entries, current, onPick, draw) {
+  const host = document.getElementById(hostId);
+  if (!host) return;
+  if (!host.dataset.built) {
+    for (const entry of entries) {
+      const button = document.createElement('button');
+      button.className = 'pick';
+      button.type = 'button';
+      button.dataset.value = entry.id;
+      draw(button, entry);
+      const name = document.createElement('span');
+      name.className = 'pick-name';
+      name.textContent = entry.label;
+      button.appendChild(name);
+      button.addEventListener('click', () => onPick(entry.id));
+      host.appendChild(button);
+    }
+    host.dataset.built = '1';
+  }
+  for (const button of host.querySelectorAll('.pick')) {
+    button.setAttribute('aria-pressed', String(button.dataset.value === current));
+  }
 }
 
 export function renderLayoutPicker(studio) {
-  const host = document.getElementById('layoutPicker');
-  if (!host) return;
-  host.innerHTML = '';
-  for (const layout of LAYOUT_LIST) {
-    const b = pickButton(studio, studio.doc.layout === layout.id, layout.label, () => {
-      rematchPanels(studio.doc, layout.id);
-    });
-    const mini = document.createElement('canvas');
-    mini.width = 120;
-    mini.height = 44;
-    drawLayoutMini(mini, layout.id);
-    b.insertBefore(mini, b.firstChild);
-    host.appendChild(b);
-  }
+  buildPicker('layout-picker', LAYOUT_LIST, studio.doc.layout, (id) => {
+    rematchPanels(studio.doc, id);
+    studio.commit();
+    studio.render();
+  }, (button, entry) => {
+    const canvas = document.createElement('canvas');
+    canvas.width = 120;
+    canvas.height = 44;
+    drawLayoutMini(canvas, entry.id);
+    button.appendChild(canvas);
+  });
 }
 
 export function renderGradePicker(studio) {
-  const host = document.getElementById('gradePicker');
-  if (!host) return;
-  host.innerHTML = '';
-  for (const grade of GRADE_LIST) {
-    const b = pickButton(studio, studio.doc.grade === grade.id, grade.label, () => {
-      studio.doc.grade = grade.id;
-    });
+  buildPicker('grade-picker', GRADE_LIST, studio.doc.grade, (id) => {
+    studio.doc.grade = id;
+    studio.commit();
+    studio.render();
+  }, (button, entry) => {
     const swatch = document.createElement('span');
     swatch.className = 'swatch';
-    swatch.style.background = gradeRampCss(grade.id);
-    b.insertBefore(swatch, b.firstChild);
-    host.appendChild(b);
-  }
+    swatch.style.background = gradeRampCss(entry.id);
+    button.appendChild(swatch);
+  });
 }
 
 export function renderTitlePicker(studio) {
-  const host = document.getElementById('titlePicker');
-  if (!host) return;
-  host.innerHTML = '';
-  const auto = pickButton(studio, studio.doc.titleStyle === 'auto', 'Auto', () => {
-    studio.doc.titleStyle = 'auto';
-  });
-  const autoChip = document.createElement('span');
-  autoChip.className = 'title-chip';
-  autoChip.textContent = 'Aa';
-  auto.insertBefore(autoChip, auto.firstChild);
-  host.appendChild(auto);
-  for (const style of TITLE_STYLES) {
-    const b = pickButton(studio, studio.doc.titleStyle === style.id, style.label, () => {
-      studio.doc.titleStyle = style.id;
-    });
+  const entries = [{ id: 'auto', label: 'Auto' }, ...TITLE_STYLES];
+  buildPicker('title-picker', entries, studio.doc.titleStyle, (id) => {
+    studio.doc.titleStyle = id;
+    studio.commit();
+    studio.render();
+  }, (button, entry) => {
     const chip = document.createElement('span');
     chip.className = 'title-chip';
     chip.textContent = 'Aa';
-    chip.style.background = titleStyleCss(style.id);
-    chip.style.webkitBackgroundClip = 'text';
-    chip.style.backgroundClip = 'text';
-    chip.style.color = 'transparent';
-    b.insertBefore(chip, b.firstChild);
-    host.appendChild(b);
-  }
+    if (entry.id !== 'auto') chip.style.background = titleStyleCss(entry.id);
+    button.appendChild(chip);
+  });
 }
 
 export function renderSizePicker(studio) {
-  const host = document.getElementById('sizePicker');
-  if (!host) return;
-  host.innerHTML = '';
-  for (const [id, size] of Object.entries(SIZES)) {
-    const b = document.createElement('button');
-    b.type = 'button';
-    b.textContent = `${id} \u00b7 ${size.w}\u00d7${size.h}`;
-    b.setAttribute('aria-pressed', studio.doc.size === id ? 'true' : 'false');
-    b.addEventListener('click', () => studio.commit(() => { studio.doc.size = id; }));
-    host.appendChild(b);
-  }
+  const entries = Object.entries(SIZES).map(([id, size]) => ({ id, label: size.label }));
+  buildPicker('size-picker', entries, studio.doc.size, (id) => {
+    studio.doc.size = id;
+    studio.commit();
+    studio.render();
+  }, () => {});
 }
