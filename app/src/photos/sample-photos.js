@@ -1,62 +1,50 @@
-// sample-photos.js — the 17 image-model sample photos and the invented cast
-// who recurs across every cover. Vera, Marcus, June and Otis are invented
-// people; their names feed the callout tags so the covers tell one story.
-// Every file is a photograph with no text and no logos in it.
+// The sample library: seventeen image-model photos of one invented cast —
+// Mira, long silver-lilac hair, and Suki, short teal bob — a Vice City duo
+// around one pink classic convertible. The default tags, the cast table,
+// and the helpers for the editor's sample strip and the cover renderer.
 export const CAST = [
-  { name: 'Vera', note: 'late 20s, copper hair, gold hoops' },
-  { name: 'Marcus', note: '30s, short beard, floral shirt, gold chain' },
-  { name: 'June', note: 'early 20s, dark bob' },
-  { name: 'Otis', note: '50s, bucket hat, white tank top' },
-  { name: 'Mira', note: '20s, long silver-lilac hair, white top' },
-  { name: 'Suki', note: '20s, short teal bob, burgundy tank top' },
+  { id: 'mira', name: 'Mira', role: 'long silver-lilac hair' },
+  { id: 'suki', name: 'Suki', role: 'short teal bob' },
 ];
 
 export const SAMPLE_PHOTOS = [
-  { file: 'samples/vera-convertible.jpg', cast: 'Vera', scene: 'convertible on the boulevard' },
-  { file: 'samples/marcus-rooftop.jpg', cast: 'Marcus', scene: 'hotel rooftop at dusk' },
-  { file: 'samples/june-otis-diner.jpg', cast: 'June and Otis', scene: 'laughing outside the diner' },
-  { file: 'samples/otis-pier.jpg', cast: 'Otis', scene: 'fishing on the pier' },
-  { file: 'samples/vera-boardwalk.jpg', cast: 'Vera', scene: 'bicycle on the boardwalk' },
-  { file: 'samples/marcus-powerboat.jpg', cast: 'Marcus', scene: 'powerboat at full throttle' },
-  { file: 'samples/june-market.jpg', cast: 'June', scene: 'night-market food stall' },
-  { file: 'samples/vera-harbor.jpg', cast: 'Vera', scene: 'yacht deck at dusk' },
-  { file: 'samples/marcus-motel.jpg', cast: 'Marcus', scene: 'motel court in the rain' },
-  { file: 'samples/june-pool.jpg', cast: 'June', scene: 'art-deco pool, flamingo float' },
-  { file: 'samples/vera-neon.jpg', cast: 'Vera', scene: 'under the neon signs' },
-  { file: 'samples/marcus-rider.jpg', cast: 'Marcus', scene: 'motorcycle at sunset' },
-  { file: 'samples/crew-bonfire.jpg', cast: 'Vera, Marcus, June and Otis', scene: 'beach bonfire at dusk' },
-  { file: 'samples/otis-garage.jpg', cast: 'Otis', scene: 'polishing the classic car' },
-  { file: 'samples/vice-duo-convertible.jpg', cast: 'Mira and Suki', scene: 'pink convertible at purple dusk' },
-  { file: 'samples/vice-duo-neon.jpg', cast: 'Mira and Suki', scene: 'pink car door under the neon signs' },
-  { file: 'samples/vice-duo-boardwalk.jpg', cast: 'Mira and Suki', scene: 'boardwalk at sunset, pink car behind' },
+  { src: 'samples/mira-suki-convertible.jpg', scene: 'Pink convertible, dusk', cast: 'mira,suki', tag: 'THE ACE' },
+  { src: 'samples/mira-suki-neon.jpg', scene: 'Pink car door, neon', cast: 'mira,suki', tag: 'THE SCOUT' },
+  { src: 'samples/mira-suki-boardwalk.jpg', scene: 'Boardwalk sunset', cast: 'mira,suki', tag: 'THE PILOT' },
+  { src: 'samples/mira-rooftop.jpg', scene: 'Rooftop dusk', cast: 'mira', tag: 'THE HOST' },
+  { src: 'samples/suki-diner.jpg', scene: 'Diner night', cast: 'suki', tag: 'THE RUNNER' },
+  { src: 'samples/mira-suki-pool.jpg', scene: 'Art-deco pool', cast: 'mira,suki', tag: 'THE ARTIST' },
+  { src: 'samples/mira-harbor.jpg', scene: 'Yacht deck', cast: 'mira', tag: 'THE DANCER' },
+  { src: 'samples/suki-market.jpg', scene: 'Night market', cast: 'suki', tag: 'THE CHEF' },
+  { src: 'samples/mira-suki-bonfire.jpg', scene: 'Beach bonfire', cast: 'mira,suki', tag: 'THE GUARD' },
+  { src: 'samples/mira-neon.jpg', scene: 'Neon signs', cast: 'mira', tag: 'THE SINGER' },
+  { src: 'samples/suki-rider.jpg', scene: 'Motorcycle sunset', cast: 'suki', tag: 'THE CAPTAIN' },
+  { src: 'samples/mira-suki-powerboat.jpg', scene: 'Powerboat', cast: 'mira,suki', tag: 'THE STRANGER' },
+  { src: 'samples/suki-pier.jpg', scene: 'Fishing pier', cast: 'suki', tag: 'THE ACE' },
+  { src: 'samples/mira-suki-motel.jpg', scene: 'Motel court, rain', cast: 'mira,suki', tag: 'THE SCOUT' },
+  { src: 'samples/mira-boardwalk.jpg', scene: 'Bicycle boardwalk', cast: 'mira', tag: 'THE PILOT' },
+  { src: 'samples/suki-garage.jpg', scene: 'Polishing pink car', cast: 'suki', tag: 'THE HOST' },
+  { src: 'samples/mira-suki-club.jpg', scene: 'Club door, neon', cast: 'mira,suki', tag: 'THE RUNNER' },
 ];
 
 export const DEFAULT_TAGS = [
-  'THE ACE',
-  'THE SCOUT',
-  'THE PILOT',
-  'THE HOST',
-  'THE RUNNER',
-  'THE ARTIST',
-  'THE DANCER',
-  'THE CHEF',
-  'THE GUARD',
-  'THE SINGER',
-  'THE CAPTAIN',
-  'THE STRANGER',
+  'THE ACE', 'THE SCOUT', 'THE PILOT', 'THE HOST', 'THE RUNNER', 'THE ARTIST',
+  'THE DANCER', 'THE CHEF', 'THE GUARD', 'THE SINGER', 'THE CAPTAIN', 'THE STRANGER',
 ];
 
-export function samplePhotoByFile(file) {
-  return SAMPLE_PHOTOS.find((photo) => photo.file === file) ?? null;
+export function isSamplePhoto(src) {
+  return SAMPLE_PHOTOS.some((photo) => photo.src === src);
 }
 
-export function samplePhotoIndex(file) {
-  return SAMPLE_PHOTOS.findIndex((photo) => photo.file === file);
-}
-
-export function nextSamplePhoto(file, step) {
-  const index = samplePhotoIndex(file);
-  const base = index < 0 ? 0 : index;
-  const next = (base + step + SAMPLE_PHOTOS.length) % SAMPLE_PHOTOS.length;
+// The next (dir +1) or previous (dir -1) sample photo after src, wrapping
+// around the library; unknown sources fall back to the first photo.
+export function nextSamplePhoto(src, dir = 1) {
+  const index = SAMPLE_PHOTOS.findIndex((photo) => photo.src === src);
+  const next = (index < 0 ? 0 : index + dir + SAMPLE_PHOTOS.length) % SAMPLE_PHOTOS.length;
   return SAMPLE_PHOTOS[next];
+}
+
+export function labelOf(src) {
+  const photo = SAMPLE_PHOTOS.find((p) => p.src === src);
+  return photo ? `${photo.scene} — ${photo.cast}` : src;
 }

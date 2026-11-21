@@ -1,107 +1,85 @@
-// layout-presets.js — the seven cover layouts. Each preset is a function of
-// the cover's pixel size returning panel rectangles as fractions of the
-// frame, so the same layout works at 1080x1080, 1080x1350 and 1920x1080.
-// The seven are maximally distinct: a hero mosaic, a hero with a stacked
-// right column, a six grid, a diagonal trio, a seven mosaic, a filmstrip of
-// vertical strips, and tilted postcards on a paper backing.
-export const LAYOUTS = [
-  {
-    id: 'hero-mosaic',
-    name: 'Hero Mosaic',
-    blurb: 'One big hero, four around it',
-    panels: (w, h) => [
-      { x: 0, y: 0, w: 0.62, h: 0.66, tilt: 0 },
-      { x: 0.62, y: 0, w: 0.38, h: 0.33, tilt: 0 },
-      { x: 0.62, y: 0.33, w: 0.38, h: 0.33, tilt: 0 },
-      { x: 0, y: 0.66, w: 0.5, h: 0.34, tilt: 0 },
-      { x: 0.5, y: 0.66, w: 0.5, h: 0.34, tilt: 0 },
-    ],
+// The seven cover layouts. A preset is a function of the cover's pixel
+// size returning panel rectangles as fractions of the cover (each a
+// [x, y, w, h] tuple from the top-left). One panel keeps the original
+// aspect ratio of the photo it is given, and the export is a fixed size.
+function rect(x, y, w, h) { return [x, y, w, h]; }
+
+function thirds(w, h) {
+  return [
+    rect(0, 0, 1 / 3, 0.5), rect(1 / 3, 0, 1 / 3, 0.5), rect(2 / 3, 0, 1 / 3, 0.5),
+    rect(0, 0.5, 1 / 3, 0.5), rect(1 / 3, 0.5, 1 / 3, 0.5), rect(2 / 3, 0.5, 1 / 3, 0.5),
+  ];
+}
+
+function halves(w, h) {
+  return [
+    rect(0, 0, 0.5, 1 / 3), rect(0.5, 0, 0.5, 1 / 3),
+    rect(0, 1 / 3, 0.5, 1 / 3), rect(0.5, 1 / 3, 0.5, 1 / 3),
+    rect(0, 2 / 3, 0.5, 1 / 3), rect(0.5, 2 / 3, 0.5, 1 / 3),
+  ];
+}
+
+const LAYOUTS = {
+  'hero-mosaic': (w, h) => {
+    if (w > h) {
+      return [
+        rect(0, 0, 0.52, 0.62), rect(0.52, 0, 0.24, 0.62), rect(0.76, 0, 0.24, 0.62),
+        rect(0, 0.62, 0.38, 0.38), rect(0.38, 0.62, 0.62, 0.38),
+      ];
+    }
+    return [
+      rect(0, 0, 1, 0.52),
+      rect(0, 0.52, 0.5, 0.24), rect(0.5, 0.52, 0.5, 0.24),
+      rect(0, 0.76, 0.5, 0.24), rect(0.5, 0.76, 0.5, 0.24),
+    ];
   },
-  {
-    id: 'hero-plus-three',
-    name: 'Hero Plus Three',
-    blurb: 'Tall hero left, stacked right',
-    panels: (w, h) => [
-      { x: 0, y: 0, w: 0.55, h: 1, tilt: 0 },
-      { x: 0.55, y: 0, w: 0.225, h: 0.5, tilt: 0 },
-      { x: 0.775, y: 0, w: 0.225, h: 0.5, tilt: 0 },
-      { x: 0.55, y: 0.5, w: 0.15, h: 0.5, tilt: 0 },
-      { x: 0.7, y: 0.5, w: 0.15, h: 0.5, tilt: 0 },
-      { x: 0.85, y: 0.5, w: 0.15, h: 0.5, tilt: 0 },
-    ],
+  'hero-plus-three': (w, h) => [
+    rect(0, 0, 0.68, 1),
+    rect(0.68, 0, 0.32, 0.34), rect(0.68, 0.34, 0.32, 0.33), rect(0.68, 0.67, 0.32, 0.33),
+  ],
+  'six-grid': (w, h) => thirds(w, h),
+  'diagonal-trio': (w, h) => [
+    rect(0, 0, 0.55, 0.55),
+    rect(0.45, 0.25, 0.55, 0.55),
+    rect(0.12, 0.6, 0.62, 0.4),
+  ],
+  'seven-mosaic': (w, h) => {
+    if (w > h) {
+      return [
+        rect(0, 0, 0.36, 0.5), rect(0.36, 0, 0.32, 0.5), rect(0.68, 0, 0.32, 0.5),
+        rect(0, 0.5, 0.26, 0.5), rect(0.26, 0.5, 0.24, 0.5),
+        rect(0.5, 0.5, 0.25, 0.5), rect(0.75, 0.5, 0.25, 0.5),
+      ];
+    }
+    return [
+      rect(0, 0, 0.5, 0.38), rect(0.5, 0, 0.5, 0.38),
+      rect(0, 0.38, 0.34, 0.31), rect(0.34, 0.38, 0.33, 0.31), rect(0.67, 0.38, 0.33, 0.31),
+      rect(0, 0.69, 0.5, 0.31), rect(0.5, 0.69, 0.5, 0.31),
+    ];
   },
-  {
-    id: 'six-grid',
-    name: 'Six Grid',
-    blurb: 'Three across, two down',
-    panels: (w, h) => {
-      const out = [];
-      for (let row = 0; row < 2; row += 1) {
-        for (let col = 0; col < 3; col += 1) {
-          out.push({ x: col / 3, y: row / 2, w: 1 / 3, h: 0.5, tilt: 0 });
-        }
-      }
-      return out;
-    },
+  filmstrip: (w, h) => {
+    if (w > h) return [0, 1, 2, 3, 4].map((i) => rect(i * 0.2, 0, 0.2, 1));
+    return [0, 1, 2, 3, 4].map((i) => rect(0, i * 0.2, 1, 0.2));
   },
-  {
-    id: 'diagonal-trio',
-    name: 'Diagonal Trio',
-    blurb: 'Three tall frames stepping down',
-    panels: (w, h) => [
-      { x: 0.0, y: 0.16, w: 0.4, h: 0.68, tilt: -2 },
-      { x: 0.3, y: 0.08, w: 0.4, h: 0.76, tilt: 0 },
-      { x: 0.6, y: 0.0, w: 0.4, h: 0.84, tilt: 2 },
-    ],
-  },
-  {
-    id: 'seven-mosaic',
-    name: 'Seven Mosaic',
-    blurb: 'Three up top, hero middle, two below',
-    panels: (w, h) => [
-      { x: 0, y: 0, w: 1 / 3, h: 0.34, tilt: 0 },
-      { x: 1 / 3, y: 0, w: 1 / 3, h: 0.34, tilt: 0 },
-      { x: 2 / 3, y: 0, w: 1 / 3, h: 0.34, tilt: 0 },
-      { x: 0, y: 0.34, w: 0.6, h: 0.33, tilt: 0 },
-      { x: 0.6, y: 0.34, w: 0.4, h: 0.33, tilt: 0 },
-      { x: 0, y: 0.67, w: 0.5, h: 0.33, tilt: 0 },
-      { x: 0.5, y: 0.67, w: 0.5, h: 0.33, tilt: 0 },
-    ],
-  },
-  {
-    id: 'filmstrip',
-    name: 'Filmstrip',
-    blurb: 'Five tall strips, staggered',
-    panels: (w, h) => [
-      { x: 0, y: 0.06, w: 0.2, h: 0.88, tilt: 0 },
-      { x: 0.2, y: 0, w: 0.2, h: 0.94, tilt: 0 },
-      { x: 0.4, y: 0.03, w: 0.2, h: 0.91, tilt: 0 },
-      { x: 0.6, y: 0.09, w: 0.2, h: 0.85, tilt: 0 },
-      { x: 0.8, y: 0, w: 0.2, h: 0.97, tilt: 0 },
-    ],
-  },
-  {
-    id: 'postcards',
-    name: 'Postcards',
-    blurb: 'Four tilted prints on paper',
-    panels: (w, h) => [
-      { x: 0.03, y: 0.04, w: 0.44, h: 0.44, tilt: -3 },
-      { x: 0.53, y: 0.02, w: 0.44, h: 0.44, tilt: 2.5 },
-      { x: 0.05, y: 0.52, w: 0.44, h: 0.44, tilt: 2 },
-      { x: 0.51, y: 0.5, w: 0.44, h: 0.46, tilt: -2.5 },
-    ],
-  },
+  postcards: (w, h) => (w > h ? thirds(w, h) : halves(w, h)),
+};
+
+export function rectsForLayout(layoutId, w, h) {
+  const preset = LAYOUTS[layoutId] || LAYOUTS['hero-mosaic'];
+  return preset(w, h);
+}
+
+export const LAYOUT_LIST = [
+  { id: 'hero-mosaic', label: 'Hero Mosaic', panels: 5 },
+  { id: 'hero-plus-three', label: 'Hero + Three', panels: 4 },
+  { id: 'six-grid', label: 'Six Grid', panels: 6 },
+  { id: 'diagonal-trio', label: 'Diagonal Trio', panels: 3 },
+  { id: 'seven-mosaic', label: 'Seven Mosaic', panels: 7 },
+  { id: 'filmstrip', label: 'Filmstrip', panels: 5 },
+  { id: 'postcards', label: 'Postcards', panels: 6 },
 ];
 
-export function layoutById(id) {
-  return LAYOUTS.find((layout) => layout.id === id) ?? LAYOUTS[0];
-}
-
-export function layoutPanelCount(id) {
-  const layout = layoutById(id);
-  return layout.panels(100, 100).length;
-}
-
-export function layoutNames() {
-  return LAYOUTS.map((layout) => layout.name);
+export function layoutPanelCount(layoutId) {
+  const found = LAYOUT_LIST.find((entry) => entry.id === layoutId);
+  return found ? found.panels : 5;
 }

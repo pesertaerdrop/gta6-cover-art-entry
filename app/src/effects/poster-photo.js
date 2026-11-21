@@ -1,108 +1,151 @@
-// poster-photo.js — turns a raw photo into a poster panel. The treatment is
-// dials, not a blanket: Paint posterizes lightly, the grade LUT tints by
-// luminance, Halftone adds a dot screen, Grain adds seeded noise, Glow lifts
-// the highlights. Defaults keep faces bright and clean; the dials only add
-// texture when the maker turns them up. Draft mode skips the two slowest
-// passes (halftone and grain) while a slider is being dragged.
-export function posterizeValue(value, levels) {
-  if (levels <= 1) return value;
-  const step = 255 / (levels - 1);
-  return Math.round(Math.round(value / step) * step);
+// Turns a raw photo into a poster panel. The treatment is dials, not a
+// blanket: Paint posterizes lightly, the grade LUT tints by brightness,
+// Halftone prints a dot screen, Grain adds noise, Glow lifts the centre.
+// Draft mode skips the per-pixel pass so a slider drag stays live; the
+// full treatment lands on release and on export.
+import { buildLut, gradeById } from './grade-presets.js';
+
+function posterize(value, levels) {
+  if (levels >= 256) return value;
+  const step = 256 / levels;
+  return Math.min(255, Math.floor(value / step) * step + step / 2);
 }
 
-export function applyLookToImageData(imageData, look, lut, draft) {
+// The source rectangle for a cover-fit draw of img into rect at the given
+// zoom and pan, biased upward when the panel's face is marked (faces sit
+// in the upper part of a photo, so the crop keeps them in frame).
+function coverSource(img, rect, zoom, panX, panY, faceMarked) {
+  const scale = Math.max(rect.w / img.width, rect.h / img.height) * zoom;
+  const sw = rect.w / scale;
+  const sh = rect.h / scale;
+  let sx = (img.width - sw) / 2 + (panX || 0) * (img.width - sw) / 2;
+  let sy;
+  const portraitPhoto = img.height > img.width;
+  const landscapePanel = rect.w > rect.h;
+  if (portraitPhoto && landscapePanel) {
+    // Faces sit in the upper third of a portrait photo; a centred crop
+    // would keep only the torso. Start the crop near the top instead
+    // (higher still when the face is marked).
+    const topBias = faceMarked ? 0.08 : 0.15;
+    sy = (img.height - sh) * topBias + (panY || 0) * (img.height - sh) / 2;
+  } else {
+    sy = (img.height - sh) / 2 + (panY || 0) * (img.height - sh) / 2;
+    if (faceMarked) sy = Math.max(0, sy - sh * 0.12);
+  }
+  sx = Math.max(0, Math.min(img.width - sw, sx));
+  sy = Math.max(0, Math.min(img.height - sh, sy));
+  return { sx, sy, sw, sh };
+}
+
+function applyPixels(imageData, lut, paint, grain) {
   const data = imageData.data;
-  const paintLevels = look.paint <= 0 ? 0 : Math.max(2, Math.round(24 - look.paint / 5));
-  const glow = look.glow / 100;
+  const levels = Math.max(2, Math.round(16 - paint * 0.6));
+  const noise = grain * 0.5;
   for (let i = 0; i < data.length; i += 4) {
-    const r = data[i];
-    const g = data[i + 1];
-    const b = data[i + 2];
-    const lum = Math.round(0.299 * r + 0.587 * g + 0.114 * b);
-    let nr = lut[lum * 3];
-    let ng = lut[lum * 3 + 1];
-    let nb = lut[lum * 3 + 2];
-    // Keep a little of the photo's own colour so faces stay human.
-    nr = Math.round(nr * 0.82 + r * 0.18);
-    ng = Math.round(ng * 0.82 + g * 0.18);
-    nb = Math.round(nb * 0.82 + b * 0.18);
-    if (paintLevels > 0) {
-      nr = posterizeValue(nr, paintLevels);
-      ng = posterizeValue(ng, paintLevels);
-      nb = posterizeValue(nb, paintLevels);
+    let r = lut[data[i] * 3];
+    let g = lut[data[i + 1] * 3 + 1];
+    let b = lut[data[i + 2] * 3 + 2];
+    if (paint > 0) {
+      r = posterize(r, levels);
+      g = posterize(g, levels);
+      b = posterize(b, levels);
     }
-    if (glow > 0) {
-      const lift = lum / 255;
-      nr = Math.min(255, nr + Math.round(glow * 26 * lift));
-      ng = Math.min(255, ng + Math.round(glow * 22 * lift));
-      nb = Math.min(255, nb + Math.round(glow * 12 * lift));
+    if (noise > 0) {
+      const n = (Math.random() - 0.5) * noise;
+      r = Math.max(0, Math.min(255, r + n));
+      g = Math.max(0, Math.min(255, g + n));
+      b = Math.max(0, Math.min(255, b + n));
     }
-    data[i] = nr;
-    data[i + 1] = ng;
-    data[i + 2] = nb;
-  }
-  if (!draft && look.grain > 0) {
-    addSeededGrain(data, imageData.width, imageData.height, look.grain, 20261120);
-  }
-  return imageData;
-}
-
-export function addSeededGrain(data, width, height, amount, seed) {
-  let state = seed >>> 0;
-  const next = () => {
-    state = (state * 1664525 + 1013904223) >>> 0;
-    return state / 4294967296;
-  };
-  const strength = amount * 0.55;
-  for (let i = 0; i < data.length; i += 4) {
-    const noise = (next() - 0.5) * strength;
-    data[i] = Math.max(0, Math.min(255, data[i] + noise));
-    data[i + 1] = Math.max(0, Math.min(255, data[i + 1] + noise));
-    data[i + 2] = Math.max(0, Math.min(255, data[i + 2] + noise));
+    data[i] = r; data[i + 1] = g; data[i + 2] = b;
   }
 }
 
-export function halftonePattern(size, dot) {
-  const canvas = document.createElement('canvas');
-  canvas.width = size;
-  canvas.height = size;
-  const ctx = canvas.getContext('2d');
-  ctx.fillStyle = '#000';
-  ctx.beginPath();
-  ctx.arc(size / 2, size / 2, dot, 0, Math.PI * 2);
-  ctx.fill();
-  return canvas;
-}
-
-export function drawHalftone(ctx, rect, strength, draft) {
-  if (strength <= 0 || draft) return;
-  const spacing = 7;
-  const pattern = halftonePattern(spacing, 1.6);
-  const fill = ctx.createPattern(pattern, 'repeat');
+function drawHalftone(ctx, rect, strength) {
+  if (strength <= 0) return;
+  const spacing = 6;
+  const alpha = (strength / 100) * 0.45;
   ctx.save();
-  ctx.globalAlpha = strength / 100 * 0.35;
-  ctx.fillStyle = fill;
+  ctx.fillStyle = `rgba(0,0,0,${alpha})`;
+  for (let y = rect.y + spacing / 2; y < rect.y + rect.h; y += spacing) {
+    for (let x = rect.x + spacing / 2; x < rect.x + rect.w; x += spacing) {
+      ctx.beginPath();
+      ctx.arc(x, y, 1.1, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+  ctx.restore();
+}
+
+function drawGlow(ctx, rect, strength) {
+  if (strength <= 0) return;
+  const cx = rect.x + rect.w / 2;
+  const cy = rect.y + rect.h * 0.35;
+  const radius = Math.max(rect.w, rect.h) * 0.7;
+  const gradient = ctx.createRadialGradient(cx, cy, 0, cx, cy, radius);
+  gradient.addColorStop(0, `rgba(255,255,255,${0.18 * (strength / 100)})`);
+  gradient.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.save();
+  ctx.globalCompositeOperation = 'overlay';
+  ctx.fillStyle = gradient;
   ctx.fillRect(rect.x, rect.y, rect.w, rect.h);
   ctx.restore();
 }
 
-export function drawPanelPhoto(ctx, image, rect, slot, draft, extraBias) {
-  const zoom = slot.zoom || 1;
-  const scale = Math.max(rect.w / image.naturalWidth, rect.h / image.naturalHeight) * zoom;
-  const dw = image.naturalWidth * scale;
-  const dh = image.naturalHeight * scale;
-  const faceBias = slot.faceMarked ? -0.1 - (extraBias || 0) : 0;
-  const dx = rect.x + (rect.w - dw) / 2 + (slot.panX || 0) * rect.w * 0.1;
-  const dy = rect.y + (rect.h - dh) / 2 + (slot.panY || 0) * rect.h * 0.1 + faceBias * rect.h;
-  ctx.save();
-  ctx.beginPath();
-  ctx.rect(rect.x, rect.y, rect.w, rect.h);
-  ctx.clip();
-  if (slot.flip) {
-    ctx.translate(rect.x + rect.w / 2, 0);
-    ctx.scale(-1, 1);
-    ctx.translate(-(rect.x + rect.w / 2), 0);
+// Draw img into rect on ctx with the full poster treatment. opts: grade id,
+// look {paint, grade, halftone, grain, glow}, zoom, panX, panY, flip,
+// faceMarked, draft (skip the per-pixel pass).
+export function applyPosterPhoto(ctx, img, rect, opts = {}) {
+  const look = opts.look || {};
+  const grade = gradeById(opts.grade || 'sunset');
+  const zoom = opts.zoom || 1;
+  const flip = !!opts.flip;
+  const src = coverSource(img, rect, zoom, opts.panX || 0, opts.panY || 0, !!opts.faceMarked);
+
+  if (opts.draft) {
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(rect.x, rect.y, rect.w, rect.h);
+    ctx.clip();
+    if (flip) {
+      ctx.translate(rect.x + rect.w, rect.y);
+      ctx.scale(-1, 1);
+      ctx.drawImage(img, src.sx, src.sy, src.sw, src.sh, 0, 0, rect.w, rect.h);
+    } else {
+      ctx.drawImage(img, src.sx, src.sy, src.sw, src.sh, rect.x, rect.y, rect.w, rect.h);
+    }
+    ctx.restore();
+    return;
   }
-  ctx.drawImage(image, dx, dy, dw, dh);
-  ctx.restore();
+
+  const off = document.createElement('canvas');
+  off.width = Math.max(1, Math.round(rect.w));
+  off.height = Math.max(1, Math.round(rect.h));
+  const octx = off.getContext('2d');
+  if (flip) {
+    octx.translate(off.width, 0);
+    octx.scale(-1, 1);
+    octx.drawImage(img, src.sx, src.sy, src.sw, src.sh, 0, 0, off.width, off.height);
+  } else {
+    octx.drawImage(img, src.sx, src.sy, src.sw, src.sh, 0, 0, off.width, off.height);
+  }
+  const imageData = octx.getImageData(0, 0, off.width, off.height);
+  applyPixels(imageData, buildLut(grade, look.grade ?? 62), look.paint ?? 10, look.grain ?? 22);
+  octx.putImageData(imageData, 0, 0);
+  drawHalftone(octx, { x: 0, y: 0, w: off.width, h: off.height }, look.halftone ?? 20);
+  drawGlow(octx, { x: 0, y: 0, w: off.width, h: off.height }, look.glow ?? 26);
+  ctx.drawImage(off, rect.x, rect.y, rect.w, rect.h);
+}
+
+// Draw one document panel (a photo plus its treatment settings) into rect.
+export function drawPanelPhoto(ctx, img, rect, panel, look, grade) {
+  applyPosterPhoto(ctx, img, rect, {
+    grade,
+    look,
+    zoom: panel.zoom || 1,
+    panX: panel.panX || 0,
+    panY: panel.panY || 0,
+    flip: !!panel.flip,
+    faceMarked: !!panel.faceMarked,
+    draft: !!panel.draft,
+  });
 }

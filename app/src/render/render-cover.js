@@ -1,195 +1,186 @@
-// render-cover.js — draws a whole cover onto a canvas from a document and a
-// map of loaded photos. One function, renderCover, owns the full stack:
-// paper backing, graded photos per panel, white panel borders, the giant
-// chrome title with its overlapping neon script and tagline ribbon, then the
-// seven poster-finish elements. The same renderer draws the editor preview,
-// the shot scenes, and the exported PNGs, so what the maker sees is what
-// the export contains.
+// Draws a whole cover onto a canvas from a document and a map of loaded
+// photos. One function, renderCover, owns the full stack: white panel
+// borders, treated photos, numbered badges, the giant chrome title with
+// its neon script, the tagline ribbon, the script line, and the seven
+// poster-finish elements. Editor overlays (selection outline, crosshair,
+// zoom badge) come from opts.editor.
 import { planCover } from '../layouts/plan-cover.js';
-import { gradeById, buildGradeLut } from '../effects/grade-presets.js';
-import { applyLookToImageData, drawHalftone, drawPanelPhoto } from '../effects/poster-photo.js';
-import { resolveTitleStyle, wrapTitleLines } from '../lettering/title-styles.js';
-import {
-  drawCalloutTag,
-  drawSeal,
-  drawVolTag,
-  drawQuoteBar,
-  drawBillingLine,
-  drawBarcode,
-  barcodeNumber,
-  drawComingSoon,
-  drawTaglineRibbon,
-} from '../lettering/poster-finish.js';
+import { drawPanelPhoto } from '../effects/poster-photo.js';
+import { gradientFor } from '../lettering/title-styles.js';
+import { drawPosterFinish } from '../lettering/poster-finish.js';
 
-const ACCENT_BY_GRADE = {
-  sunset: '#e8531f',
-  'neon-night': '#e84a7a',
-  'golden-hour': '#e8a317',
-  'tropic-teal': '#0f7a6e',
-  heatwave: '#e8531f',
-  'rose-dusk': '#e84a7a',
+export const ACCENT_BY_GRADE = {
+  sunset: '#ff6b35',
+  'neon-night': '#7fe7ff',
+  'golden-hour': '#ffd166',
+  'tropic-teal': '#7fe7c8',
+  'ember-blaze': '#f05a28',
+  'rose-dusk': '#ff7ae0',
 };
 
-export function gradedPanelImage(image, rect, slot, look, lut, draft, extraBias) {
-  const scale = Math.min(1, 900 / Math.max(rect.w, rect.h));
-  const w = Math.max(2, Math.round(rect.w * scale));
-  const h = Math.max(2, Math.round(rect.h * scale));
-  const off = document.createElement('canvas');
-  off.width = w;
-  off.height = h;
-  const octx = off.getContext('2d');
-  const tmpRect = { x: 0, y: 0, w, h };
-  drawPanelPhoto(octx, image, tmpRect, slot, draft, extraBias);
-  const data = octx.getImageData(0, 0, w, h);
-  applyLookToImageData(data, look, lut, draft);
-  octx.putImageData(data, 0, 0);
-  return off;
+export function accentForGrade(grade) {
+  return ACCENT_BY_GRADE[grade] || ACCENT_BY_GRADE.sunset;
 }
 
-export function renderCover(canvas, doc, images, options = {}) {
-  const draft = options.draft === true;
-  const plan = planCover(doc);
-  const { size } = plan;
-  canvas.width = size.width;
-  canvas.height = size.height;
-  const ctx = canvas.getContext('2d');
-  const W = size.width;
-  const H = size.height;
-  const look = doc.look;
-  const grade = gradeById(doc.grade);
-  const lut = buildGradeLut(grade, look.grade);
-  const accent = ACCENT_BY_GRADE[doc.grade] ?? '#e8531f';
-
-  ctx.fillStyle = '#f6efe4';
-  ctx.fillRect(0, 0, W, H);
-
-  for (const panel of plan.panels) {
-    const { rect } = panel;
-    const image = images.get(panel.slot.photo);
-    ctx.save();
-    if (panel.tilt) {
-      ctx.translate(rect.x + rect.w / 2, rect.y + rect.h / 2);
-      ctx.rotate((panel.tilt * Math.PI) / 180);
-      ctx.translate(-(rect.x + rect.w / 2), -(rect.y + rect.h / 2));
-    }
-    ctx.fillStyle = '#fff';
-    ctx.fillRect(rect.x - 5, rect.y - 5, rect.w + 10, rect.h + 10);
-    if (image) {
-      // Panels low on the cover get extra face bias so the title band
-      // never covers a marked face.
-      const lowPanelBias = panel.rect.y > H * 0.45 ? 0.08 : 0;
-      const graded = gradedPanelImage(image, rect, panel.slot, look, lut, draft, lowPanelBias);
-      ctx.drawImage(graded, rect.x, rect.y, rect.w, rect.h);
-    } else {
-      ctx.fillStyle = '#d8cbb2';
-      ctx.fillRect(rect.x, rect.y, rect.w, rect.h);
-    }
-    drawHalftone(ctx, rect, look.halftone, draft);
-    ctx.strokeStyle = 'rgba(20, 18, 16, 0.25)';
-    ctx.lineWidth = 2;
-    ctx.strokeRect(rect.x, rect.y, rect.w, rect.h);
-    ctx.restore();
-    // Tags sit at the panel bottom, except when the panel ends inside the
-    // title band: then they move to the panel top so the title never covers
-    // them.
-    const fracBottom = (rect.y + rect.h) / H;
-    const tagPlacement = fracBottom > 0.52 && fracBottom < 0.86 ? 'top' : 'bottom';
-    if (panel.slot.tagOn) drawCalloutTag(ctx, rect, panel.slot.tag, accent, tagPlacement, H);
+// Fit the title text to the title rectangle, shrinking the font until it
+// fits, then draw it with its chrome gradient, stroke and shadow, with the
+// neon script overlapping the caps.
+export function drawTitle(ctx, plan, doc) {
+  const { titleRect, titleStyle, titleSize, titleLift, titleText } = plan;
+  if (!titleText) return;
+  let size = titleSize;
+  ctx.save();
+  ctx.font = `${size}px Anton, 'Archivo Black', sans-serif`;
+  while (size > 24 && ctx.measureText(titleText).width > titleRect.w) {
+    size *= 0.94;
+    ctx.font = `${size}px Anton, 'Archivo Black', sans-serif`;
   }
+  const x = titleRect.x + titleRect.w / 2;
+  const y = titleRect.y + titleRect.h / 2 - titleLift;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.shadowColor = titleStyle.shadow;
+  ctx.shadowBlur = size * 0.22;
+  ctx.shadowOffsetY = size * 0.03;
+  ctx.lineWidth = Math.max(2, size * 0.08);
+  ctx.strokeStyle = titleStyle.stroke;
+  ctx.lineJoin = 'round';
+  ctx.fillStyle = gradientFor(ctx, titleStyle, { x: titleRect.x, y: y - size / 2, w: titleRect.w, h: size });
+  ctx.strokeText(titleText, x, y);
+  ctx.fillText(titleText, x, y);
+  ctx.restore();
+  // The neon script, overlapping the caps.
+  const script = doc.script || plan.caption.script;
+  if (script) {
+    ctx.save();
+    ctx.translate(x, y - size * 0.55);
+    ctx.rotate(-0.03);
+    ctx.font = `${Math.round(size * 0.42)}px 'Mr Dafoe', cursive`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.shadowColor = 'rgba(255,255,255,0.7)';
+    ctx.shadowBlur = size * 0.1;
+    ctx.fillStyle = '#fff';
+    ctx.fillText(script, 0, 0);
+    ctx.restore();
+  }
+}
 
-  // Soft scrim behind the title so the chrome reads over bright photos.
-  const scrim = ctx.createLinearGradient(0, H * 0.52, 0, H);
-  scrim.addColorStop(0, 'rgba(0,0,0,0)');
-  scrim.addColorStop(1, 'rgba(0,0,0,0.42)');
-  ctx.fillStyle = scrim;
-  ctx.fillRect(0, H * 0.52, W, H * 0.48);
+// The tagline ribbon: a coloured band with side triangles, centred under
+// the title.
+export function drawTaglineRibbon(ctx, plan, doc) {
+  const tagline = doc.tagline || plan.caption.tagline;
+  if (!tagline) return;
+  const { w, h } = plan;
+  const accent = accentForGrade(doc.grade);
+  const bandH = Math.round(h * 0.032);
+  const bandY = plan.titleRect.y + plan.titleRect.h * 0.8;
+  const bandX = 0.12 * w;
+  const bandW = 0.76 * w;
+  ctx.save();
+  ctx.font = `700 ${Math.round(bandH * 0.62)}px Oswald, sans-serif`;
+  const textW = ctx.measureText(tagline).width + 28;
+  const cx = w / 2;
+  const x0 = cx - textW / 2;
+  ctx.fillStyle = accent;
+  ctx.beginPath();
+  ctx.moveTo(x0 - bandH * 0.5, bandY);
+  ctx.lineTo(x0, bandY);
+  ctx.lineTo(x0, bandY + bandH);
+  ctx.lineTo(x0 - bandH * 0.5, bandY + bandH);
+  ctx.closePath();
+  ctx.fill();
+  ctx.beginPath();
+  ctx.moveTo(x0 + textW + bandH * 0.5, bandY);
+  ctx.lineTo(x0 + textW, bandY);
+  ctx.lineTo(x0 + textW, bandY + bandH);
+  ctx.lineTo(x0 + textW + bandH * 0.5, bandY + bandH);
+  ctx.closePath();
+  ctx.fill();
+  ctx.fillRect(x0, bandY, textW, bandH);
+  ctx.fillStyle = '#111';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(tagline, cx, bandY + bandH / 2 + 0.5);
+  ctx.restore();
+}
 
-  drawTitleBlock(ctx, doc, W, H);
-  drawFinishLayer(ctx, doc, W, H, accent);
+function drawEditorOverlays(ctx, plan, doc) {
+  const accent = accentForGrade(doc.grade);
+  plan.panels.forEach((panel, i) => {
+    const { x, y, w, h } = panel.rect;
+    // Numbered badge on every panel.
+    ctx.save();
+    ctx.fillStyle = '#111';
+    ctx.beginPath();
+    ctx.arc(x + 16, y + h - 16, 11, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#fff';
+    ctx.font = '700 13px Oswald, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(String(i + 1), x + 16, y + h - 15.5);
+    ctx.restore();
+    if (i !== doc.selected) return;
+    // Selected panel: accent outline, crosshair, zoom badge.
+    ctx.save();
+    ctx.strokeStyle = accent;
+    ctx.lineWidth = 3;
+    ctx.strokeRect(x + 1.5, y + 1.5, w - 3, h - 3);
+    ctx.beginPath();
+    ctx.moveTo(x + w / 2, y + 6);
+    ctx.lineTo(x + w / 2, y + h - 6);
+    ctx.moveTo(x + 6, y + h / 2);
+    ctx.lineTo(x + w - 6, y + h / 2);
+    ctx.strokeStyle = 'rgba(255,255,255,0.85)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    const zoomText = `${Math.round((panel.zoom || 1) * 100)}%`;
+    ctx.font = '700 13px Oswald, sans-serif';
+    const zw = ctx.measureText(zoomText).width + 14;
+    ctx.fillStyle = accent;
+    ctx.fillRect(x + w - zw - 8, y + 8, zw, 22);
+    ctx.fillStyle = '#111';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(zoomText, x + w - zw - 1, y + 19.5);
+    ctx.restore();
+  });
+}
+
+export function renderCover(ctx, doc, images, opts = {}) {
+  const plan = planCover(doc, opts.size);
+  ctx.save();
+  ctx.fillStyle = '#111';
+  ctx.fillRect(0, 0, plan.w, plan.h);
+  for (const panel of plan.panels) {
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(panel.rect.x, panel.rect.y, panel.rect.w, panel.rect.h);
+    const img = images.get ? images.get(panel.photo) : images[panel.photo];
+    if (img) {
+      drawPanelPhoto(ctx, img, panel.inner, panel, doc.look, doc.grade);
+    } else {
+      ctx.fillStyle = '#222';
+      ctx.fillRect(panel.inner.x, panel.inner.y, panel.inner.w, panel.inner.h);
+    }
+  }
+  drawTitle(ctx, plan, doc);
+  drawTaglineRibbon(ctx, plan, doc);
+  drawPosterFinish(ctx, plan, doc);
+  if (opts.editor) drawEditorOverlays(ctx, plan, doc);
+  ctx.restore();
   return plan;
 }
 
-export function drawTitleBlock(ctx, doc, W, H) {
-  const style = resolveTitleStyle(doc);
-  const look = doc.look;
-  const lines = wrapTitleLines(doc.title, 12);
-  let fontSize = Math.round(H * 0.135 * (look.titleSize / 100));
-  const maxW = W * 0.68;
-  ctx.textAlign = 'left';
-  ctx.textBaseline = 'alphabetic';
-  for (let attempt = 0; attempt < 8; attempt += 1) {
-    ctx.font = `${fontSize}px ${style.font}, sans-serif`;
-    const widest = Math.max(...lines.map((line) => ctx.measureText(line).width));
-    if (widest <= maxW || fontSize <= 24) break;
-    fontSize = Math.round(fontSize * (maxW / widest) * 0.97);
-  }
-  const lineH = fontSize * 0.92;
-  const titleBottom = H * 0.74 + look.titleLift;
-  const titleTop = titleBottom - lineH * lines.length;
-  const gradient = ctx.createLinearGradient(0, titleTop, 0, titleBottom + fontSize * 0.2);
-  for (const [at, color] of style.stops) gradient.addColorStop(at, color);
-  const x = W * 0.045;
-  ctx.save();
-  ctx.shadowColor = style.shadow;
-  ctx.shadowBlur = Math.round(fontSize * 0.18);
-  ctx.shadowOffsetY = Math.round(fontSize * 0.04);
-  ctx.font = `${fontSize}px ${style.font}, sans-serif`;
-  ctx.fillStyle = gradient;
-  ctx.strokeStyle = style.stroke;
-  ctx.lineWidth = Math.max(2, Math.round(fontSize * 0.045));
-  lines.forEach((line, i) => {
-    const y = titleBottom - (lines.length - 1 - i) * lineH;
-    ctx.strokeText(line, x, y);
-    ctx.fillText(line, x, y);
-  });
-  ctx.restore();
-
-  // Neon script overlapping the caps.
-  const scriptSize = Math.round(H * 0.068);
-  ctx.save();
-  ctx.font = `${scriptSize}px "Mr Dafoe", cursive`;
-  ctx.fillStyle = '#ff5fa2';
-  ctx.shadowColor = '#e84a7a';
-  ctx.shadowBlur = Math.round(scriptSize * 0.4);
-  ctx.textAlign = 'left';
-  ctx.fillText(doc.script, x + W * 0.1, titleBottom + scriptSize * 0.8);
-  ctx.restore();
-
-  // Tagline ribbon with side triangles.
-  const ribbonFont = Math.round(H * 0.024);
-  ctx.font = `700 ${ribbonFont}px Oswald, sans-serif`;
-  const ribbonTextW = ctx.measureText(doc.tagline.toUpperCase()).width;
-  const ribbonWidth = Math.min(W * 0.66, ribbonTextW + W * 0.08);
-  drawTaglineRibbon(ctx, x, titleBottom + scriptSize * 1.05, ribbonWidth, doc.tagline, ribbonFont);
-}
-
-export function drawFinishLayer(ctx, doc, W, H, accent) {
-  // Volume or part tag, top left.
-  drawVolTag(ctx, Math.round(W * 0.03), Math.round(H * 0.025), doc.vol, Math.round(H * 0.02));
-  // Seal, top right.
-  const sealR = Math.round(H * 0.055);
-  drawSeal(ctx, W - sealR - Math.round(W * 0.03), sealR + Math.round(H * 0.025), sealR, doc.sealText);
-  // Generated barcode, top right under the seal.
-  const barW = Math.round(W * 0.13);
-  const barH = Math.round(H * 0.045);
-  drawBarcode(ctx, W - barW - Math.round(W * 0.03), sealR * 2 + Math.round(H * 0.04), barW, barH, barcodeNumber(doc.title.length * 7919 + doc.panels.length * 131));
-  // Billing: a single centred line tucked under the top row, between the
-  // volume tag on the left and the seal on the right, leaving the bottom
-  // band open for the callout tags. The box spans 0.10W to 0.82W, so it
-  // ends before the barcode (which begins at 0.84W) and clears the volume
-  // tag on the other side, with enough width for the line to fit whole.
-  drawBillingLine(ctx, W * 0.10, H * 0.082, W * 0.72, doc.billing, Math.round(H * 0.014));
-  // Coming soon, centred above the quote bar.
-  if (doc.comingSoon) drawComingSoon(ctx, 0, H * 0.858, W, Math.round(H * 0.02));
-  // Five-star review-quote bar along the bottom edge.
-  drawQuoteBar(ctx, 0, H - Math.round(H * 0.052), W, doc.quote, doc.outlet, Math.round(H * 0.019));
-}
-
-export function exportCoverPng(doc, images, sizeKey) {
-  const sized = { ...doc, size: sizeKey };
+// Render a document to a fresh canvas at its cover size and return it.
+// opts.size overrides the cover size (the export panel renders at the
+// export pixels this way).
+export function renderCoverToCanvas(doc, images, opts = {}) {
+  const plan = planCover(doc, opts.size);
   const canvas = document.createElement('canvas');
-  renderCover(canvas, sized, images, { draft: false });
-  return new Promise((resolve) => {
-    canvas.toBlob((blob) => resolve(blob), 'image/png');
-  });
+  canvas.width = plan.w;
+  canvas.height = plan.h;
+  const ctx = canvas.getContext('2d');
+  renderCover(ctx, doc, images, opts);
+  return canvas;
 }

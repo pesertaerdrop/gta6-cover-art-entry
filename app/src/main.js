@@ -1,19 +1,19 @@
-// main.js — Saltline Cover Studio entry point. Builds the studio object
-// (the document, its history, the loaded photos, and the render/commit
-// verbs every editor module shares), wires all the modules, preloads the
-// sample photos, and applies a ?shot= scene when one is requested.
+// Saltline Cover Studio entry point. Builds the studio object (the
+// document, its history, the loaded photos, and the render/commit verbs
+// every editor module shares), wires all the modules, preloads the sample
+// photos, and applies a ?shot= scene when one is requested.
 // Saltline Cover Studio: turn any photo and a caption into GTA-style cover
 // art — multi-panel posters with callout tags, a seal, a review bar, a
 // barcode and a giant chrome title — and export the PNG in three post sizes.
-import { defaultDoc, cloneDoc, SIZES } from './state/default-doc.js';
-import { createHistory, historyPush, historyUndo, historyRedo, historyCanUndo, historyCanRedo } from './state/undo-history.js';
+import { defaultDoc } from './state/default-doc.js';
+import { createUndoHistory } from './state/undo-history.js';
 import { SAMPLE_PHOTOS } from './photos/sample-photos.js';
-import { planCover } from './layouts/plan-cover.js';
+import { planCover, applyShotScene } from './layouts/plan-cover.js';
 import { renderCover } from './render/render-cover.js';
 import { setupPreviewCanvas } from './editor/preview-canvas.js';
 import { renderInspector } from './editor/panel-inspector.js';
 import { renderLookSliders } from './editor/look-sliders.js';
-import { renderLayoutPicker, renderGradePicker, renderTitlePicker } from './editor/preset-pickers.js';
+import { renderLayoutPicker, renderGradePicker, renderTitlePicker, renderSizePicker } from './editor/preset-pickers.js';
 import { renderPhotoTray, setupPhotoInput } from './editor/photo-tray.js';
 import { setupStepBar, markStep } from './editor/step-bar.js';
 import { setupExportPanel } from './editor/export-panel.js';
@@ -21,7 +21,7 @@ import { setupKeyboardShortcuts } from './editor/keyboard-shortcuts.js';
 import { setupCoverActions, applyAutoLayout, applySurpriseMe } from './editor/cover-actions.js';
 import { setupHelpDialog } from './editor/help-dialog.js';
 import { setupCaptionFields, syncCaptionFields } from './editor/caption-fields.js';
-import { sceneFromUrl, applyShotScene, sceneMode } from './shot/shot-scenes.js';
+import { sceneFromUrl, sceneMode } from './shot/shot-scenes.js';
 
 const studio = {
   doc: defaultDoc(),
@@ -34,7 +34,7 @@ const studio = {
   openHelp: () => {},
 };
 
-studio.history = createHistory(studio.doc);
+studio.history = createUndoHistory();
 
 function loadImage(src) {
   return new Promise((resolve) => {
@@ -47,18 +47,13 @@ function loadImage(src) {
 
 async function preloadSamples() {
   const jobs = SAMPLE_PHOTOS.map(async (photo) => {
-    const img = await loadImage(`./${photo.file}`);
-    if (img) studio.images.set(photo.file, img);
+    const img = await loadImage(`./${photo.src}`);
+    if (img) studio.images.set(photo.src, img);
   });
   await Promise.all(jobs);
 }
 
-studio.selectedSlot = () => {
-  const plan = studio.currentPlan;
-  if (!plan) return studio.doc.panels[studio.doc.selected] ?? null;
-  const panel = plan.panels[studio.doc.selected];
-  return panel ? panel.slot : null;
-};
+studio.selectedSlot = () => studio.doc.panels[studio.doc.selected] ?? null;
 
 studio.uploadedCount = () => studio.uploaded.size;
 
@@ -98,31 +93,25 @@ studio.render = () => {
   renderLayoutPicker(studio);
   renderGradePicker(studio);
   renderTitlePicker(studio);
+  renderSizePicker(studio);
   syncCaptionFields(studio.doc);
-  document.getElementById('undoBtn').disabled = !historyCanUndo(studio.history);
-  document.getElementById('redoBtn').disabled = !historyCanRedo(studio.history);
+  const undoBtn = document.getElementById('undoBtn');
+  const redoBtn = document.getElementById('redoBtn');
+  if (undoBtn) undoBtn.disabled = !studio.history.canUndo();
+  if (redoBtn) redoBtn.disabled = !studio.history.canRedo();
 };
 
 studio.commit = (label) => {
-  historyPush(studio.history, studio.doc);
+  studio.history.push(studio.doc, label, studio.doc.size);
   studio.render();
-  void label;
 };
 
 studio.undo = () => {
-  const doc = historyUndo(studio.history);
-  if (doc) {
-    studio.doc = doc;
-    studio.render();
-  }
+  if (studio.history.undo(studio.doc)) studio.render();
 };
 
 studio.redo = () => {
-  const doc = historyRedo(studio.history);
-  if (doc) {
-    studio.doc = doc;
-    studio.render();
-  }
+  if (studio.history.redo(studio.doc)) studio.render();
 };
 
 studio.setStep = (step) => {
@@ -145,8 +134,12 @@ async function boot() {
   }
   if (scene && sceneMode(scene) === 'cover') {
     document.body.classList.add('shot-cover');
+    const plan = planCover(studio.doc);
     const canvas = document.getElementById('shotCanvas');
-    renderCover(canvas, studio.doc, studio.images, { draft: false });
+    canvas.width = plan.w;
+    canvas.height = plan.h;
+    const ctx = canvas.getContext('2d');
+    renderCover(ctx, studio.doc, studio.images, { draft: false });
     document.title = 'saltline-ready';
     return;
   }

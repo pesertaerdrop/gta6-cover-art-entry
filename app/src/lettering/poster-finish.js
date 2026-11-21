@@ -1,249 +1,222 @@
-// poster-finish.js — the seven poster-finish elements that make every cover
-// read as a printed movie poster: per-panel callout tags, a seal, a volume
-// or part tag, a five-star review-quote bar, a billing block, a generated
-// barcode, and a coming-soon line. All of them are drawn in code from the
-// document, and every line of text is editable in the editor.
-export function drawCalloutTag(ctx, rect, tag, accent, placement, coverH) {
-  if (!tag) return;
-  const pad = Math.max(10, rect.h * 0.06);
-  // Size the tag from the panel, but never taller than 5% of the cover, so
-  // a tag on a tall panel cannot grow wide enough to reach the barcode.
-  const cap = coverH ? Math.round(coverH * 0.05) : 999;
-  let fontSize = Math.min(Math.max(14, Math.round(rect.h * 0.11)), cap);
+// The seven poster-finish elements that make every cover read as a printed
+// movie poster: per-panel callout tags, a seal, a volume tag, a five-star
+// review bar, a billing block, a generated barcode, and a coming-soon line.
+// The billing line shrinks to fit its box (measuring with the active font,
+// ×0.92 a step, down to a floor of max(8px, 0.55× the requested size), and
+// wrapping to two lines if it still does not fit) — it never truncates and
+// never uses an ellipsis.
+const FONT_DISPLAY = (px) => `${px}px Anton, 'Archivo Black', sans-serif`;
+const FONT_SCRIPT = (px) => `${px}px 'Mr Dafoe', cursive`;
+
+export function drawCalloutTag(ctx, x, y, text, size = 14) {
+  if (!text) return;
+  const pad = 8;
   ctx.save();
-  ctx.font = `700 ${fontSize}px Oswald, sans-serif`;
-  // Shrink the tag until its chip fits inside the panel.
-  const maxW = rect.w - 16;
-  let textW = ctx.measureText(tag).width;
-  let chipW = textW + pad * 2 + fontSize * 0.5;
-  while (chipW > maxW && fontSize > 12) {
-    fontSize = Math.round(fontSize * 0.92);
-    ctx.font = `700 ${fontSize}px Oswald, sans-serif`;
-    textW = ctx.measureText(tag).width;
-    chipW = textW + pad * 2 + fontSize * 0.5;
-  }
-  const h = fontSize + pad * 1.1;
-  const x = rect.x + Math.max(8, rect.w * 0.03);
-  const y = placement === 'top'
-    ? rect.y + Math.max(8, rect.h * 0.04)
-    : rect.y + rect.h - h - Math.max(8, rect.h * 0.04);
-  ctx.fillStyle = 'rgba(10, 8, 6, 0.92)';
-  ctx.fillRect(x, y, chipW, h);
-  ctx.fillStyle = accent;
-  ctx.fillRect(x, y, fontSize * 0.32, h);
+  ctx.font = `700 ${size}px Oswald, sans-serif`;
+  const width = ctx.measureText(text).width + pad * 2;
+  const height = 24;
+  ctx.fillStyle = '#111';
+  ctx.fillRect(x, y, width, height);
   ctx.fillStyle = '#fff';
   ctx.textBaseline = 'middle';
-  ctx.fillText(tag, x + pad + fontSize * 0.32, y + h / 2 + 1);
+  ctx.textAlign = 'left';
+  ctx.fillText(text, x + pad, y + height / 2 + 0.5);
   ctx.restore();
 }
 
-export function drawSeal(ctx, cx, cy, radius, text) {
+export function drawSeal(ctx, x, y, radius) {
   ctx.save();
-  ctx.translate(cx, cy);
+  ctx.translate(x, y);
   ctx.beginPath();
   ctx.arc(0, 0, radius, 0, Math.PI * 2);
-  ctx.fillStyle = '#e8a317';
+  ctx.fillStyle = 'rgba(17,17,17,0.85)';
   ctx.fill();
-  ctx.lineWidth = Math.max(2, radius * 0.07);
-  ctx.strokeStyle = '#7a4d00';
+  ctx.lineWidth = 2;
+  ctx.strokeStyle = '#fff';
   ctx.stroke();
   ctx.beginPath();
-  ctx.arc(0, 0, radius * 0.78, 0, Math.PI * 2);
-  ctx.strokeStyle = '#7a4d00';
-  ctx.lineWidth = Math.max(1, radius * 0.03);
+  ctx.arc(0, 0, radius - 5, 0, Math.PI * 2);
+  ctx.strokeStyle = 'rgba(255,255,255,0.7)';
+  ctx.lineWidth = 1;
   ctx.stroke();
-  ctx.fillStyle = '#3d2400';
-  ctx.font = `700 ${Math.round(radius * 0.34)}px Oswald, sans-serif`;
+  ctx.fillStyle = '#ffd166';
+  ctx.font = `700 ${Math.round(radius * 0.55)}px Anton, sans-serif`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  const words = text.split(' ');
-  ctx.fillText(words[0] ?? '', 0, -radius * 0.22);
-  ctx.fillText(words.slice(1).join(' ') || 'ORIGINAL', 0, radius * 0.22);
+  ctx.fillText('★', 0, -radius * 0.18);
+  ctx.fillStyle = '#fff';
+  ctx.font = `700 ${Math.round(radius * 0.22)}px Oswald, sans-serif`;
+  ctx.fillText('SALTLINE', 0, radius * 0.32);
   ctx.restore();
 }
 
-export function drawVolTag(ctx, x, y, text, fontSize) {
+export function drawVolTag(ctx, x, y, text) {
+  if (!text) return;
   ctx.save();
-  ctx.font = `700 ${fontSize}px Oswald, sans-serif`;
-  const pad = fontSize * 0.7;
-  const w = ctx.measureText(text).width + pad * 2;
-  const h = fontSize * 1.9;
-  ctx.fillStyle = '#141210';
-  ctx.fillRect(x, y, w, h);
-  ctx.strokeStyle = '#e8a317';
-  ctx.lineWidth = Math.max(2, fontSize * 0.08);
-  ctx.strokeRect(x, y, w, h);
-  ctx.fillStyle = '#e8a317';
+  ctx.font = `700 15px Oswald, sans-serif`;
+  const width = ctx.measureText(text).width + 16;
+  ctx.fillStyle = '#fff';
+  ctx.fillRect(x, y, width, 26);
+  ctx.fillStyle = '#111';
   ctx.textBaseline = 'middle';
-  ctx.fillText(text, x + pad, y + h / 2 + 1);
+  ctx.textAlign = 'left';
+  ctx.fillText(text, x + 8, y + 13.5);
   ctx.restore();
-  return w;
 }
 
-export function drawQuoteBar(ctx, x, y, w, quote, outlet, fontSize) {
-  const barH = fontSize * 2.6;
+export function drawReviewBar(ctx, rect, quote, outlet) {
+  if (!quote && !outlet) return;
   ctx.save();
-  ctx.fillStyle = 'rgba(10, 8, 6, 0.94)';
-  ctx.fillRect(x, y, w, barH);
-  ctx.fillStyle = '#e8a317';
-  ctx.font = `${Math.round(fontSize * 1.1)}px sans-serif`;
-  ctx.textBaseline = 'middle';
+  ctx.fillStyle = 'rgba(0,0,0,0.62)';
+  ctx.fillRect(rect.x, rect.y, rect.w, rect.h);
   const stars = '★★★★★';
-  ctx.fillText(stars, x + fontSize * 0.7, y + barH / 2);
-  const starW = ctx.measureText(stars).width;
+  const size = Math.round(rect.h * 0.42);
+  ctx.font = `${size}px sans-serif`;
+  ctx.fillStyle = '#ffd166';
+  ctx.textBaseline = 'middle';
+  ctx.textAlign = 'left';
+  ctx.fillText(stars, rect.x + 14, rect.y + rect.h / 2);
+  const starWidth = ctx.measureText(stars).width;
   ctx.fillStyle = '#fff';
-  ctx.font = `italic 700 ${fontSize}px Georgia, serif`;
-  const quoteX = x + fontSize * 0.7 + starW + fontSize * 0.6;
-  const maxQuote = w - (quoteX - x) - fontSize * 0.7 - ctx.measureText(outlet).width - fontSize * 1.4;
-  let shown = quote;
-  while (ctx.measureText(`"${shown}"`).width > maxQuote && shown.length > 8) {
-    shown = shown.slice(0, -1);
+  ctx.font = `italic 400 ${Math.round(rect.h * 0.34)}px Georgia, serif`;
+  const quoteText = quote ? `"${quote}"` : '';
+  ctx.fillText(quoteText, rect.x + 14 + starWidth + 12, rect.y + rect.h / 2);
+  if (outlet) {
+    ctx.font = `700 ${Math.round(rect.h * 0.3)}px Oswald, sans-serif`;
+    ctx.fillStyle = '#ffd166';
+    ctx.textAlign = 'right';
+    ctx.fillText(outlet, rect.x + rect.w - 14, rect.y + rect.h / 2);
   }
-  ctx.fillText(`"${shown}"`, quoteX, y + barH / 2);
-  ctx.fillStyle = '#e8a317';
-  ctx.font = `700 ${Math.round(fontSize * 0.85)}px Oswald, sans-serif`;
-  ctx.textAlign = 'right';
-  ctx.fillText(outlet, x + w - fontSize * 0.7, y + barH / 2);
   ctx.restore();
-  return barH;
 }
 
-export function drawBillingLine(ctx, x, y, w, text, fontSize) {
-  const line = text.toUpperCase();
-  // A billing line is never allowed to run off its box: shrink it step by
-  // step until it fits, measuring against the font that is really in use
-  // right now. While a webfont is still loading, the fallback face measures
-  // much wider than the real one, so a size chosen from the real face's
-  // metrics alone can still overflow on a capture. If even the smallest
-  // size is too wide, fall through to the two-line wrapped block instead
-  // of trimming a single letter. Returns the size the line was drawn at.
-  const minSize = Math.max(8, Math.round(fontSize * 0.55));
-  let size = fontSize;
+// Wrap text into at most two lines that fit maxWidth, drawing them centred
+// on (cx, y) — the billing fallback when shrink-to-fit reaches its floor.
+export function drawBillingBlock(ctx, cx, y, maxWidth, text, size) {
   ctx.save();
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  const fits = () => ctx.measureText(line).width <= w;
-  const setSize = (next) => {
-    size = next;
-    ctx.font = `${size}px Oswald, sans-serif`;
-  };
-  setSize(size);
-  while (!fits() && size > minSize) {
-    setSize(Math.max(minSize, Math.round(size * 0.92)));
-  }
-  if (!fits()) {
-    ctx.restore();
-    drawBillingBlock(ctx, x, y - size * 1.15, w, text, size);
-    return size;
-  }
-  ctx.shadowColor = 'rgba(0, 0, 0, 0.85)';
-  ctx.shadowBlur = Math.round(size * 0.4);
-  ctx.fillStyle = '#fff';
-  ctx.fillText(line, x + w / 2, y);
-  ctx.restore();
-  return size;
-}
-
-export function drawBillingBlock(ctx, x, y, w, text, fontSize) {
-  ctx.save();
-  ctx.fillStyle = 'rgba(255, 250, 240, 0.92)';
-  ctx.font = `${fontSize}px Oswald, sans-serif`;
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
+  ctx.font = `${size}px Oswald, sans-serif`;
   const words = text.split(' ');
-  const lines = [];
-  let current = '';
+  const lines = [''];
   for (const word of words) {
-    const next = current ? `${current} ${word}` : word;
-    if (ctx.measureText(next).width > w * 0.96 && current) {
-      lines.push(current);
-      current = word;
+    const trial = lines[lines.length - 1] ? lines[lines.length - 1] + ' ' + word : word;
+    if (ctx.measureText(trial).width <= maxWidth || lines[lines.length - 1] === '') {
+      lines[lines.length - 1] = trial;
+    } else if (lines.length < 2) {
+      lines.push(word);
     } else {
-      current = next;
+      lines[1] += ' ' + word;
     }
   }
-  if (current) lines.push(current);
-  const shown = lines.slice(0, 2);
-  ctx.fillStyle = '#141210';
-  shown.forEach((line, i) => {
-    ctx.fillText(line.toUpperCase(), x + w / 2, y + fontSize * (i + 0.6));
+  ctx.fillStyle = '#fff';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'top';
+  lines.forEach((line, i) => ctx.fillText(line, cx, y + i * (size + 2)));
+  ctx.restore();
+}
+
+// The billing line: shrink the font ×0.92 a step until the text fits the
+// box, never below max(8px, 0.55× the requested size); if it still does
+// not fit, wrap it into two lines instead of cutting anything off.
+export function drawBillingLine(ctx, x, y, maxWidth, text, requestedSize) {
+  if (!text) return;
+  const floor = Math.max(8, 0.55 * requestedSize);
+  let size = requestedSize;
+  ctx.save();
+  ctx.font = `${size}px Oswald, sans-serif`;
+  while (size > floor && ctx.measureText(text).width > maxWidth) {
+    size = Math.max(floor, size * 0.92);
+    ctx.font = `${size}px Oswald, sans-serif`;
+  }
+  if (ctx.measureText(text).width <= maxWidth) {
+    ctx.fillStyle = '#fff';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'top';
+    ctx.fillText(text, x, y);
+    ctx.restore();
+    return;
+  }
+  ctx.restore();
+  drawBillingBlock(ctx, x + maxWidth / 2, y, maxWidth, text, floor);
+}
+
+export function drawBarcode(ctx, x, y, w, h) {
+  ctx.save();
+  ctx.fillStyle = '#fff';
+  ctx.fillRect(x - 4, y - 4, w + 8, h + 18);
+  ctx.fillStyle = '#111';
+  let cursor = x;
+  let seed = 1234567;
+  const next = () => { seed = (seed * 1103515245 + 12345) % 2147483648; return seed / 2147483648; };
+  while (cursor < x + w - 2) {
+    const bar = 1 + Math.floor(next() * 4);
+    const gap = 1 + Math.floor(next() * 3);
+    if (next() > 0.35) ctx.fillRect(cursor, y, bar, h);
+    cursor += bar + gap;
+  }
+  ctx.font = '11px monospace';
+  ctx.textAlign = 'center';
+  ctx.fillText('8 900241 202611', x + w / 2, y + h + 12);
+  ctx.restore();
+}
+
+export function drawComingSoon(ctx, x, y, text) {
+  if (!text) return;
+  ctx.save();
+  ctx.font = `700 16px Oswald, sans-serif`;
+  const width = ctx.measureText(text).width + 16;
+  ctx.fillStyle = '#e5381a';
+  ctx.fillRect(x - width, y, width, 26);
+  ctx.fillStyle = '#fff';
+  ctx.textBaseline = 'middle';
+  ctx.textAlign = 'left';
+  ctx.fillText(text, x - width + 8, y + 13.5);
+  ctx.restore();
+}
+
+// Draw all seven finish elements onto a cover described by plan (from
+// planCover) and doc. Callout tags sit on each panel, the seal on the hero
+// panel's bottom-right, the volume tag top-left, the review bar across the
+// bottom, the billing line above it, the barcode bottom-right, and the
+// coming-soon line top-right.
+export function drawPosterFinish(ctx, plan, doc) {
+  const { w, h } = plan;
+  const caption = plan.caption;
+  // Callout tags, one per panel. The hero panel's tag sits below the
+  // volume tag (top-left of the cover) so the two never collide, and any
+  // tag that would fall across the title glyphs or the tagline ribbon
+  // drops just below both.
+  const glyphTop = plan.titleRect.y + plan.titleRect.h / 2 - plan.titleLift - plan.titleSize / 2;
+  const titleZoneBottom = plan.titleRect.y + plan.titleRect.h * 0.8 + Math.round(h * 0.032);
+  plan.panels.forEach((panel, i) => {
+    if (!panel.tagOn || !panel.tag) return;
+    const tagSize = Math.max(11, Math.round(w * 0.011));
+    ctx.save();
+    ctx.font = `700 ${tagSize}px Oswald, sans-serif`;
+    const width = ctx.measureText(panel.tag).width + 16;
+    const height = Math.round(tagSize * 1.7);
+    let tagY = i === 0 ? Math.round(0.03 * h) + 30 : panel.rect.y + 8;
+    if (tagY + height > glyphTop && tagY < titleZoneBottom) tagY = titleZoneBottom + 6;
+    ctx.fillStyle = '#111';
+    ctx.fillRect(panel.rect.x + 8, tagY, width, height);
+    ctx.fillStyle = '#fff';
+    ctx.textBaseline = 'middle';
+    ctx.textAlign = 'left';
+    ctx.fillText(panel.tag, panel.rect.x + 16, tagY + height / 2 + 0.5);
+    ctx.restore();
   });
-  ctx.restore();
-  return shown.length * fontSize * 1.15;
-}
-
-export function barcodeNumber(seed) {
-  let state = seed >>> 0;
-  const digits = [];
-  for (let i = 0; i < 12; i += 1) {
-    state = (state * 1664525 + 1013904223) >>> 0;
-    digits.push(String(state % 10));
+  // Seal on the hero panel.
+  const hero = plan.panels[0];
+  if (hero) {
+    drawSeal(ctx, hero.rect.x + hero.rect.w - 34, hero.rect.y + hero.rect.h - 34, 28);
   }
-  return digits.join('');
-}
-
-export function drawBarcode(ctx, x, y, w, h, number) {
-  ctx.save();
-  ctx.fillStyle = '#fff';
-  ctx.fillRect(x, y, w, h);
-  let state = 0;
-  for (const ch of number) state = (state * 31 + ch.charCodeAt(0)) >>> 0;
-  const barW = w / (number.length * 3);
-  let bx = x + barW;
-  for (const ch of number) {
-    state = (state * 1664525 + 1013904223) >>> 0;
-    const thick = (state % 3) + 1;
-    ctx.fillStyle = '#141210';
-    ctx.fillRect(bx, y + 4, barW * thick * 0.5, h * 0.62);
-    bx += barW * 3;
-  }
-  ctx.fillStyle = '#141210';
-  ctx.font = `${Math.max(10, Math.round(h * 0.16))}px monospace`;
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'bottom';
-  ctx.fillText(`${number.slice(0, 6)} ${number.slice(6)}`, x + w / 2, y + h - 3);
-  ctx.restore();
-}
-
-export function drawComingSoon(ctx, x, y, w, fontSize) {
-  ctx.save();
-  ctx.fillStyle = '#fff';
-  ctx.font = `700 ${fontSize}px Oswald, sans-serif`;
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText('COMING SOON', x + w / 2, y);
-  ctx.restore();
-}
-
-export function drawTaglineRibbon(ctx, x, y, w, text, fontSize) {
-  ctx.save();
-  const tri = fontSize * 0.9;
-  ctx.fillStyle = '#e8531f';
-  ctx.beginPath();
-  ctx.moveTo(x, y);
-  ctx.lineTo(x + w, y);
-  ctx.lineTo(x + w - tri, y + fontSize * 1.7);
-  ctx.lineTo(x + tri, y + fontSize * 1.7);
-  ctx.closePath();
-  ctx.fill();
-  ctx.fillStyle = '#b23a10';
-  ctx.beginPath();
-  ctx.moveTo(x, y);
-  ctx.lineTo(x + tri, y + fontSize * 1.7);
-  ctx.lineTo(x, y + fontSize * 1.7);
-  ctx.closePath();
-  ctx.fill();
-  ctx.beginPath();
-  ctx.moveTo(x + w, y);
-  ctx.lineTo(x + w - tri, y + fontSize * 1.7);
-  ctx.lineTo(x + w, y + fontSize * 1.7);
-  ctx.closePath();
-  ctx.fill();
-  ctx.fillStyle = '#fff';
-  ctx.font = `700 ${fontSize}px Oswald, sans-serif`;
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText(text.toUpperCase(), x + w / 2, y + fontSize * 0.85);
-  ctx.restore();
-  return fontSize * 1.7;
+  // Volume tag top-left, coming soon top-right.
+  drawVolTag(ctx, 0.04 * w, 0.03 * h, doc.vol || caption.vol);
+  drawComingSoon(ctx, 0.96 * w, 0.03 * h, doc.comingSoon || caption.comingSoon);
+  // Review bar and billing above the bottom edge.
+  const barH = Math.round(h * 0.055);
+  drawReviewBar(ctx, { x: 0.04 * w, y: h - barH - 12, w: 0.92 * w, h: barH }, doc.quote || caption.quote, doc.outlet || caption.outlet);
+  const billingSize = doc.size === '4:5' ? 17 : 15;
+  drawBillingLine(ctx, 0.1 * w, h - barH - 12 - billingSize - 8, 0.72 * w, doc.billing || caption.billing, billingSize);
+  // Barcode bottom-right, clear of the billing box and of the review bar.
+  drawBarcode(ctx, 0.86 * w, h - barH - 68, Math.round(0.09 * w), 30);
 }

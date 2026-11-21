@@ -1,53 +1,64 @@
-// export-panel.js — the export panel: per-size checkboxes for the three post
-// sizes (1080x1080, 1080x1350, 1920x1080), the big Export all three button,
-// and a status line that reports readiness and what was just exported.
-// Exports are PNG files downloaded from the canvas on this machine.
-import { exportCoverPng } from '../render/render-cover.js';
-import { SIZES } from '../state/default-doc.js';
+// The export panel: per-size checkboxes for the three post sizes (1080 by
+// 1080, 1080 by 1350, 1920 by 1080), the big Export all three button, and
+// the status line. Each chosen size renders the cover at exactly those
+// pixels and downloads as a PNG.
+import { renderCoverToCanvas } from '../render/render-cover.js';
 
-export function setupExportPanel(studio) {
-  const button = document.getElementById('exportAllBtn');
-  const status = document.getElementById('exportStatus');
-  const boxes = [...document.querySelectorAll('[data-export-size]')];
-  button.addEventListener('click', async () => {
-    const chosen = boxes.filter((box) => box.checked).map((box) => box.dataset.exportSize);
-    if (chosen.length === 0) {
-      status.textContent = 'Pick at least one size above first.';
-      status.classList.remove('ready');
-      return;
-    }
-    button.disabled = true;
-    status.textContent = `Exporting ${chosen.length} cover${chosen.length > 1 ? 's' : ''}...`;
-    status.classList.remove('ready');
-    let done = 0;
-    for (const sizeKey of chosen) {
-      const blob = await exportCoverPng(studio.doc, studio.images, sizeKey);
-      const size = SIZES[sizeKey];
-      downloadBlob(blob, `saltline-${studio.doc.title.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${size.width}x${size.height}.png`);
-      done += 1;
-      status.textContent = `Exported ${done} of ${chosen.length}...`;
-    }
-    status.textContent = `Done: ${done} PNG${done > 1 ? 's' : ''} exported (${chosen.join(', ')}).`;
-    status.classList.add('ready');
-    button.disabled = false;
+export const EXPORT_SIZES = {
+  '1:1': { w: 1080, h: 1080, label: '1080 by 1080 square' },
+  '4:5': { w: 1080, h: 1350, label: '1080 by 1350 portrait' },
+  '16:9': { w: 1920, h: 1080, label: '1920 by 1080 wide' },
+};
+
+function checkedSizes() {
+  return [...document.querySelectorAll('input[data-export-size]:checked')].map((input) => input.dataset.exportSize);
+}
+
+function downloadPng(canvas, filename) {
+  return new Promise((resolve) => {
+    canvas.toBlob((blob) => {
+      if (!blob) { resolve(false); return; }
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      resolve(true);
+    }, 'image/png');
   });
 }
 
-export function downloadBlob(blob, filename) {
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = filename;
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 5000);
+export async function exportAllSizes(studio) {
+  const status = document.getElementById('exportStatus');
+  const sizes = checkedSizes();
+  if (sizes.length === 0) {
+    if (status) {
+      status.textContent = 'Tick at least one size above, then export.';
+      status.classList.remove('ready');
+    }
+    return;
+  }
+  if (status) status.textContent = `Exporting ${sizes.length} size${sizes.length > 1 ? 's' : ''}…`;
+  let done = 0;
+  for (const sizeId of sizes) {
+    const size = EXPORT_SIZES[sizeId];
+    if (!size) continue;
+    const canvas = renderCoverToCanvas(studio.doc, studio.images, { size: { w: size.w, h: size.h } });
+    const ok = await downloadPng(canvas, `saltline-${sizeId.replace(':', 'x')}.png`);
+    if (ok) done++;
+  }
+  if (status) {
+    status.textContent = done === sizes.length
+      ? `Exported ${done} PNG${done > 1 ? 's' : ''}.`
+      : `Exported ${done} of ${sizes.length} sizes — try again for the rest.`;
+    status.classList.toggle('ready', done === sizes.length);
+  }
 }
 
-export function exportStatusReady() {
-  const status = document.getElementById('exportStatus');
-  if (status) {
-    status.textContent = 'Ready to export. Pick sizes above, then export.';
-    status.classList.add('ready');
-  }
+export function setupExportPanel(studio) {
+  const btn = document.getElementById('exportAllBtn');
+  if (btn) btn.addEventListener('click', () => exportAllSizes(studio));
 }

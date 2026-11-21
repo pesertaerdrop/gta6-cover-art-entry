@@ -1,101 +1,70 @@
-// title-styles.js — the six title styles plus Auto. A style is a chrome
-// gradient ramp, a stroke, and a shadow colour. Auto picks the style that
-// matches the current grade. The title is drawn huge (about two thirds of
-// the cover width) in Anton or Archivo Black, with the neon script overlapping
-// its lower edge and a tagline ribbon underneath.
+// The six title styles plus Auto. A style is a chrome gradient ramp, a
+// stroke colour and a shadow colour. Auto picks the style that matches the
+// cover's grade, so a sunset cover gets dusk chrome and a neon cover gets
+// glacier neon without the user having to choose.
 export const TITLE_STYLES = [
   {
-    id: 'sunset-chrome',
-    name: 'Sunset Chrome',
-    blurb: 'Gold to ember, warm edge',
-    font: 'Anton',
-    stops: [[0, '#ffe9a8'], [0.45, '#f7b733'], [0.7, '#e8531f'], [1, '#7a1e05']],
-    stroke: '#3d0f02',
-    shadow: '#ff7a3d',
+    id: 'dusk-chrome', label: 'Dusk Chrome',
+    stops: [[0, '#1a0b2e'], [0.3, '#ff6b35'], [0.5, '#ffd166'], [0.7, '#fff8e7'], [1, '#ff9e5e']],
+    stroke: '#1a0b2e', shadow: 'rgba(255,107,53,0.55)',
   },
   {
-    id: 'ice-neon',
-    name: 'Ice Neon',
-    blurb: 'Pale cyan to white',
-    font: 'Archivo Black',
-    stops: [[0, '#eafcff'], [0.5, '#7fe3f0'], [1, '#1d7fa8']],
-    stroke: '#062a38',
-    shadow: '#54d8e8',
+    id: 'glacier-neon', label: 'Glacier Neon',
+    stops: [[0, '#04122e'], [0.3, '#2f7fe0'], [0.5, '#7fe7ff'], [0.7, '#e8fbff'], [1, '#4fc3f7']],
+    stroke: '#04122e', shadow: 'rgba(127,231,255,0.6)',
   },
   {
-    id: 'gold-rush',
-    name: 'Gold Rush',
-    blurb: 'Brass, honey, cream',
-    font: 'Anton',
-    stops: [[0, '#fff3c4'], [0.4, '#e8a317'], [0.75, '#a86e00'], [1, '#5c3a00']],
-    stroke: '#2e1d00',
-    shadow: '#ffd34d',
+    id: 'brass-gold', label: 'Brass Gold',
+    stops: [[0, '#3d2408'], [0.3, '#b8860b'], [0.5, '#ffd700'], [0.7, '#fff8dc'], [1, '#daa520']],
+    stroke: '#3d2408', shadow: 'rgba(255,215,0,0.5)',
   },
   {
-    id: 'heat-blade',
-    name: 'Heat Blade',
-    blurb: 'White-hot core, red edge',
-    font: 'Archivo Black',
-    stops: [[0, '#ffffff'], [0.35, '#ffd0a8'], [0.7, '#f05a28'], [1, '#8f0f0f']],
-    stroke: '#3d0505',
-    shadow: '#ff5a2a',
+    id: 'magma-edge', label: 'Magma Edge',
+    stops: [[0, '#2b0505'], [0.3, '#e5381a'], [0.5, '#ff7a3d'], [0.7, '#ffe08a'], [1, '#ff3d00']],
+    stroke: '#2b0505', shadow: 'rgba(255,61,0,0.55)',
   },
   {
-    id: 'ultra-chrome',
-    name: 'Ultra Chrome',
-    blurb: 'Silver bands, dark cuts',
-    font: 'Anton',
-    stops: [[0, '#ffffff'], [0.3, '#c9d2d8'], [0.55, '#5f6d75'], [0.8, '#e8eef1'], [1, '#3a454c']],
-    stroke: '#14181b',
-    shadow: '#9fb3bd',
+    id: 'steel-chrome', label: 'Steel Chrome',
+    stops: [[0, '#0f1c22'], [0.3, '#5a7d8a'], [0.5, '#bfe3ec'], [0.7, '#ffffff'], [1, '#7fb3c8']],
+    stroke: '#0f1c22', shadow: 'rgba(191,227,236,0.55)',
   },
   {
-    id: 'neon-sign',
-    name: 'Neon Sign',
-    blurb: 'Hot pink to warm coral',
-    font: 'Fascinate Inline',
-    stops: [[0, '#ffe3f0'], [0.5, '#e84a7a'], [1, '#8f1d4a']],
-    stroke: '#2e0518',
-    shadow: '#ff5fa2',
+    id: 'pink-neon', label: 'Pink Neon',
+    stops: [[0, '#2e0a2e'], [0.3, '#e040fb'], [0.5, '#ff7ae0'], [0.7, '#ffd6f5'], [1, '#ff4fd8']],
+    stroke: '#2e0a2e', shadow: 'rgba(255,79,216,0.6)',
   },
 ];
 
-export const AUTO_STYLE_BY_GRADE = {
-  sunset: 'sunset-chrome',
-  'neon-night': 'ice-neon',
-  'golden-hour': 'gold-rush',
-  'tropic-teal': 'ultra-chrome',
-  heatwave: 'heat-blade',
-  'rose-dusk': 'neon-sign',
+const AUTO_STYLE_BY_GRADE = {
+  sunset: 'dusk-chrome',
+  'neon-night': 'glacier-neon',
+  'golden-hour': 'brass-gold',
+  'tropic-teal': 'steel-chrome',
+  'ember-blaze': 'magma-edge',
+  'rose-dusk': 'pink-neon',
 };
 
-export function titleStyleById(id) {
-  return TITLE_STYLES.find((style) => style.id === id) ?? TITLE_STYLES[0];
+export { AUTO_STYLE_BY_GRADE };
+
+export function styleById(id) {
+  return TITLE_STYLES.find((s) => s.id === id) || TITLE_STYLES[0];
 }
 
-export function resolveTitleStyle(doc) {
-  if (doc.titleStyle && doc.titleStyle !== 'auto') return titleStyleById(doc.titleStyle);
-  return titleStyleById(AUTO_STYLE_BY_GRADE[doc.grade] ?? 'sunset-chrome');
+export function resolveTitleStyle(titleStyle, grade) {
+  if (titleStyle && titleStyle !== 'auto') return styleById(titleStyle);
+  return styleById(AUTO_STYLE_BY_GRADE[grade] || 'dusk-chrome');
 }
 
-export function titleStyleCss(style) {
-  const stops = style.stops.map(([at, color]) => `${color} ${Math.round(at * 100)}%`).join(', ');
+// Build the vertical chrome gradient for a style over a rectangle.
+export function gradientFor(ctx, style, rect) {
+  const gradient = ctx.createLinearGradient(rect.x, rect.y, rect.x, rect.y + rect.h);
+  for (const [offset, color] of style.stops) gradient.addColorStop(offset, color);
+  return gradient;
+}
+
+// The CSS gradient for a style's "Aa" chip in the title picker.
+export function titleStyleCss(id) {
+  const style = styleById(id);
+  const stops = style.stops.map(([offset, color]) => `${color} ${Math.round(offset * 100)}%`).join(', ');
   return `linear-gradient(180deg, ${stops})`;
-}
-
-export function wrapTitleLines(title, maxChars) {
-  const words = title.trim().split(/\s+/).filter(Boolean);
-  const lines = [];
-  let current = '';
-  for (const word of words) {
-    const next = current ? `${current} ${word}` : word;
-    if (next.length > maxChars && current) {
-      lines.push(current);
-      current = word;
-    } else {
-      current = next;
-    }
-  }
-  if (current) lines.push(current);
-  return lines.slice(0, 2);
 }

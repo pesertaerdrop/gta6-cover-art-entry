@@ -1,9 +1,8 @@
-// preview-canvas.js — the live preview: renders the cover onto #preview and
-// draws the editor overlay onto #overlay: numbered badges on every panel,
-// a pink outline plus crosshair plus zoom badge on the selected panel.
-// It also owns the pointer listeners (click to select, drag to pan, wheel
-// to zoom, double-click to reset, Shift-drag to swap) and keeps the preview
-// canvas sized to the document's aspect ratio.
+// The live preview: renders the cover onto #preview (with the editor
+// overlay — numbered badges, a pink outline plus crosshair plus zoom badge
+// on the selected panel) and owns the pointer listeners: click to select,
+// drag to pan, wheel to zoom, double-click to reset, Shift-drag to swap.
+// It also keeps the size label and the readiness line up to date.
 import { renderCover } from '../render/render-cover.js';
 import { planCover } from '../layouts/plan-cover.js';
 import {
@@ -16,17 +15,38 @@ import {
   resetPanel,
 } from './panel-gestures.js';
 
+const EXPORT_LABEL = {
+  '16:9': '16:9 wide, 1920 by 1080 export',
+  '4:5': '4:5 portrait, 1080 by 1350 export',
+  '1:1': '1:1 square, 1080 by 1080 export',
+};
+
 export function setupPreviewCanvas(studio) {
   const canvas = document.getElementById('preview');
-  const overlay = document.getElementById('overlay');
   let drag = null;
   let draftTimer = null;
 
   function draw(draft) {
-    const plan = renderCover(canvas, studio.doc, studio.images, { draft: draft === true });
-    drawOverlay(overlay, plan, studio.doc);
+    const plan = planCover(studio.doc);
+    if (canvas.width !== plan.w || canvas.height !== plan.h) {
+      canvas.width = plan.w;
+      canvas.height = plan.h;
+    }
+    const ctx = canvas.getContext('2d');
+    renderCover(ctx, studio.doc, studio.images, { editor: true, draft: draft === true });
     updateReadiness(studio, plan);
     return plan;
+  }
+
+  function updateReadiness(studio, plan) {
+    const sizeLabel = document.getElementById('sizeLabel');
+    if (sizeLabel) sizeLabel.textContent = EXPORT_LABEL[studio.doc.size] || studio.doc.size;
+    const readiness = document.getElementById('readiness');
+    if (readiness) {
+      const filled = plan.panels.filter((panel) => panel.photo).length;
+      const marked = plan.panels.filter((panel) => panel.faceMarked).length;
+      readiness.textContent = `Ready: ${filled} panels filled${marked ? `, ${marked} face${marked > 1 ? 's' : ''} marked` : ', faces kept whole'}`;
+    }
   }
 
   canvas.addEventListener('pointerdown', (event) => {
@@ -44,115 +64,50 @@ export function setupPreviewCanvas(studio) {
     if (!drag) return;
     const plan = planCover(studio.doc);
     const point = pointToCanvas(canvas, event.clientX, event.clientY);
-    const panel = plan.panels[drag.panelIndex];
-    if (!panel) return;
-    const delta = dragPanDelta(drag, point, panel.rect);
-    const slot = panel.slot;
+    const rect = plan.panels[drag.panelIndex].rect;
+    const delta = dragPanDelta(drag, point, rect);
+    const slot = studio.doc.panels[drag.panelIndex];
     slot.panX = Math.max(-1, Math.min(1, (slot.panX || 0) + delta.dx));
     slot.panY = Math.max(-1, Math.min(1, (slot.panY || 0) + delta.dy));
-    draw(true);
+    studio.renderPreviewDraft();
   });
 
   canvas.addEventListener('pointerup', (event) => {
     if (!drag) return;
     const plan = planCover(studio.doc);
     const point = pointToCanvas(canvas, event.clientX, event.clientY);
-    const swap = endDragSwap(plan, drag, point);
-    const moved = drag.moved;
-    drag = null;
-    if (swap) {
-      swapPanelPhotos(studio.doc, swap.from, swap.to);
+    const target = endDragSwap(plan, drag, point);
+    if (target !== null) {
+      swapPanelPhotos(studio.doc, drag.panelIndex, target);
       studio.commit('swap panels');
-    } else if (moved) {
+    } else if (drag.moved) {
       studio.commit('pan panel');
-    } else {
-      studio.renderPanelsOnly();
     }
+    drag = null;
   });
 
   canvas.addEventListener('wheel', (event) => {
     event.preventDefault();
-    const plan = planCover(studio.doc);
-    const point = pointToCanvas(canvas, event.clientX, event.clientY);
-    const panel = plan.panels.find((p) => {
-      const r = p.rect;
-      return point.x >= r.x && point.x <= r.x + r.w && point.y >= r.y && point.y <= r.y + r.h;
-    });
-    if (!panel) return;
-    zoomPanel(panel.slot, event.deltaY < 0 ? 1.08 : 0.93);
-    studio.doc.selected = panel.index;
-    draw(true);
+    const slot = studio.selectedSlot();
+    if (!slot) return;
+    zoomPanel(slot, event.deltaY < 0 ? 1.1 : 0.91);
+    studio.renderPreviewDraft();
     clearTimeout(draftTimer);
-    draftTimer = setTimeout(() => studio.render(), 220);
+    draftTimer = setTimeout(() => studio.commit('zoom panel'), 400);
   }, { passive: false });
 
   canvas.addEventListener('dblclick', (event) => {
     const plan = planCover(studio.doc);
     const point = pointToCanvas(canvas, event.clientX, event.clientY);
-    const panel = plan.panels.find((p) => {
-      const r = p.rect;
-      return point.x >= r.x && point.x <= r.x + r.w && point.y >= r.y && point.y <= r.y + r.h;
+    const hit = plan.panels.findIndex((panel) => {
+      const r = panel.rect;
+      return point.x >= r.x && point.x < r.x + r.w && point.y >= r.y && point.y < r.y + r.h;
     });
-    if (!panel) return;
-    resetPanel(panel.slot);
-    studio.commit('reset panel');
+    if (hit >= 0) {
+      resetPanel(studio.doc.panels[hit]);
+      studio.commit('reset panel');
+    }
   });
 
   return { draw };
-}
-
-export function drawOverlay(overlay, plan, doc) {
-  overlay.width = plan.size.width;
-  overlay.height = plan.size.height;
-  const ctx = overlay.getContext('2d');
-  ctx.clearRect(0, 0, overlay.width, overlay.height);
-  const badgeR = Math.max(18, Math.round(plan.size.width * 0.016));
-  plan.panels.forEach((panel) => {
-    const { rect } = panel;
-    const cx = rect.x + badgeR + 6;
-    const cy = rect.y + badgeR + 6;
-    ctx.beginPath();
-    ctx.arc(cx, cy, badgeR, 0, Math.PI * 2);
-    ctx.fillStyle = panel.index === doc.selected ? '#e8531f' : 'rgba(20, 18, 16, 0.9)';
-    ctx.fill();
-    ctx.fillStyle = '#fff';
-    ctx.font = `700 ${Math.round(badgeR * 0.95)}px Oswald, sans-serif`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(String(panel.number), cx, cy + 1);
-    if (panel.index === doc.selected) {
-      ctx.save();
-      ctx.strokeStyle = '#e84a7a';
-      ctx.lineWidth = Math.max(3, Math.round(plan.size.width * 0.003));
-      ctx.strokeRect(rect.x - 3, rect.y - 3, rect.w + 6, rect.h + 6);
-      const mx = rect.x + rect.w / 2;
-      const my = rect.y + rect.h / 2;
-      const arm = Math.min(rect.w, rect.h) * 0.14;
-      ctx.beginPath();
-      ctx.moveTo(mx - arm, my);
-      ctx.lineTo(mx + arm, my);
-      ctx.moveTo(mx, my - arm);
-      ctx.lineTo(mx, my + arm);
-      ctx.stroke();
-      const zoomText = `${(panel.slot.zoom || 1).toFixed(1)}x`;
-      ctx.font = `700 ${Math.round(badgeR * 0.9)}px Oswald, sans-serif`;
-      const tw = ctx.measureText(zoomText).width + badgeR;
-      ctx.fillStyle = '#e84a7a';
-      ctx.fillRect(rect.x + rect.w - tw - 8, rect.y + 8, tw, badgeR * 1.7);
-      ctx.fillStyle = '#fff';
-      ctx.fillText(zoomText, rect.x + rect.w - tw / 2 - 8, rect.y + 8 + badgeR * 0.85);
-      ctx.restore();
-    }
-  });
-}
-
-export function updateReadiness(studio, plan) {
-  const filled = plan.panels.filter((p) => p.slot.photo).length;
-  const faces = plan.panels.filter((p) => p.slot.faceMarked).length;
-  const out = document.getElementById('readiness');
-  if (out) out.textContent = `Ready: ${filled} panels filled, ${faces} faces kept whole`;
-  const sizeLabel = document.getElementById('sizeLabel');
-  if (sizeLabel) {
-    sizeLabel.textContent = `${plan.size.label ?? studio.doc.size}, ${plan.size.width} by ${plan.size.height} export`;
-  }
 }

@@ -1,7 +1,7 @@
-// caption-fields.js — binds the seven caption fields (title, script line,
-// tagline ribbon, review quote, review outlet, billing block, volume tag) to
-// the document. Typing re-renders the preview live; leaving a field commits
-// the change so undo can step back to the earlier caption.
+// Binds the seven caption fields (title, script line, tagline ribbon,
+// review quote, review outlet, billing block, volume tag) to the document.
+// Typing re-renders the preview live; leaving a field commits the change
+// so undo can step back to the earlier caption.
 export const CAPTION_FIELDS = [
   { id: 'titleInput', key: 'title', upper: true },
   { id: 'scriptInput', key: 'script', upper: false },

@@ -27,7 +27,7 @@
 <main class="workbench">
   <div class="rail">
     <section class="card" aria-labelledby="photosHeading">
-      <h2 id="photosHeading">Photos <span class="count" id="photoCount">14 samples</span></h2>
+      <h2 id="photosHeading">Photos <span class="count" id="photoCount">17 samples</span></h2>
       <div class="tray" id="photoTray"></div>
       <div class="dropzone" id="dropzone">Drop photos here, paste from the clipboard, or use Add photos. Your photos never leave this machine.</div>
       <div class="btn-row">
@@ -57,13 +57,12 @@
   <div class="stage">
     <div class="preview-wrap">
       <canvas id="preview" width="1280" height="720" aria-label="Live cover preview"></canvas>
-      <canvas id="overlay" width="1280" height="720" aria-hidden="true"></canvas>
     </div>
     <div class="preview-meta">
       <span id="sizeLabel">16:9 wide, 1920 by 1080 export</span>
       <output id="readiness">Ready: 5 panels filled, faces kept whole</output>
     </div>
-    <p class="hint" id="hintLine">Drag to pan a panel, wheel or corner handles to zoom, Shift-drag to swap, double-click resets, drop a photo on a panel to place it.</p>
+    <p class="hint" id="hintLine">Drag to pan a panel, wheel to zoom, Shift-drag to swap, double-click resets, drop a photo on a panel to place it.</p>
 
     <section class="card" aria-labelledby="captionHeading">
       <h2 id="captionHeading">Caption</h2>
@@ -73,27 +72,27 @@
       </div>
       <div class="field">
         <label for="scriptInput">Script line under the title</label>
-        <input id="scriptInput" type="text" maxlength="48" value="chasing the last light">
+        <input id="scriptInput" type="text" maxlength="48" value="A coastal epic of two outlaws">
       </div>
       <div class="field">
         <label for="taglineInput">Tagline ribbon</label>
-        <input id="taglineInput" type="text" maxlength="48" value="A SALTLINE ORIGINAL">
+        <input id="taglineInput" type="text" maxlength="48" value="THEIR STORY BEGINS">
       </div>
       <div class="field">
         <label for="quoteInput">Review quote (invented, for the poster)</label>
-        <input id="quoteInput" type="text" maxlength="64" value="Salt air and high stakes, beautifully shot">
+        <input id="quoteInput" type="text" maxlength="64" value="A poster that pops off the page">
       </div>
       <div class="field">
         <label for="outletInput">Review outlet (invented)</label>
-        <input id="outletInput" type="text" maxlength="32" value="THE BOARDWALK LEDGER">
+        <input id="outletInput" type="text" maxlength="32" value="NEON MAGAZINE">
       </div>
       <div class="field">
         <label for="billingInput">Billing block (invented production line)</label>
-        <input id="billingInput" type="text" maxlength="120" value="A Saltline Pictures production, starring Vera, Marcus, June and Otis, shot on the coast, graded by hand">
+        <input id="billingInput" type="text" maxlength="120" value="A Saltline Pictures production, starring Mira and Suki, shot on the coast, graded by hand">
       </div>
       <div class="field">
         <label for="volInput">Volume or part tag</label>
-        <input id="volInput" type="text" maxlength="16" value="VOL. 2">
+        <input id="volInput" type="text" maxlength="16" value="VOL. 1">
       </div>
     </section>
   </div>
@@ -149,12 +148,13 @@
     <tr><td><kbd>A</kbd></td><td>Auto layout</td></tr>
     <tr><td><kbd>S</kbd></td><td>Surprise me (new layout, grade and caption)</td></tr>
     <tr><td><kbd>E</kbd></td><td>Export all three sizes</td></tr>
+    <tr><td><kbd>?</kbd></td><td>Open this help</td></tr>
     <tr><td><kbd>Ctrl</kbd>+<kbd>Z</kbd> / <kbd>Ctrl</kbd>+<kbd>Y</kbd></td><td>Undo / redo</td></tr>
   </table>
   <div class="btn-row"><button type="button" id="helpCloseBtn" class="primary">Close</button></div>
 </dialog>
 
-<footer class="foot">Saltline Cover Studio. All photos are image-model samples of an invented cast. No game-studio logo, artwork or font is used here.</footer>
+<footer class="foot">Saltline Cover Studio. All photos are image-model samples of an invented cast, Mira and Suki. No game-studio logo, artwork or font is used here.</footer>
 
 <script type="module" src="./src/main.js"></script>
 </body>

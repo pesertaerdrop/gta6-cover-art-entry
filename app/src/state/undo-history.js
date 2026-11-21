@@ -1,49 +1,44 @@
-// undo-history.js — a small snapshot stack for the document. Every edit
-// pushes the previous document JSON; undo and redo move a pointer through
-// the stack instead of mutating history, so a redo after an undo still works.
-import { cloneDoc, docToJson, docFromJson } from './default-doc.js';
+// A small undo/redo stack for the document (used by the app's main
+// function). Every entry is a full JSON snapshot of the document at the
+// moment before a change, with the time it was made, the label the UI
+// shows it under, and the size it covers; entries are capped at 50.
+export function createUndoHistory(limit = 50) {
+  let undo = [];
+  let redo = [];
 
-export function createHistory(firstDoc) {
+  function snapshot(doc) {
+    return JSON.stringify(doc);
+  }
+
+  function restore(doc, saved) {
+    for (const key of Object.keys(doc)) delete doc[key];
+    Object.assign(doc, JSON.parse(saved));
+  }
+
   return {
-    stack: [docToJson(firstDoc)],
-    index: 0,
+    push(doc, label, size) {
+      undo.push({ snapshot: snapshot(doc), time: Date.now(), label, size });
+      if (undo.length > limit) undo.shift();
+      redo = [];
+    },
+    undo(doc) {
+      const step = undo.pop();
+      if (!step) return false;
+      redo.push({ snapshot: snapshot(doc), time: Date.now(), label: step.label, size: step.size });
+      restore(doc, step.snapshot);
+      return true;
+    },
+    redo(doc) {
+      const step = redo.pop();
+      if (!step) return false;
+      undo.push({ snapshot: snapshot(doc), time: Date.now(), label: step.label, size: step.size });
+      restore(doc, step.snapshot);
+      return true;
+    },
+    canUndo() { return undo.length > 0; },
+    canRedo() { return redo.length > 0; },
+    undoLabel() { return undo.length ? undo[undo.length - 1].label : ''; },
+    redoLabel() { return redo.length ? redo[redo.length - 1].label : ''; },
+    clear() { undo = []; redo = []; },
   };
-}
-
-export function historyPush(history, doc) {
-  const snapshot = docToJson(doc);
-  if (history.stack[history.index] === snapshot) return history;
-  history.stack = history.stack.slice(0, history.index + 1);
-  history.stack.push(snapshot);
-  if (history.stack.length > 80) history.stack.shift();
-  history.index = history.stack.length - 1;
-  return history;
-}
-
-export function historyUndo(history) {
-  if (history.index <= 0) return null;
-  history.index -= 1;
-  return docFromJson(history.stack[history.index]);
-}
-
-export function historyRedo(history) {
-  if (history.index >= history.stack.length - 1) return null;
-  history.index += 1;
-  return docFromJson(history.stack[history.index]);
-}
-
-export function historyCanUndo(history) {
-  return history.index > 0;
-}
-
-export function historyCanRedo(history) {
-  return history.index < history.stack.length - 1;
-}
-
-export function historySnapshotCount(history) {
-  return history.stack.length;
-}
-
-export function cloneHistoryDoc(doc) {
-  return cloneDoc(doc);
 }

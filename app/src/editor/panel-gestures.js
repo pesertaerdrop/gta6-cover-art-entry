@@ -1,8 +1,8 @@
-// panel-gestures.js — the pointer math for the preview: hit-testing a point
-// against the plan's rectangles, dragging to pan a panel, wheeling to zoom,
-// double-clicking to reset, and Shift-dragging one panel onto another to
-// swap their photos. The preview canvas owns the listeners; this module owns
-// the geometry so the gestures stay testable and small.
+// The pointer math for the preview: hit-testing a point against the plan's
+// rectangles, dragging to pan a panel, wheeling to zoom, double-clicking to
+// reset, and Shift-dragging one panel onto another to swap their photos.
+// The preview canvas owns the listeners; this module owns the geometry so
+// the gestures stay testable and small.
 import { panelAtPoint } from '../layouts/plan-cover.js';
 
 export function pointToCanvas(canvas, clientX, clientY) {
@@ -44,31 +44,24 @@ export function endDragSwap(plan, drag, point) {
   if (!drag.shiftKey) return null;
   const target = hitPanel(plan, point);
   if (!target || target.index === drag.panelIndex) return null;
-  return { from: drag.panelIndex, to: target.index };
+  return target.index;
 }
 
-export function swapPanelPhotos(doc, from, to) {
-  const a = doc.panels[from % doc.panels.length];
-  const b = doc.panels[to % doc.panels.length];
-  if (!a || !b || a === b) return false;
-  const photoA = a.photo;
-  const tagA = a.tag;
-  a.photo = b.photo;
-  a.tag = b.tag;
-  b.photo = photoA;
-  b.tag = tagA;
-  return true;
+// Swap the photos of two document panels (their tags stay with the slots).
+export function swapPanelPhotos(doc, a, b) {
+  const photo = doc.panels[a].photo;
+  doc.panels[a].photo = doc.panels[b].photo;
+  doc.panels[b].photo = photo;
 }
 
-export function zoomPanel(slot, factor) {
-  slot.zoom = Math.max(1, Math.min(4, (slot.zoom || 1) * factor));
-  return slot.zoom;
+export function zoomPanel(panel, factor) {
+  panel.zoom = Math.max(1, Math.min(4, (panel.zoom || 1) * factor));
 }
 
-export function resetPanel(slot) {
-  slot.zoom = 1.15;
-  slot.panX = 0;
-  slot.panY = 0;
-  slot.flip = false;
-  return slot;
+export function resetPanel(panel) {
+  panel.zoom = 1;
+  panel.panX = 0;
+  panel.panY = 0;
+  panel.flip = false;
+  panel.faceMarked = false;
 }

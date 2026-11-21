@@ -9,9 +9,9 @@ photos never leave the machine.
 
 ## How it works
 
-1. **Add photos** — tap one of the 14 sample photos, drop your own in, or
-   paste from the clipboard. One invented cast (Vera, Marcus, June, Otis)
-   recurs across the covers, so the callout tags tell one story.
+1. **Add photos** — tap one of the 17 sample photos, drop your own in, or
+   paste from the clipboard. One invented cast — Mira and Suki, a Vice City
+   duo — recurs across the covers, so the callout tags tell one story.
 2. **Caption** — title, script line, tagline ribbon, review quote and
    outlet, billing block, volume tag. All editable.
 3. **Export PNG** — tick the sizes, hit Export all three.
@@ -21,7 +21,7 @@ photos never leave the machine.
 - **7 layouts** (Hero Mosaic, Hero Plus Three, Six Grid, Diagonal Trio,
   Seven Mosaic, Filmstrip, Postcards), drawn as live mini-tiles; changing
   size re-matches photos so every panel stays filled.
-- **6 grades** (Sunset, Neon Night, Golden Hour, Tropic Teal, Heatwave,
+- **6 grades** (Sunset, Neon Night, Golden Hour, Tropic Teal, Ember Blaze,
   Rose Dusk) as gradient-map LUTs with swatch chips.
 - **6 title styles plus Auto** (match grade), giant chrome title, neon
   script overlapping the caps, tagline ribbon with side triangles.
