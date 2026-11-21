@@ -1,64 +1,51 @@
-// The keyboard map, listed in full in the help dialog.
-//
-// Tab or 1–7 selects a panel, arrows pan it, plus and minus zoom it,
-// brackets change its photo, F flips it, R resets it, M marks its face,
-// A runs auto layout, S surprises, E exports, ? opens help, and Ctrl+Z /
-// Ctrl+Y undo and redo. Keys do nothing while the user is typing in a
-// field, so a caption can hold any of these letters.
+// Keyboard shortcuts: the fast path through the editor. Undo and redo
+// follow the platform convention, S surprises, A lays out again, ? opens
+// the help sheet, the arrows nudge the selected panel's photo, and +/-
+// zoom it. Shortcuts never fire while the user is typing in a field.
 import { zoomPanel, resetPanel } from './panel-gestures.js';
-import { nextSamplePhoto } from '../photos/sample-photos.js';
+
+function typingInField() {
+  const el = document.activeElement;
+  return el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT');
+}
 
 export function setupKeyboardShortcuts(studio) {
-  document.addEventListener('keydown', (event) => {
-    const tag = event.target?.tagName;
-    if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
-    if (event.ctrlKey || event.metaKey) {
-      if (event.key.toLowerCase() === 'z' && !event.shiftKey) {
-        event.preventDefault();
-        studio.undo();
-      } else if (event.key.toLowerCase() === 'y' || (event.key.toLowerCase() === 'z' && event.shiftKey)) {
-        event.preventDefault();
-        studio.redo();
-      }
-      return;
-    }
-    const slot = studio.selectedSlot();
-    const plan = studio.currentPlan;
-    const count = plan ? plan.panels.length : 0;
-    switch (event.key) {
-      case 'Tab':
-        event.preventDefault();
-        studio.doc.selected = (studio.doc.selected + (event.shiftKey ? -1 : 1) + count) % count;
-        studio.renderPanelsOnly();
-        break;
-      case '1': case '2': case '3': case '4': case '5': case '6': case '7': {
-        const n = Number(event.key) - 1;
-        if (n < count) {
-          studio.doc.selected = n;
-          studio.renderPanelsOnly();
-        }
-        break;
-      }
-      case 'ArrowLeft': if (slot) { slot.panX = Math.max(-1, (slot.panX || 0) - 0.08); studio.renderPreviewDraft(); } break;
-      case 'ArrowRight': if (slot) { slot.panX = Math.min(1, (slot.panX || 0) + 0.08); studio.renderPreviewDraft(); } break;
-      case 'ArrowUp': if (slot) { slot.panY = Math.max(-1, (slot.panY || 0) - 0.08); studio.renderPreviewDraft(); } break;
-      case 'ArrowDown': if (slot) { slot.panY = Math.min(1, (slot.panY || 0) + 0.08); studio.renderPreviewDraft(); } break;
-      case '+': case '=': if (slot) { zoomPanel(slot, 1.1); studio.renderPreviewDraft(); } break;
-      case '-': case '_': if (slot) { zoomPanel(slot, 0.91); studio.renderPreviewDraft(); } break;
-      case '[': if (slot) { slot.photo = nextSamplePhoto(slot.photo, -1).src; studio.commit('previous photo'); } break;
-      case ']': if (slot) { slot.photo = nextSamplePhoto(slot.photo, 1).src; studio.commit('next photo'); } break;
-      case 'f': case 'F': if (slot) { slot.flip = !slot.flip; studio.commit('flip panel'); } break;
-      case 'r': case 'R': if (slot) { resetPanel(slot); studio.commit('reset panel'); } break;
-      case 'm': case 'M': if (slot) { slot.faceMarked = !slot.faceMarked; studio.commit('mark face'); } break;
-      case 'a': case 'A': studio.autoLayout(); break;
-      case 's': case 'S': studio.surpriseMe(); break;
-      case 'e': case 'E': {
-        const btn = document.getElementById('exportAllBtn');
-        if (btn) btn.click();
-        break;
-      }
-      case '?': studio.openHelp(); break;
-      default: break;
+  document.addEventListener('keydown', (e) => {
+    if (typingInField()) return;
+    const mod = e.ctrlKey || e.metaKey;
+    const doc = studio.doc;
+    const panel = doc.panels[doc.selected];
+    if (mod && e.key.toLowerCase() === 'z' && !e.shiftKey) {
+      e.preventDefault();
+      studio.undo();
+    } else if ((mod && e.key.toLowerCase() === 'y') || (mod && e.shiftKey && e.key.toLowerCase() === 'z')) {
+      e.preventDefault();
+      studio.redo();
+    } else if (e.key === 's' || e.key === 'S') {
+      studio.commit(() => studio.surprise());
+    } else if (e.key === 'a' || e.key === 'A') {
+      studio.commit(() => studio.autoLayout());
+    } else if (e.key === '?') {
+      document.getElementById('helpDialog')?.showModal();
+    } else if (e.key === 'ArrowLeft' || e.key === 'ArrowRight' || e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+      if (!panel) return;
+      e.preventDefault();
+      studio.checkpoint();
+      const step = 0.06;
+      if (e.key === 'ArrowLeft') panel.panX = Math.max(-1, panel.panX - step);
+      if (e.key === 'ArrowRight') panel.panX = Math.min(1, panel.panX + step);
+      if (e.key === 'ArrowUp') panel.panY = Math.max(-1, panel.panY - step);
+      if (e.key === 'ArrowDown') panel.panY = Math.min(1, panel.panY + step);
+      studio.drawPreview();
+    } else if (e.key === '+' || e.key === '=') {
+      if (!panel) return;
+      studio.commit(() => zoomPanel(panel, 1.1));
+    } else if (e.key === '-' || e.key === '_') {
+      if (!panel) return;
+      studio.commit(() => zoomPanel(panel, 0.9));
+    } else if (e.key === '0') {
+      if (!panel) return;
+      studio.commit(() => resetPanel(panel));
     }
   });
 }

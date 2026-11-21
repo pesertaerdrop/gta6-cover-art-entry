@@ -1,133 +1,121 @@
-// The panel inspector card.
-//
-// For the selected panel it shows an 88x88 thumbnail of the panel's photo
-// (drawn with the same poster treatment as the cover), the panel's title
-// and a "smart crop, faces kept whole" note, a zoom slider from 100 to
-// 400 percent, Photo previous/next buttons, Reset, Flip, Swap and
-// Face-mark buttons, and the callout tag field. Every control acts on the
-// selected panel and commits, so undo can step back from it.
+// The panel inspector: the right-rail card for the selected panel. It
+// shows a thumbnail of the panel's photo, the panel's name and note, a
+// zoom slider, photo stepping, and the framing buttons (reset, flip,
+// swap with the next panel, mark face) plus the callout tag field. Every
+// control commits through the studio, so each change is undoable. Sliders
+// and the tag field checkpoint when the user grabs them, so one drag or
+// one edit is one undo step even though the preview moves live.
 import { drawPanelPhoto } from '../effects/poster-photo.js';
-import { zoomPanel, resetPanel, swapPanelPhotos } from './panel-gestures.js';
 import { nextSamplePhoto, labelOf } from '../photos/sample-photos.js';
+import { resetPanel } from './panel-gestures.js';
 
-// A small button in a row, wired to a handler.
-function rowButton(label, onClick) {
-  const btn = document.createElement('button');
-  btn.type = 'button';
-  btn.textContent = label;
-  btn.addEventListener('click', onClick);
-  return btn;
+function thumbOf(studio, panel) {
+  const canvas = document.createElement('canvas');
+  canvas.width = 176;
+  canvas.height = 176;
+  const img = studio.images.get(panel.photo);
+  const grade = studio.plan ? studio.plan.grade : null;
+  if (img) {
+    const ctx = canvas.getContext('2d');
+    drawPanelPhoto(ctx, img, { x: 0, y: 0, w: 176, h: 176 }, panel, studio.doc.look, grade);
+  }
+  return canvas;
 }
 
 export function renderInspector(studio) {
-  const host = document.getElementById('inspectorBody');
-  if (!host) return;
+  const body = document.getElementById('inspectorBody');
+  if (!body) return;
   const doc = studio.doc;
-  const panel = doc.panels[doc.selected];
-  host.innerHTML = '';
-  if (!panel) {
-    host.textContent = 'No panel selected.';
-    return;
-  }
-  const img = studio.images.get(panel.photo);
-
-  // Head: the thumbnail and the panel's name.
-  const head = document.createElement('div');
-  head.className = 'inspector-thumb';
-  const thumb = document.createElement('canvas');
-  thumb.width = 88;
-  thumb.height = 88;
-  const thumbCtx = thumb.getContext('2d');
-  thumbCtx.fillStyle = '#222';
-  thumbCtx.fillRect(0, 0, 88, 88);
-  if (img) {
-    drawPanelPhoto(thumbCtx, img, { x: 0, y: 0, w: 88, h: 88 }, panel, doc.look, doc.grade);
-  }
+  const panel = doc.panels[doc.selected] || doc.panels[0];
+  const index = doc.panels.indexOf(panel);
+  body.innerHTML = '';
+  const wrap = document.createElement('div');
+  wrap.className = 'inspector-thumb';
+  wrap.appendChild(thumbOf(studio, panel));
   const who = document.createElement('div');
   who.className = 'who';
-  who.textContent = `Panel ${doc.selected + 1} — ${labelOf(panel.photo)}`;
+  who.textContent = `Panel ${index + 1} \u2014 ${labelOf(panel.photo)}`;
   const note = document.createElement('small');
   note.textContent = 'Smart crop, faces kept whole';
   who.appendChild(note);
-  head.appendChild(thumb);
-  head.appendChild(who);
-  host.appendChild(head);
+  wrap.appendChild(who);
+  body.appendChild(wrap);
 
-  // Zoom: a slider from 100 to 400 percent with a live value. Dragging
-  // re-renders in draft; releasing commits.
   const zoomRow = document.createElement('div');
   zoomRow.className = 'slider-row';
   const zoomLabel = document.createElement('label');
   zoomLabel.textContent = 'Zoom';
-  zoomLabel.htmlFor = 'inspectorZoom';
   const zoom = document.createElement('input');
   zoom.type = 'range';
-  zoom.id = 'inspectorZoom';
-  zoom.min = '100';
-  zoom.max = '400';
-  zoom.step = '5';
-  zoom.value = String(Math.round((panel.zoom || 1) * 100));
+  zoom.min = '60';
+  zoom.max = '300';
+  zoom.value = String(Math.round((panel.zoom || 1.15) * 100));
   const zoomOut = document.createElement('output');
-  zoomOut.textContent = `${Math.round((panel.zoom || 1) * 100)}%`;
+  zoomOut.textContent = `${Math.round((panel.zoom || 1.15) * 100)}%`;
+  zoom.addEventListener('pointerdown', () => studio.checkpoint());
   zoom.addEventListener('input', () => {
     panel.zoom = Number(zoom.value) / 100;
     zoomOut.textContent = `${zoom.value}%`;
-    studio.renderPreviewDraft();
+    studio.drawPreview();
   });
-  zoom.addEventListener('change', () => studio.commit('zoom panel'));
-  zoomRow.appendChild(zoomLabel);
-  zoomRow.appendChild(zoom);
-  zoomRow.appendChild(zoomOut);
-  host.appendChild(zoomRow);
+  zoom.addEventListener('change', () => studio.drawPreview());
+  zoomRow.append(zoomLabel, zoom, zoomOut);
+  body.appendChild(zoomRow);
 
-  // Photo: step to the previous or next sample photo in the library.
-  const photoRow = document.createElement('div');
-  photoRow.className = 'btn-row';
-  photoRow.appendChild(rowButton('← Photo', () => {
-    panel.photo = nextSamplePhoto(panel.photo, -1).src;
-    studio.commit('previous photo');
-  }));
-  photoRow.appendChild(rowButton('Photo →', () => {
-    panel.photo = nextSamplePhoto(panel.photo, 1).src;
-    studio.commit('next photo');
-  }));
-  host.appendChild(photoRow);
+  const stepRow = document.createElement('div');
+  stepRow.className = 'btn-row';
+  const prev = document.createElement('button');
+  prev.type = 'button';
+  prev.textContent = '\u2190 Photo';
+  prev.addEventListener('click', () => studio.commit(() => { panel.photo = nextSamplePhoto(panel.photo, -1); }));
+  const next = document.createElement('button');
+  next.type = 'button';
+  next.textContent = 'Photo \u2192';
+  next.addEventListener('click', () => studio.commit(() => { panel.photo = nextSamplePhoto(panel.photo, 1); }));
+  stepRow.append(prev, next);
+  body.appendChild(stepRow);
 
-  // Actions: reset the crop, flip the photo, swap with the next panel,
-  // and mark (or unmark) the face so the crop keeps it whole.
-  const actionRow = document.createElement('div');
-  actionRow.className = 'btn-row';
-  actionRow.appendChild(rowButton('Reset', () => { resetPanel(panel); studio.commit('reset panel'); }));
-  actionRow.appendChild(rowButton('Flip', () => { panel.flip = !panel.flip; studio.commit('flip panel'); }));
-  actionRow.appendChild(rowButton('Swap', () => {
-    const other = (doc.selected + 1) % doc.panels.length;
-    swapPanelPhotos(doc, doc.selected, other);
-    studio.commit('swap panels');
-  }));
-  actionRow.appendChild(rowButton(panel.faceMarked ? 'Face marked ✓' : 'Mark face', () => {
-    panel.faceMarked = !panel.faceMarked;
-    studio.commit('mark face');
-  }));
-  host.appendChild(actionRow);
+  const frameRow = document.createElement('div');
+  frameRow.className = 'btn-row';
+  const mkBtn = (text, fn) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.textContent = text;
+    b.addEventListener('click', () => studio.commit(fn));
+    return b;
+  };
+  frameRow.append(
+    mkBtn('Reset', () => resetPanel(panel)),
+    mkBtn('Flip', () => { panel.flip = !panel.flip; }),
+    mkBtn('Swap', () => {
+      const j = (index + 1) % doc.panels.length;
+      const a = doc.panels[index];
+      const b = doc.panels[j];
+      const photo = a.photo;
+      const tag = a.tag;
+      a.photo = b.photo;
+      a.tag = b.tag;
+      b.photo = photo;
+      b.tag = tag;
+    }),
+    mkBtn('Mark face', () => { panel.faceMarked = !panel.faceMarked; }),
+  );
+  body.appendChild(frameRow);
 
-  // Callout tag: free text, uppercased, at most 16 characters. Typing
-  // re-renders live; leaving the field commits.
   const tagField = document.createElement('div');
   tagField.className = 'field';
   const tagLabel = document.createElement('label');
   tagLabel.textContent = 'Callout tag';
-  tagLabel.htmlFor = 'inspectorTag';
   const tagInput = document.createElement('input');
   tagInput.type = 'text';
-  tagInput.id = 'inspectorTag';
-  tagInput.maxLength = 16;
   tagInput.value = panel.tag || '';
+  tagInput.maxLength = 24;
+  tagInput.addEventListener('focus', () => studio.checkpoint());
   tagInput.addEventListener('input', () => {
     panel.tag = tagInput.value.toUpperCase();
-    studio.renderPreviewOnly();
+    studio.drawPreview();
   });
-  tagInput.addEventListener('change', () => studio.commit('edit tag'));
-  tagField.appendChild(tagLabel);
-  tagField.appendChild(tagInput);
-  host.appendChild(tagField);
+  tagInput.addEventListener('change', () => studio.drawPreview());
+  tagField.append(tagLabel, tagInput);
+  body.appendChild(tagField);
 }

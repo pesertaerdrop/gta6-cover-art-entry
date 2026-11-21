@@ -1,18 +1,10 @@
-// Saltline Cover Studio — entry point.
-//
-// The studio object is the one thing every editor module shares: the
-// document (doc), its undo history, the loaded photos (images, keyed by
-// source), the uploaded photos (uploaded), the last plan the preview drew
-// (currentPlan), the preview's draw handle, and the verbs render / commit /
-// undo / redo that every module calls. boot() wires the modules, preloads
-// the seventeen sample photos, and either draws a ?shot= cover scene
-// full-frame (for the screenshots) or opens the editor.
-//
-// Saltline Cover Studio: turn any photo and a caption into GTA-style cover
-// art — multi-panel posters with callout tags, a seal, a review bar, a
-// barcode and a giant chrome title in its own title field along the foot
-// of the cover — and export the PNG in three post sizes (1080x1080,
-// 1080x1350, 1920x1080).
+// Saltline Cover Studio: the boot and the studio. The studio is the one
+// object every editor module shares: the document, the loaded photos, the
+// undo history, and the three verbs the UI runs on — checkpoint (remember
+// the document before a drag starts), commit (remember, mutate, redraw)
+// and redraw (re-plan and repaint every card). The boot loads the photos
+// and the local fonts first, then either draws one cover full-frame for
+// a ?shot= scene or opens the workbench.
 import { defaultDoc } from './state/default-doc.js';
 import { createUndoHistory } from './state/undo-history.js';
 import { SAMPLE_PHOTOS } from './photos/sample-photos.js';
@@ -31,21 +23,6 @@ import { setupHelpDialog } from './editor/help-dialog.js';
 import { setupCaptionFields, syncCaptionFields } from './editor/caption-fields.js';
 import { sceneFromUrl, sceneMode } from './shot/shot-scenes.js';
 
-// The studio: one object, built up below, so the modules never import
-// each other — they all take `studio` and call its verbs.
-const studio = {
-  doc: defaultDoc(),
-  history: createUndoHistory(),
-  images: new Map(),
-  uploaded: new Map(),
-  currentPlan: null,
-  preview: null,
-  step: 1,
-  openHelp: () => {},
-};
-
-// Load one image by source, resolving to null (never rejecting) so a
-// missing file cannot stop the preload.
 function loadImage(src) {
   return new Promise((resolve) => {
     const img = new Image();
@@ -55,120 +32,122 @@ function loadImage(src) {
   });
 }
 
-// Preload every sample photo in parallel, keeping the ones that load.
-async function preloadSamples() {
-  const jobs = SAMPLE_PHOTOS.map(async (photo) => {
-    const img = await loadImage(`./${photo.src}`);
-    if (img) studio.images.set(photo.src, img);
-  });
-  await Promise.all(jobs);
+async function loadAllPhotos(doc) {
+  const srcs = [...new Set([...SAMPLE_PHOTOS.map((p) => p.src), ...doc.panels.map((p) => p.photo)])];
+  const map = new Map();
+  for (const src of srcs) {
+    const img = await loadImage(src);
+    if (img) map.set(src, img);
+  }
+  return map;
 }
 
-// The selected panel's slot, or null when nothing is selected.
-studio.selectedSlot = () => studio.doc.panels[studio.doc.selected] ?? null;
-
-studio.uploadedCount = () => studio.uploaded.size;
-
-// Take files the user added (picker, drop, paste): keep the images, put
-// each one in the tray under an upload: key, and fill the selected panel
-// with the last one. Nothing leaves the machine.
-studio.addUploadedFiles = async (files) => {
-  const list = [...files].filter((file) => file.type.startsWith('image/'));
-  for (const file of list) {
-    const url = URL.createObjectURL(file);
-    const img = await loadImage(url);
-    if (!img) continue;
-    const key = `upload:${file.name}:${Date.now()}`;
-    studio.uploaded.set(key, img);
-    studio.images.set(key, img);
-    const slot = studio.selectedSlot();
-    if (slot) slot.photo = key;
-  }
-  studio.commit('add photos');
-};
-
-// Re-render the preview only (full quality), in draft (fast, per-pixel
-// pass skipped) for a drag, or just the panels when the selection moves.
-studio.renderPreviewOnly = () => {
-  if (studio.preview) studio.currentPlan = studio.preview.draw(false);
-};
-
-studio.renderPreviewDraft = () => {
-  if (studio.preview) studio.currentPlan = studio.preview.draw(true);
-};
-
-studio.renderPanelsOnly = () => {
-  studio.renderPreviewOnly();
-  renderInspector(studio);
-};
-
-// Re-render everything: the preview and every picker, inspector, slider
-// and caption field, and the undo/redo buttons' disabled state.
-studio.render = () => {
-  studio.currentPlan = planCover(studio.doc);
-  studio.renderPreviewOnly();
-  renderInspector(studio);
-  renderLookSliders(studio);
-  renderLayoutPicker(studio);
-  renderGradePicker(studio);
-  renderTitlePicker(studio);
-  renderSizePicker(studio);
-  syncCaptionFields(studio.doc);
-  const undoBtn = document.getElementById('undoBtn');
-  const redoBtn = document.getElementById('redoBtn');
-  if (undoBtn) undoBtn.disabled = !studio.history.canUndo();
-  if (redoBtn) redoBtn.disabled = !studio.history.canRedo();
-};
-
-// Commit the document as it stands (push the pre-change snapshot with a
-// label) and re-render, so undo can step back to it.
-studio.commit = (label) => {
-  studio.history.push(studio.doc, label, studio.doc.size);
-  studio.render();
-};
-
-studio.undo = () => {
-  if (studio.history.undo(studio.doc)) studio.render();
-};
-
-studio.redo = () => {
-  if (studio.history.redo(studio.doc)) studio.render();
-};
-
-studio.setStep = (step) => {
-  studio.step = step;
-  markStep(step);
-};
-
-studio.autoLayout = () => applyAutoLayout(studio);
-studio.surpriseMe = () => applySurpriseMe(studio);
-studio.syncCaptionFields = () => syncCaptionFields(studio.doc);
-
-// Boot: apply a ?shot= scene if one is named, preload the samples, wait
-// for the fonts (fallbacks cover a failure), then either draw the cover
-// scene full-frame for a screenshot or open the editor.
-async function boot() {
-  const scene = sceneFromUrl();
-  if (scene) applyShotScene(studio.doc, scene);
-  await preloadSamples();
+async function loadFonts() {
+  const wants = ['16px Anton', '16px "Mr Dafoe"', '600 16px Oswald', '700 16px "Archivo Black"', '16px "Fascinate Inline"'];
   try {
+    await Promise.race([
+      Promise.all(wants.map((f) => document.fonts.load(f))),
+      new Promise((r) => setTimeout(r, 3000)),
+    ]);
     await document.fonts.ready;
   } catch {
-    // Fonts are decorative; the canvas still draws with fallbacks.
+    // A missing face falls back to the stack in the CSS; never block boot.
   }
+}
+
+function createStudio(doc, images) {
+  const history = createUndoHistory(50);
+  let lastSnap = null;
+  const studio = {
+    doc,
+    images,
+    history,
+    plan: planCover(doc),
+    previewScale: 1,
+    previewPlan: null,
+
+    checkpoint() {
+      const snap = JSON.stringify(this.doc);
+      if (snap !== lastSnap) {
+        this.history.push(this.doc);
+        lastSnap = snap;
+      }
+    },
+
+    commit(mutator) {
+      this.checkpoint();
+      mutator(this.doc);
+      this.redraw();
+    },
+
+    redraw() {
+      this.plan = planCover(this.doc);
+      this.drawPreview();
+      renderInspector(this);
+      renderLookSliders(this);
+      renderLayoutPicker(this);
+      renderGradePicker(this);
+      renderTitlePicker(this);
+      renderSizePicker(this);
+      renderPhotoTray(this);
+      syncCaptionFields(this.doc);
+      const undo = document.getElementById('undoBtn');
+      const redo = document.getElementById('redoBtn');
+      if (undo) undo.disabled = !this.history.canUndo();
+      if (redo) redo.disabled = !this.history.canRedo();
+    },
+
+    select(index) {
+      this.doc.selected = index;
+      this.redraw();
+    },
+
+    undo() {
+      const prev = this.history.undo();
+      if (!prev) return;
+      this.doc = prev;
+      lastSnap = JSON.stringify(this.doc);
+      this.redraw();
+    },
+
+    redo() {
+      const next = this.history.redo();
+      if (!next) return;
+      this.doc = next;
+      lastSnap = JSON.stringify(this.doc);
+      this.redraw();
+    },
+
+    autoLayout() {
+      applyAutoLayout(this);
+    },
+
+    surprise() {
+      applySurpriseMe(this);
+    },
+  };
+  history.push(doc);
+  lastSnap = JSON.stringify(doc);
+  return studio;
+}
+
+async function boot() {
+  const doc = defaultDoc();
+  const scene = sceneFromUrl();
+  if (scene) applyShotScene(doc, scene);
+  const images = await loadAllPhotos(doc);
+  await loadFonts();
   if (scene && sceneMode(scene) === 'cover') {
     document.body.classList.add('shot-cover');
-    const plan = planCover(studio.doc);
     const canvas = document.getElementById('shotCanvas');
+    const plan = planCover(doc);
     canvas.width = plan.w;
     canvas.height = plan.h;
-    const ctx = canvas.getContext('2d');
-    renderCover(ctx, studio.doc, studio.images, { draft: false });
-    document.title = 'saltline-ready';
+    renderCover(canvas.getContext('2d'), doc, images);
     return;
   }
-  studio.preview = setupPreviewCanvas(studio);
-  renderPhotoTray(studio);
+  const studio = createStudio(doc, images);
+  setupPreviewCanvas(studio);
   setupPhotoInput(studio);
   setupStepBar(studio);
   setupExportPanel(studio);
@@ -176,8 +155,8 @@ async function boot() {
   setupCoverActions(studio);
   setupHelpDialog(studio);
   setupCaptionFields(studio);
-  studio.render();
-  document.title = 'saltline-ready';
+  studio.redraw();
+  markStep(1);
 }
 
 boot();

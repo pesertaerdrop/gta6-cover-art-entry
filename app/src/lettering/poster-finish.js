@@ -1,149 +1,141 @@
-// The small finish pieces: the billing line, the generated barcode, the
-// seal, the volume tag and the COMING SOON line.
-//
-// The billing line shrinks to fit its box (about 8% per step) down to a
-// floor of the larger of 8 px and 55% of the requested size; if it still
-// does not fit, it falls back to a two-line wrapped block. The ellipsis
-// path is gone — a billing line is never cut off with dots. The billing
-// line sits inside the title field, on the field's own dark gradient, so
-// white text always reads.
+// The poster finish: the small systems that make a cover read as a
+// poster on every size — the billing line, the barcode, the gold seal,
+// the volume tag and the COMING SOON flag. Each is drawn with plain canvas
+// shapes and the Oswald/Anton faces, so the finish is identical in the
+// browser and in the exported PNG.
+const INK = '#141210';
+const GOLD = '#e8a317';
+const PAPER = '#f6efe4';
+
+// Fit one line of text into a rect by shrinking it step by step; the
+// billing must read whole on every cover, so the floor is low and the
+// fallback wraps to a second line only when shrinking cannot save it.
 export function drawBillingLine(ctx, rect, text) {
-  if (!text) return;
-  const upper = text.toUpperCase();
-  const startSize = rect.h * 0.92;
-  const floor = Math.max(8, startSize * 0.45);
-  let size = startSize;
+  let size = Math.round(rect.h * 0.72);
+  const face = (s) => `600 ${s}px Oswald, "Archivo Black", sans-serif`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.font = `bold ${size}px "Oswald", sans-serif`;
-  let width = ctx.measureText(upper).width;
-  while (width > rect.w && size > floor) {
-    size *= 0.92;
-    ctx.font = `bold ${size}px "Oswald", sans-serif`;
-    width = ctx.measureText(upper).width;
+  while (size > 8) {
+    ctx.font = face(size);
+    if (ctx.measureText(text).width <= rect.w) break;
+    size = Math.max(8, Math.floor(size * 0.92));
   }
-  ctx.fillStyle = '#ffffff';
-  if (width <= rect.w) {
-    ctx.fillText(upper, rect.x + rect.w / 2, rect.y + rect.h / 2);
-    return;
-  }
-  drawBillingBlock(ctx, rect, upper, floor);
+  ctx.fillStyle = PAPER;
+  ctx.font = face(size);
+  ctx.fillText(text.toUpperCase(), rect.x + rect.w / 2, rect.y + rect.h / 2);
+  return size;
 }
 
-// The two-line fallback: split the billing text at the word nearest the
-// middle, and draw both halves centred.
+// The billing block: the production line at a given size, shrinking to
+// fit the rect the same way the single line does.
 export function drawBillingBlock(ctx, rect, text, size) {
-  const words = text.split(' ');
-  let best = 1;
-  let bestDiff = Infinity;
-  for (let i = 1; i < words.length; i++) {
-    const left = words.slice(0, i).join(' ').length;
-    const diff = Math.abs(left - text.length / 2);
-    if (diff < bestDiff) {
-      bestDiff = diff;
-      best = i;
-    }
-  }
-  const line1 = words.slice(0, best).join(' ');
-  const line2 = words.slice(best).join(' ');
-  ctx.font = `bold ${size}px "Oswald", sans-serif`;
+  let s = size || Math.round(rect.h * 0.72);
+  const face = (v) => `600 ${v}px Oswald, "Archivo Black", sans-serif`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillStyle = '#ffffff';
-  ctx.fillText(line1, rect.x + rect.w / 2, rect.y + rect.h * 0.28);
-  ctx.fillText(line2, rect.x + rect.w / 2, rect.y + rect.h * 0.72);
+  while (s > 8) {
+    ctx.font = face(s);
+    if (ctx.measureText(text).width <= rect.w) break;
+    s = Math.max(8, Math.floor(s * 0.92));
+  }
+  ctx.fillStyle = PAPER;
+  ctx.font = face(s);
+  ctx.fillText(text.toUpperCase(), rect.x + rect.w / 2, rect.y + rect.h / 2);
+  return s;
 }
 
-// The barcode: a white box, black bars generated deterministically from
-// the code (a hash of the title), and the code's characters under it.
+// A barcode: bar widths from a hash of the code, so the same code always
+// draws the same bars, with the code itself in tiny caps underneath.
 export function drawBarcode(ctx, x, y, w, h, code) {
-  const digits = String(code || 'SALTLINE').replace(/[^A-Z0-9]/gi, '').toUpperCase() || 'SALTLINE';
-  const barH = h * 0.72;
+  const label = (code || 'SALTLINE').toUpperCase();
   ctx.fillStyle = '#ffffff';
   ctx.fillRect(x, y, w, h);
-  let hash = 2166136261;
-  for (let i = 0; i < digits.length; i++) {
-    hash ^= digits.charCodeAt(i);
-    hash = Math.imul(hash, 16777619);
-  }
-  let seed = hash >>> 0;
-  const next = () => {
-    seed = (seed * 1664525 + 1013904223) >>> 0;
-    return seed / 4294967296;
-  };
-  let bx = x + w * 0.05;
-  const endX = x + w * 0.95;
+  let seed = 0;
+  for (let i = 0; i < label.length; i++) seed = (seed * 31 + label.charCodeAt(i)) >>> 0;
+  const barH = h * 0.72;
+  let bx = x + w * 0.06;
+  const end = x + w * 0.94;
   ctx.fillStyle = '#111111';
-  while (bx < endX - 2) {
-    const bw = 1 + next() * (w * 0.02);
-    if (next() > 0.4) ctx.fillRect(bx, y + h * 0.06, bw, barH);
-    bx += bw + 1 + next() * 2;
+  while (bx < end) {
+    seed = (seed * 1103515245 + 12345) >>> 0;
+    const bw = 1 + (seed % 4) * (w / 90);
+    const gap = 1 + ((seed >> 8) % 3) * (w / 110);
+    if ((seed >> 4) % 3 !== 0) ctx.fillRect(bx, y + h * 0.08, bw, barH);
+    bx += bw + gap;
   }
-  ctx.fillStyle = '#111111';
-  ctx.font = `${Math.max(8, h * 0.14)}px "Oswald", sans-serif`;
+  ctx.fillStyle = INK;
+  ctx.font = `600 ${Math.max(7, Math.round(h * 0.16))}px Oswald, sans-serif`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillText(digits.slice(0, 12), x + w / 2, y + h * 0.88);
+  ctx.fillText(label, x + w / 2, y + h * 0.9);
 }
 
-// The seal: a gold disc with a dark ring, a star, the studio name and the
-// year, sitting on a mosaic corner.
+// The gold seal: a double-ringed circle with a star, SALTLINE and the
+// founding year, stamped over the panel band's top-right corner.
 export function drawSeal(ctx, x, y, size) {
-  const cx = x + size / 2;
-  const cy = y + size / 2;
   const r = size / 2;
+  const cx = x + r;
+  const cy = y + r;
   ctx.save();
   ctx.beginPath();
   ctx.arc(cx, cy, r, 0, Math.PI * 2);
-  ctx.fillStyle = '#f5c542';
+  ctx.fillStyle = GOLD;
   ctx.fill();
-  ctx.lineWidth = Math.max(2, size * 0.05);
-  ctx.strokeStyle = '#1a0b2e';
+  ctx.lineWidth = Math.max(2, size * 0.04);
+  ctx.strokeStyle = INK;
   ctx.stroke();
   ctx.beginPath();
-  ctx.arc(cx, cy, r * 0.78, 0, Math.PI * 2);
+  ctx.arc(cx, cy, r * 0.82, 0, Math.PI * 2);
   ctx.lineWidth = Math.max(1, size * 0.02);
   ctx.stroke();
-  ctx.fillStyle = '#1a0b2e';
+  // Five-point star.
+  ctx.beginPath();
+  for (let i = 0; i < 10; i++) {
+    const ang = -Math.PI / 2 + (i * Math.PI) / 5;
+    const rad = i % 2 === 0 ? r * 0.30 : r * 0.13;
+    const px = cx + Math.cos(ang) * rad;
+    const py = cy + r * 0.18 + Math.sin(ang) * rad;
+    if (i === 0) ctx.moveTo(px, py);
+    else ctx.lineTo(px, py);
+  }
+  ctx.closePath();
+  ctx.fillStyle = INK;
+  ctx.fill();
+  ctx.fillStyle = INK;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.font = `bold ${size * 0.22}px "Oswald", sans-serif`;
-  ctx.fillText('★', cx, cy - r * 0.42);
-  ctx.font = `bold ${size * 0.13}px "Oswald", sans-serif`;
-  ctx.fillText('SALTLINE', cx, cy + r * 0.08);
-  ctx.font = `${size * 0.1}px "Oswald", sans-serif`;
-  ctx.fillText('EST. 2026', cx, cy + r * 0.45);
+  ctx.font = `700 ${Math.max(8, Math.round(size * 0.13))}px Anton, "Archivo Black", sans-serif`;
+  ctx.fillText('SALTLINE', cx, cy + r * 0.48);
+  ctx.font = `600 ${Math.max(6, Math.round(size * 0.09))}px Oswald, sans-serif`;
+  ctx.fillText('EST. 2026', cx, cy + r * 0.68);
   ctx.restore();
 }
 
-// The volume tag: a dark chip with a gold border, e.g. "VOL. 3".
-export function drawVolTag(ctx, x, y, vol) {
-  if (!vol) return;
-  const text = String(vol).toUpperCase();
-  const fontSize = 15;
-  ctx.font = `bold ${fontSize}px "Oswald", sans-serif`;
-  const pad = 10;
+// The volume tag: a black chip with a gold edge, bottom-left of the
+// panel band. The optional height scales it to the cover.
+export function drawVolTag(ctx, x, y, vol, h) {
+  const text = (vol || 'VOL. 1').toUpperCase();
+  const height = h || 30;
+  ctx.font = `700 ${Math.max(10, Math.round(height * 0.6))}px Oswald, sans-serif`;
+  const pad = Math.round(height * 0.4);
   const w = ctx.measureText(text).width + pad * 2;
-  const h = fontSize * 1.9;
-  ctx.fillStyle = 'rgba(10,8,16,0.88)';
-  ctx.fillRect(x, y, w, h);
-  ctx.strokeStyle = '#f5c542';
-  ctx.lineWidth = 1.5;
-  ctx.strokeRect(x + 0.75, y + 0.75, w - 1.5, h - 1.5);
-  ctx.fillStyle = '#f5c542';
+  ctx.fillStyle = INK;
+  ctx.fillRect(x, y, w, height);
+  ctx.lineWidth = 2;
+  ctx.strokeStyle = GOLD;
+  ctx.strokeRect(x + 1, y + 1, w - 2, height - 2);
+  ctx.fillStyle = GOLD;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillText(text, x + w / 2, y + h / 2 + 1);
+  ctx.fillText(text, x + w / 2, y + height / 2 + 1);
 }
 
-// COMING SOON, top-left, gold with a dark shadow so it reads over any photo.
+// COMING SOON in gold caps across the panel band's top-left corner.
 export function drawComingSoon(ctx, x, y, coverW) {
-  const fontSize = Math.max(13, coverW * 0.02);
-  ctx.font = `bold ${fontSize}px "Archivo Black", sans-serif`;
+  const size = Math.max(16, Math.round(coverW * 0.022));
+  ctx.font = `700 ${size}px Oswald, "Archivo Black", sans-serif`;
   ctx.textAlign = 'left';
   ctx.textBaseline = 'top';
-  ctx.fillStyle = 'rgba(10,8,16,0.7)';
-  ctx.fillText('COMING SOON', x + 2, y + 2);
-  ctx.fillStyle = '#f5c542';
+  ctx.fillStyle = GOLD;
   ctx.fillText('COMING SOON', x, y);
 }

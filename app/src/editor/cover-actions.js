@@ -1,61 +1,50 @@
-// The one-tap cover actions.
-//
-// Auto layout picks the layout whose panel count fits the photos best
-// (fewest panels wasted, ties broken by layout id) and re-matches the
-// panels to it. Surprise me rolls a new layout, a new grade and a new
-// caption from the deck, and fills the caption fields from it. The header
-// undo/redo buttons call the studio's undo and redo.
+// Cover actions: the two one-click moves in the top bar and the tray.
+// Auto layout picks the layout that fits the panel count and refills the
+// panels; Surprise me shuffles the layout, the grade, the caption and
+// the title style, so one click is a whole new poster. Undo and redo are
+// wired here too, next to the buttons they serve.
+import { GRADE_ORDER } from '../effects/grade-presets.js';
+import { TITLE_STYLE_ORDER } from '../lettering/title-styles.js';
 import { CAPTION_DECK } from '../state/default-doc.js';
-import { LAYOUT_LIST, layoutPanelCount } from '../layouts/layout-presets.js';
-import { GRADES } from '../effects/grade-presets.js';
-import { rematchPanels } from '../layouts/plan-cover.js';
+import { LAYOUT_LIST } from '../layouts/layout-presets.js';
+import { autoLayoutFor, rematchPanels } from '../layouts/plan-cover.js';
 
-// The layout whose panel count is closest to the document's panel count.
+function pick(arr) {
+  return arr[Math.floor(Math.random() * arr.length)];
+}
+
 export function pickAutoLayout(doc) {
-  const scored = LAYOUT_LIST.map((layout) => ({
-    layout,
-    fit: Math.abs(layoutPanelCount(layout.id) - doc.panels.length),
-  }));
-  scored.sort((a, b) => a.fit - b.fit || (a.layout.id < b.layout.id ? -1 : 1));
-  return scored[0].layout.id;
+  return autoLayoutFor(doc);
 }
 
 export function applyAutoLayout(studio) {
-  const doc = studio.doc;
-  doc.layout = pickAutoLayout(doc);
-  doc.panels = rematchPanels(doc, doc.layout);
-  doc.selected = 0;
-  studio.commit('auto layout');
+  const layout = pickAutoLayout(studio.doc);
+  rematchPanels(studio.doc, layout);
+  studio.redraw();
 }
 
-// A fresh cover: a random layout, a random grade, a random deck caption
-// (with its fields written into the document), title style back to Auto,
-// and the panels re-matched to the new layout.
 export function applySurpriseMe(studio) {
   const doc = studio.doc;
-  const layout = LAYOUT_LIST[Math.floor(Math.random() * LAYOUT_LIST.length)];
-  const grade = GRADES[Math.floor(Math.random() * GRADES.length)];
-  const captionIndex = Math.floor(Math.random() * CAPTION_DECK.length);
-  const caption = CAPTION_DECK[captionIndex];
-  doc.layout = layout.id;
-  doc.grade = grade.id;
-  doc.titleStyle = 'auto';
-  doc.caption = captionIndex;
-  for (const field of ['title', 'script', 'tagline', 'quote', 'outlet', 'billing', 'vol', 'comingSoon']) {
-    doc[field] = caption[field];
+  doc.layout = pick(LAYOUT_LIST).id;
+  rematchPanels(doc, doc.layout);
+  doc.grade = pick(GRADE_ORDER);
+  doc.caption = Math.floor(Math.random() * CAPTION_DECK.length);
+  doc.titleStyle = Math.random() < 0.5 ? 'auto' : pick(TITLE_STYLE_ORDER);
+  for (const panel of doc.panels) {
+    panel.zoom = 1 + Math.random() * 0.35;
+    panel.panX = (Math.random() - 0.5) * 0.5;
+    panel.panY = (Math.random() - 0.5) * 0.5;
   }
-  doc.panels = rematchPanels(doc, doc.layout);
-  doc.selected = 0;
-  studio.commit('surprise me');
+  studio.redraw();
 }
 
 export function setupCoverActions(studio) {
-  const autoBtn = document.getElementById('autoLayoutBtn');
-  const surpriseBtn = document.getElementById('surpriseBtn');
-  const undoBtn = document.getElementById('undoBtn');
-  const redoBtn = document.getElementById('redoBtn');
-  if (autoBtn) autoBtn.addEventListener('click', () => studio.autoLayout());
-  if (surpriseBtn) surpriseBtn.addEventListener('click', () => studio.surpriseMe());
-  if (undoBtn) undoBtn.addEventListener('click', () => studio.undo());
-  if (redoBtn) redoBtn.addEventListener('click', () => studio.redo());
+  const surprise = document.getElementById('surpriseBtn');
+  if (surprise) surprise.addEventListener('click', () => studio.commit(() => applySurpriseMe(studio)));
+  const auto = document.getElementById('autoLayoutBtn');
+  if (auto) auto.addEventListener('click', () => studio.commit(() => applyAutoLayout(studio)));
+  const undo = document.getElementById('undoBtn');
+  if (undo) undo.addEventListener('click', () => studio.undo());
+  const redo = document.getElementById('redoBtn');
+  if (redo) redo.addEventListener('click', () => studio.redo());
 }

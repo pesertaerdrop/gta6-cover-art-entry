@@ -1,165 +1,119 @@
-// Turns a document into a concrete cover plan: pixel rectangles for every
-// panel (with gutters and white borders), the title field and every
-// rectangle inside it, the resolved title style, and the panels the
-// document describes. Also the caption lookup, the shot-scene applier, and
-// the auto-layout picker.
-//
-// The title field is the cover's own ground: the bottom 38% of the frame
-// belongs to the title cluster — the script line, the giant chrome title,
-// the tagline ribbon, the review bar and the billing line. The mosaic
-// layouts are compressed into the top 62%, so a panel can never run under
-// a letter and a title can never cover a face. The field is a designed
-// surface (a grade-tinted gradient with a palm, grid or skyline motif),
-// not a strip painted over photos: nothing is hidden behind it, because
-// nothing was ever drawn there.
+// The cover plan: where every panel and the title field sit, and which
+// caption the cover shows. A cover is two bands: the panel band on top
+// (62% of the height) and the title field below it (38%). The plan is a
+// plain object the renderer, the inspector and the gesture code all read:
+//   { size, w, h, panelArea, field, panels, caption, style, grade }
+// where panels carry both their rect and their document data (photo, tag,
+// zoom, pan, flip), merged so the renderer never looks the doc up again.
 import { CAPTION_DECK } from '../state/default-doc.js';
-import { rectsForLayout, layoutPanelCount } from './layout-presets.js';
-import { resolveTitleStyle } from '../lettering/title-styles.js';
 import { SAMPLE_PHOTOS } from '../photos/sample-photos.js';
+import { rectsForLayout, layoutPanelCount } from './layout-presets.js';
+import { gradeById } from '../effects/grade-presets.js';
+import { resolveTitleStyle } from '../lettering/title-styles.js';
 
 export const SIZES = {
-  '16:9': { w: 1280, h: 720 },
-  '4:5': { w: 1024, h: 1280 },
-  '1:1': { w: 1080, h: 1080 },
+  '16:9': { w: 1920, h: 1080, label: '16:9 wide' },
+  '4:5': { w: 1080, h: 1350, label: '4:5 portrait' },
+  '1:1': { w: 1080, h: 1080, label: '1:1 square' },
 };
 
 export const GUTTER = 10;
 export const BORDER = 6;
-
-// The share of the cover height the title field takes, along the foot.
-// The mosaic region is everything above it.
 export const FIELD_H = 0.38;
 
-export function planCover(doc, overrideSize) {
-  const size = overrideSize || SIZES[doc.size] || SIZES['16:9'];
-  const { w, h } = size;
-  const mosaicH = 1 - FIELD_H;
-  // Every layout rect is compressed into the mosaic region: its y and
-  // height scale by the mosaic share, its x and width stay as drawn.
-  const rects = rectsForLayout(doc.layout, w, h).map(([fx, fy, fw, fh]) => [
-    fx, fy * mosaicH, fw, fh * mosaicH,
-  ]);
-  const panels = rects.map((frac, i) => {
-    const panel = doc.panels[i] || {};
-    const x = Math.round(frac[0] * w) + (i === 0 ? 0 : GUTTER);
-    const y = Math.round(frac[1] * h) + (i === 0 ? 0 : GUTTER);
-    const pw = Math.round(frac[2] * w) - GUTTER;
-    const ph = Math.round(frac[3] * h) - GUTTER;
-    const inner = {
-      x: x + BORDER,
-      y: y + BORDER,
-      w: pw - BORDER * 2,
-      h: ph - BORDER * 2,
-    };
-    return {
-      ...panel,
-      rect: { x, y, w: pw, h: ph },
-      inner,
-      tag: panel.tag || '',
-      tagOn: panel.tagOn !== false,
-    };
-  });
-  const titleText = doc.title && doc.title.trim()
-    ? doc.title
-    : (CAPTION_DECK[doc.caption]?.title || '');
-  const caption = CAPTION_DECK[doc.caption] || CAPTION_DECK[0];
-  // The title field and the cluster inside it, as fractions of the field.
-  const fieldY = Math.round(mosaicH * h);
-  const fieldH = h - fieldY;
-  const titleSize = Math.min(w * 0.11, fieldH * 0.44) * (doc.look.titleSize / 100);
+// Resolve the caption a document shows: the deck entry at doc.caption,
+// with any field the user typed by hand winning over the deck.
+export function applyDocCaption(doc) {
+  const deck = CAPTION_DECK[doc.caption] || CAPTION_DECK[0];
+  const pick = (key) => (doc[key] !== undefined && doc[key] !== '' ? doc[key] : deck[key]);
   return {
-    w,
-    h,
-    panels,
-    titleField: { x: 0, y: fieldY, w, h: fieldH },
-    titleFieldMotif: caption.field || 'palms',
-    titleRect: { x: 0.04 * w, y: fieldY + fieldH * 0.20, w: 0.92 * w, h: fieldH * 0.40 },
-    scriptRect: { x: 0.05 * w, y: fieldY + fieldH * 0.02, w: 0.9 * w, h: fieldH * 0.14 },
-    ribbonRect: { x: 0.12 * w, y: fieldY + fieldH * 0.64, w: 0.76 * w, h: fieldH * 0.09 },
-    quoteRect: { x: 0.04 * w, y: fieldY + fieldH * 0.76, w: 0.92 * w, h: fieldH * 0.10 },
-    billingRect: { x: 0.10 * w, y: fieldY + fieldH * 0.90, w: 0.80 * w, h: fieldH * 0.08 },
-    titleStyle: resolveTitleStyle(doc.titleStyle, doc.grade),
-    titleSize,
-    titleLift: h * 0.03 * (doc.look.titleLift / 100),
-    caption,
-    titleText,
+    id: deck.id,
+    title: pick('title'),
+    script: pick('script'),
+    tagline: pick('tagline'),
+    quote: pick('quote'),
+    outlet: pick('outlet'),
+    billing: pick('billing'),
+    vol: pick('vol'),
+    comingSoon: pick('comingSoon'),
+    field: deck.field,
   };
 }
 
-// Fill the caption fields of a document from the deck entry it points at,
-// letting anything the user typed by hand win over the deck.
-export function applyDocCaption(doc) {
-  const entry = CAPTION_DECK[doc.caption] || CAPTION_DECK[0];
-  for (const field of ['title', 'script', 'tagline', 'quote', 'outlet', 'billing', 'vol', 'comingSoon']) {
-    if (!doc[field]) doc[field] = entry[field];
-  }
-}
-
-// Apply a shot scene to a document: size, layout, grade, title style and
-// caption, then one panel per photo index, with optional per-panel zoom
-// and pan overrides (scene.panelZooms / scene.panelPans).
-export function applyShotScene(doc, scene) {
-  doc.size = scene.size;
-  doc.layout = scene.layout;
-  doc.grade = scene.grade;
-  doc.titleStyle = scene.titleStyle || 'auto';
-  doc.caption = scene.caption;
-  applyDocCaption(doc);
-  const photoList = scene.photos || [];
-  const tags = scene.tags || [];
-  doc.panels = photoList.map((photoIndex, i) => {
-    const photo = SAMPLE_PHOTOS[photoIndex];
-    return {
-      photo: photo ? photo.src : '',
-      tag: tags[i] || (photo ? photo.tag : ''),
-      tagOn: true,
-      zoom: scene.panelZooms ? (scene.panelZooms[i] ?? 1.15) : 1.15,
-      panX: scene.panelPans ? (scene.panelPans[i]?.[0] ?? 0) : 0,
-      panY: scene.panelPans ? (scene.panelPans[i]?.[1] ?? 0) : 0,
-      flip: false,
-      faceMarked: scene.faceMarked ? scene.faceMarked.includes(i) : false,
-    };
+// Build the full plan for a document, optionally at another size.
+export function planCover(doc, overrideSize) {
+  const size = SIZES[overrideSize || doc.size] || SIZES['16:9'];
+  const w = size.w;
+  const h = size.h;
+  const panelH = Math.round(h * (1 - FIELD_H));
+  const panelArea = { x: 0, y: 0, w, h: panelH };
+  const field = { x: 0, y: panelH, w, h: h - panelH };
+  const rects = rectsForLayout(doc.layout, w, panelH);
+  const caption = applyDocCaption(doc);
+  const panels = rects.map((rect, i) => {
+    const data = doc.panels[i] || doc.panels[0];
+    return { ...data, rect, index: i };
   });
-  doc.selected = scene.selected ?? 0;
+  return {
+    size, w, h, panelArea, field, panels, caption,
+    style: resolveTitleStyle(doc.titleStyle, doc.grade),
+    grade: gradeById(doc.grade),
+  };
 }
 
-// The layout that fits a panel count: three panels get the diagonal trio,
-// four get hero plus three, five get the filmstrip, six get the six grid
-// on wide covers and postcards on tall ones, seven get the seven mosaic;
-// anything else falls back to hero mosaic.
+// Apply a shot scene to a document in place: size, layout, grade,
+// caption, the scene's panels (photo, tag, zoom, pan) and selection.
+export function applyShotScene(doc, scene) {
+  if (!scene) return doc;
+  if (scene.size) doc.size = scene.size;
+  if (scene.layout) doc.layout = scene.layout;
+  if (scene.grade) doc.grade = scene.grade;
+  if (scene.titleStyle) doc.titleStyle = scene.titleStyle;
+  if (scene.caption !== undefined) doc.caption = scene.caption;
+  if (scene.panels) {
+    doc.panels = scene.panels.map((p) => ({
+      photo: p.photo,
+      tag: p.tag,
+      tagOn: p.tagOn !== false,
+      zoom: p.zoom ?? 1.15,
+      panX: p.panX ?? 0,
+      panY: p.panY ?? 0,
+      flip: !!p.flip,
+      faceMarked: !!p.faceMarked,
+    }));
+  }
+  if (scene.selected !== undefined) doc.selected = scene.selected;
+  return doc;
+}
+
+// Pick the layout that fits a document's panel count.
 export function autoLayoutFor(doc) {
-  const count = doc.panels.length;
-  const wide = (SIZES[doc.size] || SIZES['16:9']).w > (SIZES[doc.size] || SIZES['16:9']).h;
-  if (count === 3) return 'diagonal-trio';
-  if (count === 4) return 'hero-plus-three';
-  if (count === 5) return 'filmstrip';
-  if (count === 6) return wide ? 'six-grid' : 'postcards';
-  if (count === 7) return 'seven-mosaic';
-  return 'hero-mosaic';
+  const n = doc.panels.length;
+  if (n <= 2) return 'duo-split';
+  if (n === 3) return 'diagonal-trio';
+  if (n === 4) return 'quad-grid';
+  if (n === 5) return 'film-strip';
+  if (n === 6) return 'hero-mosaic';
+  return 'seven-mosaic';
 }
 
-// The panel whose rectangle contains the point (x, y), with its index, or
-// null when the point falls on no panel.
+// The index of the panel under a point in cover coordinates, or -1.
 export function panelAtPoint(plan, x, y) {
   for (let i = 0; i < plan.panels.length; i++) {
-    const rect = plan.panels[i].rect;
-    if (x >= rect.x && x < rect.x + rect.w && y >= rect.y && y < rect.y + rect.h) {
-      return { ...plan.panels[i], index: i };
-    }
+    const r = plan.panels[i].rect;
+    if (x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.h) return i;
   }
-  return null;
+  return -1;
 }
 
-// Re-match a document's panels to a layout: keep the panels it has, trim
-// the extras, and fill any shortfall by cycling through the sample photos
-// with their default tags.
+// Resize a document's panels to a layout's panel count, keeping the
+// photos already placed and filling new slots from the samples.
 export function rematchPanels(doc, layoutId) {
-  const count = layoutPanelCount(layoutId);
-  const panels = doc.panels.slice(0, count);
-  let i = panels.length;
-  while (panels.length < count) {
+  const want = layoutPanelCount(layoutId);
+  const next = doc.panels.slice(0, want);
+  for (let i = next.length; i < want; i++) {
     const photo = SAMPLE_PHOTOS[i % SAMPLE_PHOTOS.length];
-    panels.push({
+    next.push({
       photo: photo.src,
       tag: photo.tag,
       tagOn: true,
@@ -169,7 +123,9 @@ export function rematchPanels(doc, layoutId) {
       flip: false,
       faceMarked: false,
     });
-    i++;
   }
-  return panels;
+  doc.panels = next;
+  doc.layout = layoutId;
+  if (doc.selected >= want) doc.selected = 0;
+  return doc;
 }

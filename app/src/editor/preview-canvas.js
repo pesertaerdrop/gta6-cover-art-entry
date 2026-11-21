@@ -1,128 +1,117 @@
-// The live preview.
-//
-// Renders the cover onto #preview (with the editor overlay — numbered
-// badges on every panel, an accent outline plus crosshair plus zoom badge
-// on the selected one) and owns the pointer listeners: click to select a
-// panel, drag to pan it, wheel to zoom it, double-click to reset it,
-// Shift-drag to swap it with another. It also keeps the size label and
-// the readiness line up to date.
-import { renderCover } from '../render/render-cover.js';
+// The live preview canvas: draws the document's cover into #preview and
+// wires the pointer at it. Drag pans the photo inside its panel, the
+// wheel zooms, Shift-drag swaps two panels' photos, double-click resets
+// a panel's framing, and dropping a photo on a panel places it there.
+// The canvas is sized to the cover's aspect inside a 1280x720 box, so
+// client pixels map to cover pixels with one scale factor. A pan drag
+// checkpoints when it starts, so one drag is one undo step even though
+// the photo moves on every pointer move.
+import { renderCoverToCanvas } from '../render/render-cover.js';
 import { planCover } from '../layouts/plan-cover.js';
-import {
-  pointToCanvas,
-  startDrag,
-  dragPanDelta,
-  endDragSwap,
-  swapPanelPhotos,
-  zoomPanel,
-  resetPanel,
-} from './panel-gestures.js';
+import { pointToCanvas, hitPanel, startDrag, dragPanDelta, endDragSwap, swapPanelPhotos, zoomPanel, resetPanel } from './panel-gestures.js';
 
-// What the size label says for each cover size, in export pixels.
-const EXPORT_LABEL = {
-  '16:9': '16:9 wide, 1920 by 1080 export',
-  '4:5': '4:5 portrait, 1080 by 1350 export',
-  '1:1': '1:1 square, 1080 by 1080 export',
-};
+function fitBox(w, h, maxW, maxH) {
+  const s = Math.min(maxW / w, maxH / h, 1);
+  return { w: Math.round(w * s), h: Math.round(h * s), scale: s };
+}
 
 export function setupPreviewCanvas(studio) {
   const canvas = document.getElementById('preview');
-  let drag = null;
-  let draftTimer = null;
+  const label = document.getElementById('sizeLabel');
+  const readiness = document.getElementById('readiness');
 
-  // Draw the cover onto the canvas (resizing the canvas to the plan when
-  // the size changed), then refresh the labels. draft draws in fast mode.
-  function draw(draft) {
+  // Draw the document's cover into the preview canvas, fitted in the box.
+  studio.drawPreview = () => {
     const plan = planCover(studio.doc);
-    if (canvas.width !== plan.w || canvas.height !== plan.h) {
-      canvas.width = plan.w;
-      canvas.height = plan.h;
-    }
+    const box = fitBox(plan.w, plan.h, 1280, 720);
+    canvas.width = box.w;
+    canvas.height = box.h;
+    const cover = renderCoverToCanvas(studio.doc, studio.images, { width: box.w, height: box.h });
     const ctx = canvas.getContext('2d');
-    renderCover(ctx, studio.doc, studio.images, { editor: true, draft: draft === true });
-    updateReadiness(studio, plan);
-    return plan;
-  }
-
-  // The size label and the readiness line under the preview: how many
-  // panels hold a photo, and how many faces are marked.
-  function updateReadiness(studio, plan) {
-    const sizeLabel = document.getElementById('sizeLabel');
-    if (sizeLabel) sizeLabel.textContent = EXPORT_LABEL[studio.doc.size] || studio.doc.size;
-    const readiness = document.getElementById('readiness');
+    ctx.drawImage(cover, 0, 0);
+    studio.previewScale = plan.w / box.w;
+    studio.previewPlan = plan;
+    if (label) label.textContent = `${studio.doc.size} ${plan.w === 1920 ? 'wide' : plan.w === 1080 && plan.h === 1350 ? 'portrait' : 'square'}, ${plan.w} by ${plan.h} export`;
     if (readiness) {
-      const filled = plan.panels.filter((panel) => panel.photo).length;
-      const marked = plan.panels.filter((panel) => panel.faceMarked).length;
-      readiness.textContent = `Ready: ${filled} panels filled${marked ? `, ${marked} face${marked > 1 ? 's' : ''} marked` : ', faces kept whole'}`;
+      const filled = studio.doc.panels.filter((p) => p.photo).length;
+      readiness.textContent = `Ready: ${filled} panels filled, faces kept whole`;
     }
-  }
+  };
 
-  // Press: pick up the panel under the pointer and select it.
-  canvas.addEventListener('pointerdown', (event) => {
-    const plan = planCover(studio.doc);
-    const point = pointToCanvas(canvas, event.clientX, event.clientY);
-    drag = startDrag(plan, point, event.shiftKey);
+  const toCover = (clientX, clientY) => {
+    const p = pointToCanvas(canvas, clientX, clientY);
+    const s = studio.previewScale || 1;
+    return { x: p.x * s, y: p.y * s };
+  };
+
+  let drag = null;
+  let dragBase = null;
+
+  canvas.addEventListener('pointerdown', (e) => {
+    const point = toCover(e.clientX, e.clientY);
+    drag = startDrag(studio.previewPlan, point, e.shiftKey);
     if (drag) {
-      studio.doc.selected = drag.panelIndex;
-      canvas.setPointerCapture(event.pointerId);
-      studio.renderPanelsOnly();
+      dragBase = { panX: studio.doc.panels[drag.index].panX, panY: studio.doc.panels[drag.index].panY };
+      canvas.setPointerCapture(e.pointerId);
+      studio.select(drag.index);
+      if (!drag.swap) studio.checkpoint();
     }
   });
 
-  // Move: pan the dragged panel (clamped to the photo) in draft mode.
-  canvas.addEventListener('pointermove', (event) => {
+  canvas.addEventListener('pointermove', (e) => {
     if (!drag) return;
-    const plan = planCover(studio.doc);
-    const point = pointToCanvas(canvas, event.clientX, event.clientY);
-    const rect = plan.panels[drag.panelIndex].rect;
-    const delta = dragPanDelta(drag, point, rect);
-    const slot = studio.doc.panels[drag.panelIndex];
-    slot.panX = Math.max(-1, Math.min(1, (slot.panX || 0) + delta.dx));
-    slot.panY = Math.max(-1, Math.min(1, (slot.panY || 0) + delta.dy));
-    studio.renderPreviewDraft();
+    const point = toCover(e.clientX, e.clientY);
+    if (drag.swap) {
+      drag.over = hitPanel(studio.previewPlan, point);
+      return;
+    }
+    const rect = studio.previewPlan.panels[drag.index].rect;
+    const d = dragPanDelta(drag, point, rect);
+    const panel = studio.doc.panels[drag.index];
+    panel.panX = Math.max(-1, Math.min(1, dragBase.panX + d.dx));
+    panel.panY = Math.max(-1, Math.min(1, dragBase.panY + d.dy));
+    studio.drawPreview();
   });
 
-  // Release: a Shift-drag onto another panel swaps the two photos; a
-  // plain drag that moved commits the pan.
-  canvas.addEventListener('pointerup', (event) => {
+  canvas.addEventListener('pointerup', (e) => {
     if (!drag) return;
-    const plan = planCover(studio.doc);
-    const point = pointToCanvas(canvas, event.clientX, event.clientY);
-    const target = endDragSwap(plan, drag, point);
-    if (target !== null) {
-      swapPanelPhotos(studio.doc, drag.panelIndex, target);
-      studio.commit('swap panels');
-    } else if (drag.moved) {
-      studio.commit('pan panel');
+    const point = toCover(e.clientX, e.clientY);
+    const swap = endDragSwap(studio.previewPlan, drag, point);
+    if (swap) {
+      studio.commit(() => swapPanelPhotos(studio.doc, swap.from, swap.to));
+    } else {
+      studio.drawPreview();
     }
     drag = null;
+    dragBase = null;
   });
 
-  // Wheel: zoom the selected panel in draft, and commit 400 ms after the
-  // last wheel tick so a flurry of ticks becomes one undo step.
-  canvas.addEventListener('wheel', (event) => {
-    event.preventDefault();
-    const slot = studio.selectedSlot();
-    if (!slot) return;
-    zoomPanel(slot, event.deltaY < 0 ? 1.1 : 0.91);
-    studio.renderPreviewDraft();
-    clearTimeout(draftTimer);
-    draftTimer = setTimeout(() => studio.commit('zoom panel'), 400);
+  canvas.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    const point = toCover(e.clientX, e.clientY);
+    const index = hitPanel(studio.previewPlan, point);
+    if (index === -1) return;
+    studio.commit(() => zoomPanel(studio.doc.panels[index], e.deltaY < 0 ? 1.1 : 0.9));
   }, { passive: false });
 
-  // Double-click: reset the panel under the pointer.
-  canvas.addEventListener('dblclick', (event) => {
-    const plan = planCover(studio.doc);
-    const point = pointToCanvas(canvas, event.clientX, event.clientY);
-    const hit = plan.panels.findIndex((panel) => {
-      const r = panel.rect;
-      return point.x >= r.x && point.x < r.x + r.w && point.y >= r.y && point.y < r.y + r.h;
-    });
-    if (hit >= 0) {
-      resetPanel(studio.doc.panels[hit]);
-      studio.commit('reset panel');
-    }
+  canvas.addEventListener('dblclick', (e) => {
+    const point = toCover(e.clientX, e.clientY);
+    const index = hitPanel(studio.previewPlan, point);
+    if (index === -1) return;
+    studio.commit(() => resetPanel(studio.doc.panels[index]));
   });
 
-  return { draw };
+  canvas.addEventListener('dragover', (e) => e.preventDefault());
+  canvas.addEventListener('drop', (e) => {
+    e.preventDefault();
+    const src = e.dataTransfer.getData('text/plain');
+    if (!src) return;
+    const point = toCover(e.clientX, e.clientY);
+    const index = hitPanel(studio.previewPlan, point);
+    if (index === -1) return;
+    studio.commit(() => {
+      studio.doc.panels[index].photo = src;
+      studio.select(index);
+    });
+  });
 }

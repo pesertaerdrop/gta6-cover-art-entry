@@ -1,36 +1,49 @@
-// Binds the seven caption fields to the document.
-//
-// Title, script line, tagline ribbon, review quote, review outlet,
-// billing block, volume tag. Typing re-renders the preview live (the
-// title, tagline and billing fields are uppercased as they are typed);
-// leaving a field commits the change so undo can step back to the
-// earlier caption.
+// The caption fields: the eight text inputs under the preview that edit
+// the cover's words. A field starts from the deck entry and remembers
+// what the user typed: typing wins over the deck until the caption is
+// picked again. syncCaptionFields writes the resolved caption into the
+// inputs whenever the document changes under them.
+import { applyDocCaption } from '../layouts/plan-cover.js';
+
 export const CAPTION_FIELDS = [
-  { id: 'titleInput', key: 'title', upper: true },
-  { id: 'scriptInput', key: 'script', upper: false },
-  { id: 'taglineInput', key: 'tagline', upper: true },
-  { id: 'quoteInput', key: 'quote', upper: false },
-  { id: 'outletInput', key: 'outlet', upper: true },
-  { id: 'billingInput', key: 'billing', upper: false },
-  { id: 'volInput', key: 'vol', upper: true },
+  { key: 'title', label: 'Cover title', max: 24 },
+  { key: 'script', label: 'Script line under the title', max: 48 },
+  { key: 'tagline', label: 'Tagline on the gold ribbon', max: 48 },
+  { key: 'quote', label: 'Review quote', max: 64 },
+  { key: 'outlet', label: 'Review outlet', max: 32 },
+  { key: 'billing', label: 'Billing line', max: 120 },
+  { key: 'vol', label: 'Volume tag', max: 16 },
+  { key: 'comingSoon', label: 'Coming soon flag', max: 16 },
 ];
+
+const INPUT_IDS = {
+  title: 'titleInput',
+  script: 'scriptInput',
+  tagline: 'taglineInput',
+  quote: 'quoteInput',
+  outlet: 'outletInput',
+  billing: 'billingInput',
+  vol: 'volInput',
+  comingSoon: 'comingSoonInput',
+};
 
 export function setupCaptionFields(studio) {
   for (const field of CAPTION_FIELDS) {
-    const input = document.getElementById(field.id);
+    const input = document.getElementById(INPUT_IDS[field.key]);
     if (!input) continue;
+    input.addEventListener('focus', () => studio.checkpoint());
     input.addEventListener('input', () => {
-      studio.doc[field.key] = field.upper ? input.value.toUpperCase() : input.value;
-      studio.renderPreviewOnly();
+      studio.doc[field.key] = input.value;
+      studio.drawPreview();
     });
-    input.addEventListener('change', () => studio.commit(`edit ${field.key}`));
+    input.addEventListener('change', () => studio.drawPreview());
   }
 }
 
-// Fill the fields from a document (after undo, redo, or a scene load).
 export function syncCaptionFields(doc) {
+  const resolved = applyDocCaption(doc);
   for (const field of CAPTION_FIELDS) {
-    const input = document.getElementById(field.id);
-    if (input) input.value = doc[field.key] ?? '';
+    const input = document.getElementById(INPUT_IDS[field.key]);
+    if (input && document.activeElement !== input) input.value = resolved[field.key] || '';
   }
 }

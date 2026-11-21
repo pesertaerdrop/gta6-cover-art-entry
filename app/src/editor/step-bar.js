@@ -1,37 +1,31 @@
-// The clickable three-step header.
-//
-// 1 Add photos, 2 Caption, 3 Export PNG. Clicking a step moves focus to
-// that part of the editor (the photo tray, the title field, or the export
-// button) and marks it current, so the path from a photo to a PNG is
-// always visible.
+// The three-step bar in the top bar: 1 Add photos, 2 Caption, 3 Export
+// PNG. The steps are navigation, not a wizard: each jumps to the card it
+// names, and the current step is marked so the user always knows where
+// they are in the three moves from a photo to a poster.
+const STEP_TARGETS = {
+  1: 'photosHeading',
+  2: 'captionHeading',
+  3: 'exportHeading',
+};
+
 export function setupStepBar(studio) {
   const bar = document.getElementById('stepbar');
-  const targets = {
-    1: document.getElementById('photoTray'),
-    2: document.getElementById('titleInput'),
-    3: document.getElementById('exportAllBtn'),
-  };
-  bar.querySelectorAll('button[data-step]').forEach((button) => {
+  if (!bar) return;
+  for (const button of bar.querySelectorAll('button[data-step]')) {
     button.addEventListener('click', () => {
-      markStep(Number(button.dataset.step));
-      const target = targets[button.dataset.step];
-      if (target) {
-        target.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        if (target.focus) target.focus({ preventScroll: true });
-      }
-      studio.setStep(Number(button.dataset.step));
+      const n = Number(button.dataset.step);
+      markStep(n);
+      const target = document.getElementById(STEP_TARGETS[n]);
+      if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
     });
-  });
+  }
 }
 
-// Mark one step current (aria-current="step") and clear the others.
 export function markStep(number) {
   const bar = document.getElementById('stepbar');
-  bar.querySelectorAll('button[data-step]').forEach((button) => {
-    if (Number(button.dataset.step) === number) {
-      button.setAttribute('aria-current', 'step');
-    } else {
-      button.removeAttribute('aria-current');
-    }
-  });
+  if (!bar) return;
+  for (const button of bar.querySelectorAll('button[data-step]')) {
+    const on = Number(button.dataset.step) === number;
+    button.setAttribute('aria-current', on ? 'step' : 'false');
+  }
 }

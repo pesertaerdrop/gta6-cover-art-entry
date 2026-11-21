@@ -1,52 +1,61 @@
-// The sample library: seventeen image-model photos of one invented cast —
-// Mira, long silver-lilac hair, and Suki, a short teal bob — a Vice City
-// duo around one pink classic convertible. Every photo carries its scene,
-// its cast and its default callout tag; the helpers below serve the
-// editor's sample strip and the cover renderer. Every photo was generated
-// with the faces fully inside the frame, so no crop ever has to cut one.
+// The cast and the sample photos. Mira has long silver-lilac hair, Suki
+// a short teal bob; every sample is a shot of one or both of them around
+// Vice City at dusk: the pink convertible, the neon streets, the boardwalk,
+// the harbour, the diner, the pool, the bonfire, the powerboat. The photos
+// were made with an image model for this entry, so they are free to use.
+// Each row is [file, tray label, default callout tag]; the tag is only a
+// starting point — a panel's tag is edited in the inspector.
 export const CAST = [
-  { id: 'mira', name: 'Mira', role: 'long silver-lilac hair' },
-  { id: 'suki', name: 'Suki', role: 'short teal bob' },
+  { name: 'Mira', note: 'long silver-lilac hair' },
+  { name: 'Suki', note: 'short teal bob' },
 ];
 
-export const SAMPLE_PHOTOS = [
-  { src: 'samples/mira-suki-convertible.jpg', scene: 'Pink convertible, dusk', cast: 'mira,suki', tag: 'THE ACE' },
-  { src: 'samples/mira-suki-neon.jpg', scene: 'Pink car door, neon', cast: 'mira,suki', tag: 'THE SCOUT' },
-  { src: 'samples/mira-suki-boardwalk.jpg', scene: 'Boardwalk sunset', cast: 'mira,suki', tag: 'THE PILOT' },
-  { src: 'samples/mira-rooftop.jpg', scene: 'Rooftop dusk', cast: 'mira', tag: 'THE HOST' },
-  { src: 'samples/suki-diner.jpg', scene: 'Diner night', cast: 'suki', tag: 'THE RUNNER' },
-  { src: 'samples/mira-suki-pool.jpg', scene: 'Art-deco pool', cast: 'mira,suki', tag: 'THE ARTIST' },
-  { src: 'samples/mira-harbor.jpg', scene: 'Yacht deck', cast: 'mira', tag: 'THE DANCER' },
-  { src: 'samples/suki-market.jpg', scene: 'Night market', cast: 'suki', tag: 'THE CHEF' },
-  { src: 'samples/mira-suki-bonfire.jpg', scene: 'Beach bonfire', cast: 'mira,suki', tag: 'THE GUARD' },
-  { src: 'samples/mira-neon.jpg', scene: 'Neon signs', cast: 'mira', tag: 'THE SINGER' },
-  { src: 'samples/suki-rider.jpg', scene: 'Motorcycle sunset', cast: 'suki', tag: 'THE CAPTAIN' },
-  { src: 'samples/mira-suki-powerboat.jpg', scene: 'Powerboat', cast: 'mira,suki', tag: 'THE STRANGER' },
-  { src: 'samples/suki-pier.jpg', scene: 'Fishing pier', cast: 'suki', tag: 'THE ACE' },
-  { src: 'samples/mira-suki-motel.jpg', scene: 'Motel court, rain', cast: 'mira,suki', tag: 'THE SCOUT' },
-  { src: 'samples/mira-boardwalk.jpg', scene: 'Bicycle boardwalk', cast: 'mira', tag: 'THE PILOT' },
-  { src: 'samples/suki-garage.jpg', scene: 'Polishing pink car', cast: 'suki', tag: 'THE HOST' },
-  { src: 'samples/mira-suki-club.jpg', scene: 'Club door, neon', cast: 'mira,suki', tag: 'THE RUNNER' },
+const PHOTO_ROWS = [
+  ['mira-suki-convertible.jpg', 'Pink convertible, dusk', 'THE ACE'],
+  ['mira-suki-neon.jpg', 'Pink car door, neon', 'THE SCOUT'],
+  ['mira-suki-boardwalk.jpg', 'Boardwalk sunset', 'THE CREW'],
+  ['mira-harbor.jpg', 'Yacht deck', 'THE LOOKOUT'],
+  ['suki-diner.jpg', 'Diner night', 'THE RUNNER'],
+  ['mira-suki-pool.jpg', 'Art-deco pool', 'THE GETAWAY'],
+  ['mira-rooftop.jpg', 'Rooftop dusk', 'THE CAPTAIN'],
+  ['mira-suki-club.jpg', 'Club door, neon', 'THE RUNNER'],
+  ['mira-suki-motel.jpg', 'Motel court, rain', 'THE SCOUT'],
+  ['mira-neon.jpg', 'Neon signs', 'THE ARTIST'],
+  ['suki-rider.jpg', 'Motorcycle sunset', 'THE RIDER'],
+  ['mira-suki-powerboat.jpg', 'Powerboat', 'THE CHASE'],
+  ['suki-pier.jpg', 'Fishing pier', 'THE PIER'],
+  ['mira-boardwalk.jpg', 'Bicycle boardwalk', 'THE WALK'],
+  ['suki-garage.jpg', 'Polishing pink car', 'THE GARAGE'],
+  ['mira-suki-bonfire.jpg', 'Beach bonfire', 'THE BONFIRE'],
+  ['suki-market.jpg', 'Night market', 'THE DANCER'],
 ];
 
+export const SAMPLE_PHOTOS = PHOTO_ROWS.map(([file, label, tag]) => ({
+  src: `./samples/${file}`,
+  file,
+  label,
+  tag,
+}));
+
+// The tags a fresh panel cycles through when a photo is placed.
 export const DEFAULT_TAGS = [
-  'THE ACE', 'THE SCOUT', 'THE PILOT', 'THE HOST', 'THE RUNNER', 'THE ARTIST',
-  'THE DANCER', 'THE CHEF', 'THE GUARD', 'THE SINGER', 'THE CAPTAIN', 'THE STRANGER',
+  'THE ACE', 'THE SCOUT', 'THE CREW', 'THE LOOKOUT', 'THE RUNNER',
+  'THE GETAWAY', 'THE CAPTAIN', 'THE ARTIST', 'THE RIDER', 'THE CHASE',
+  'THE PIER', 'THE WALK', 'THE GARAGE', 'THE BONFIRE', 'THE DANCER',
 ];
 
 export function isSamplePhoto(src) {
-  return SAMPLE_PHOTOS.some((photo) => photo.src === src);
+  return SAMPLE_PHOTOS.some((p) => p.src === src);
 }
 
-// The next (dir +1) or previous (dir -1) sample photo after src, wrapping
-// around the library; an unknown source falls back to the first photo.
 export function nextSamplePhoto(src, dir = 1) {
-  const index = SAMPLE_PHOTOS.findIndex((photo) => photo.src === src);
-  const next = (index < 0 ? 0 : index + dir + SAMPLE_PHOTOS.length) % SAMPLE_PHOTOS.length;
-  return SAMPLE_PHOTOS[next];
+  const i = SAMPLE_PHOTOS.findIndex((p) => p.src === src);
+  if (i === -1) return SAMPLE_PHOTOS[0].src;
+  const n = SAMPLE_PHOTOS.length;
+  return SAMPLE_PHOTOS[(i + dir + n) % n].src;
 }
 
 export function labelOf(src) {
-  const photo = SAMPLE_PHOTOS.find((p) => p.src === src);
-  return photo ? `${photo.scene} — ${photo.cast}` : src;
+  const found = SAMPLE_PHOTOS.find((p) => p.src === src);
+  return found ? found.label : 'Your photo';
 }

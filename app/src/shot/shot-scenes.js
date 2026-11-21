@@ -1,69 +1,89 @@
-// The four screenshot scenes. The app reads ?shot= from the URL: cover
-// scenes draw one cover full-frame (the app itself drawing it), and the
-// editor scene shows the editor with a photo loaded and a panel selected.
-// Photo indices point into SAMPLE_PHOTOS. The scout and runner panels
-// are tuned so faces stay whole: the scout panels centre both faces (the
-// neon sign reads as a backdrop behind them), and the runner panels are
-// face close-ups (zoom 1.5, panned to centre Suki's face) so her face
-// stays whole and the cut signs stay out of frame.
-//
-// Cover 1 — TIDELINE, 16:9, hero mosaic. The duo on the pink convertible
-// is the hero; the scout (neon door) and the runner (diner) are panels 2
-// and 5.
-// Cover 3 — EMBER COAST, 4:5, hero mosaic. The scout opens the cover and
-// the runner follows; the motel scout and the club runner close it.
-// Cover 4 — SALTWATER, 1:1, seven mosaic. The boardwalk duo opens it and
-// the convertible duo is the second panel; the rider, the pier and the
-// garage fill the foot.
+// The screenshot scenes: the four views the capture script photographs.
+// Each scene is a full document preset — size, layout, grade, caption and
+// the exact panels (photo, tag, zoom, pan) — so the screenshots are
+// reproducible from the app alone. The editor scene shows the editor with
+// a photo loaded and a panel selected; the three cover scenes draw one
+// cover full-frame. A panel row is [photo file, tag, zoom, panX, panY].
+// Pans are tuned by eye: the crew strip on cover 1 pans up so both faces
+// sit inside the thin band, and the scout on cover 3 pans left so the
+// VICE CITY sign reads whole.
+const P = (file, tag, zoom = 1.15, panX = 0, panY = 0) => ({
+  photo: `./samples/${file}`,
+  tag,
+  tagOn: true,
+  zoom,
+  panX,
+  panY,
+  flip: false,
+  faceMarked: false,
+});
+
 export const SHOT_SCENES = {
   cover1: {
     id: 'cover1',
+    mode: 'cover',
     size: '16:9',
     layout: 'hero-mosaic',
     grade: 'sunset',
-    titleStyle: 'auto',
     caption: 0,
-    photos: [0, 1, 2, 6, 4, 5],
-    tags: ['THE ACE', 'THE SCOUT', 'THE CREW', 'THE LOOKOUT', 'THE RUNNER', 'THE GETAWAY'],
-    panelZooms: [1.15, 1.2, 1.15, 1.0, 1.5, 1.15],
-    panelPans: [[0, 0], [-0.2, 0], [0, -0.45], [0, -0.79], [0.3, 0.1], [0, 0]],
-    faceMarked: [1, 4],
+    selected: 0,
+    panels: [
+      P('mira-suki-convertible.jpg', 'THE ACE'),
+      P('mira-suki-neon.jpg', 'THE SCOUT'),
+      P('mira-suki-boardwalk.jpg', 'THE CREW', 1.15, 0, 0.7),
+      P('mira-harbor.jpg', 'THE LOOKOUT'),
+      P('suki-diner.jpg', 'THE RUNNER'),
+      P('mira-suki-pool.jpg', 'THE GETAWAY'),
+    ],
   },
   editor: {
     id: 'editor',
+    mode: 'editor',
     size: '16:9',
     layout: 'diagonal-trio',
     grade: 'neon-night',
-    titleStyle: 'auto',
     caption: 1,
-    photos: [5, 0, 10],
     selected: 1,
+    panels: [
+      P('mira-neon.jpg', 'THE ARTIST'),
+      P('mira-suki-convertible.jpg', 'THE ACE'),
+      P('mira-rooftop.jpg', 'THE CAPTAIN'),
+    ],
   },
   cover3: {
     id: 'cover3',
+    mode: 'cover',
     size: '4:5',
     layout: 'hero-mosaic',
     grade: 'neon-night',
-    titleStyle: 'auto',
     caption: 2,
-    photos: [1, 4, 13, 16, 8, 11],
-    tags: ['THE SCOUT', 'THE RUNNER', 'THE SCOUT', 'THE RUNNER', 'THE BONFIRE', 'THE CHASE'],
-    panelZooms: [1.2, 1.5, 1.15, 1.5, 1.15, 1.15],
-    panelPans: [[-0.2, 0], [0.3, 0.1], [0, 0], [0.3, 0.1], [0, 0], [0, 0]],
-    faceMarked: [0, 1, 2, 3],
+    selected: 0,
+    panels: [
+      P('mira-suki-neon.jpg', 'THE SCOUT', 1.15, 0.3, 0),
+      P('suki-diner.jpg', 'THE RUNNER'),
+      P('mira-suki-motel.jpg', 'THE SCOUT'),
+      P('mira-suki-club.jpg', 'THE RUNNER'),
+      P('mira-suki-bonfire.jpg', 'THE BONFIRE'),
+      P('mira-suki-powerboat.jpg', 'THE CHASE'),
+    ],
   },
   cover4: {
     id: 'cover4',
+    mode: 'cover',
     size: '1:1',
     layout: 'seven-mosaic',
     grade: 'ember-blaze',
-    titleStyle: 'auto',
     caption: 3,
-    photos: [2, 0, 6, 10, 12, 14, 15],
-    tags: ['THE CREW', 'THE ACE', 'THE HARBOR', 'THE RIDER', 'THE PIER', 'THE WALK', 'THE GARAGE'],
-    panelZooms: [1.15, 1.15, 1.15, 1.15, 1.15, 1.15, 1.15],
-    panelPans: [[0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0]],
-    faceMarked: [1],
+    selected: 0,
+    panels: [
+      P('mira-suki-boardwalk.jpg', 'THE CREW'),
+      P('mira-suki-convertible.jpg', 'THE ACE'),
+      P('mira-harbor.jpg', 'THE HARBOR'),
+      P('suki-rider.jpg', 'THE RIDER'),
+      P('suki-pier.jpg', 'THE PIER'),
+      P('mira-boardwalk.jpg', 'THE WALK'),
+      P('suki-garage.jpg', 'THE GARAGE'),
+    ],
   },
 };
 
@@ -71,16 +91,19 @@ export function shotScene(id) {
   return SHOT_SCENES[id] || null;
 }
 
-// The scene named by ?shot= in the URL, or null when the app opens as the
+// Read ?shot=<id> from the page URL, for the capture script and for
+// anyone opening a scene directly. Returns the scene or null for the
 // plain editor.
 export function sceneFromUrl() {
-  const params = new URLSearchParams(window.location.search);
-  const id = params.get('shot');
-  return id ? shotScene(id) : null;
+  try {
+    const params = new URLSearchParams(window.location.search);
+    return shotScene(params.get('shot'));
+  } catch {
+    return null;
+  }
 }
 
-// 'cover' scenes draw one cover full-frame for a screenshot; 'editor'
-// shows the editor itself with a scene applied.
+// 'cover' draws one cover full-frame; 'editor' shows the workbench.
 export function sceneMode(scene) {
-  return scene && scene.id === 'editor' ? 'editor' : 'cover';
+  return scene ? scene.mode || 'cover' : 'editor';
 }

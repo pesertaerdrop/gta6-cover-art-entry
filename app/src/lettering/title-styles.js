@@ -1,52 +1,38 @@
-// The six title styles plus Auto. A style is a chrome gradient ramp (a
-// list of [offset, colour] stops), a stroke colour and a glow colour.
-// Auto picks the style that matches the cover's grade, so a sunset cover
-// gets dusk chrome and a neon cover gets glacier neon without the user
-// having to choose.
-export const TITLE_STYLES = [
-  {
-    id: 'dusk-chrome', label: 'Dusk Chrome',
-    stops: [[0, '#1a0b2e'], [0.3, '#ff6b35'], [0.5, '#ffd166'], [0.7, '#fff8e7'], [1, '#ff9e5e']],
-    stroke: '#1a0b2e', shadow: 'rgba(255,107,53,0.55)',
-  },
-  {
-    id: 'glacier-neon', label: 'Glacier Neon',
-    stops: [[0, '#04122e'], [0.3, '#2f7fe0'], [0.5, '#7fe7ff'], [0.7, '#e8fbff'], [1, '#4fc3f7']],
-    stroke: '#04122e', shadow: 'rgba(127,231,255,0.6)',
-  },
-  {
-    id: 'brass-gold', label: 'Brass Gold',
-    stops: [[0, '#3d2408'], [0.3, '#b8860b'], [0.5, '#ffd700'], [0.7, '#fff8dc'], [1, '#daa520']],
-    stroke: '#3d2408', shadow: 'rgba(255,215,0,0.5)',
-  },
-  {
-    id: 'magma-edge', label: 'Magma Edge',
-    stops: [[0, '#2b0505'], [0.3, '#e5381a'], [0.5, '#ff7a3d'], [0.7, '#ffe08a'], [1, '#ff3d00']],
-    stroke: '#2b0505', shadow: 'rgba(255,61,0,0.55)',
-  },
-  {
-    id: 'steel-chrome', label: 'Steel Chrome',
-    stops: [[0, '#0f1c22'], [0.3, '#5a7d8a'], [0.5, '#bfe3ec'], [0.7, '#ffffff'], [1, '#7fb3c8']],
-    stroke: '#0f1c22', shadow: 'rgba(191,227,236,0.55)',
-  },
-  {
-    id: 'pink-neon', label: 'Pink Neon',
-    stops: [[0, '#2e0a2e'], [0.3, '#e040fb'], [0.5, '#ff7ae0'], [0.7, '#ffd6f5'], [1, '#ff4fd8']],
-    stroke: '#2e0a2e', shadow: 'rgba(255,79,216,0.6)',
-  },
-];
-
-// The style each grade maps to when the title style is Auto.
-const AUTO_STYLE_BY_GRADE = {
-  sunset: 'dusk-chrome',
-  'neon-night': 'glacier-neon',
-  'golden-hour': 'brass-gold',
-  'tropic-teal': 'steel-chrome',
-  'ember-blaze': 'magma-edge',
-  'rose-dusk': 'pink-neon',
+// The six title styles. A style is a vertical chrome ramp (three stops),
+// a dark edge drawn around the letters, a glow colour for the halo behind
+// the title, and the face colour used for the title chips in the editor.
+// The title is drawn with the Anton face at a size the look sliders scale.
+const STYLE_DEFS = {
+  ember: { label: 'Ember Chrome', stops: ['#fff3d6', '#ff9a2e', '#ff5c1a'], edge: '#3a0d02', glow: 'rgba(255, 110, 20, 0.55)' },
+  ice: { label: 'Ice Chrome', stops: ['#eaf9ff', '#6ec6ff', '#2f7fe0'], edge: '#06182e', glow: 'rgba(80, 180, 255, 0.55)' },
+  magma: { label: 'Magma Chrome', stops: ['#ffe9c4', '#ff8a3c', '#d62f16'], edge: '#330a04', glow: 'rgba(255, 80, 30, 0.5)' },
+  gold: { label: 'Solid Gold', stops: ['#ffe9a8', '#f7c948', '#c98f12'], edge: '#2e1c02', glow: 'rgba(247, 201, 72, 0.45)' },
+  neon: { label: 'Neon Outline', stops: ['#d8fff4', '#4ef0c0', '#0f8f6e'], edge: '#04241c', glow: 'rgba(78, 240, 192, 0.6)' },
+  rose: { label: 'Rose Chrome', stops: ['#fff0f6', '#ff8fc0', '#e0408a'], edge: '#33061e', glow: 'rgba(255, 90, 160, 0.5)' },
 };
 
-export { AUTO_STYLE_BY_GRADE };
+export const TITLE_STYLE_ORDER = ['ember', 'ice', 'magma', 'gold', 'neon', 'rose'];
+
+export const TITLE_STYLES = TITLE_STYLE_ORDER.map((id) => ({
+  id,
+  label: STYLE_DEFS[id].label,
+  top: STYLE_DEFS[id].stops[0],
+  mid: STYLE_DEFS[id].stops[1],
+  bottom: STYLE_DEFS[id].stops[2],
+  edge: STYLE_DEFS[id].edge,
+  glow: STYLE_DEFS[id].glow,
+}));
+
+// Which style 'auto' picks for each grade, so the title always matches
+// the photo grade without the user thinking about it.
+export const AUTO_STYLE_BY_GRADE = {
+  sunset: 'ember',
+  'neon-night': 'ice',
+  'golden-hour': 'gold',
+  'tropic-teal': 'neon',
+  'ember-blaze': 'magma',
+  'rose-dusk': 'rose',
+};
 
 export function styleById(id) {
   return TITLE_STYLES.find((s) => s.id === id) || TITLE_STYLES[0];
@@ -54,19 +40,21 @@ export function styleById(id) {
 
 export function resolveTitleStyle(titleStyle, grade) {
   if (titleStyle && titleStyle !== 'auto') return styleById(titleStyle);
-  return styleById(AUTO_STYLE_BY_GRADE[grade] || 'dusk-chrome');
+  return styleById(AUTO_STYLE_BY_GRADE[grade] || 'ember');
 }
 
-// Build the vertical chrome gradient for a style over a rectangle.
+// A vertical gradient across a title rect, light at the top, saturated in
+// the middle, deep at the bottom: the chrome look.
 export function gradientFor(ctx, style, rect) {
-  const gradient = ctx.createLinearGradient(rect.x, rect.y, rect.x, rect.y + rect.h);
-  for (const [offset, color] of style.stops) gradient.addColorStop(offset, color);
-  return gradient;
+  const g = ctx.createLinearGradient(0, rect.y, 0, rect.y + rect.h);
+  g.addColorStop(0, style.top);
+  g.addColorStop(0.45, style.mid);
+  g.addColorStop(1, style.bottom);
+  return g;
 }
 
-// The CSS gradient for a style's "Aa" chip in the title picker.
+// The CSS gradient for a title style's chip in the editor picker.
 export function titleStyleCss(id) {
-  const style = styleById(id);
-  const stops = style.stops.map(([offset, color]) => `${color} ${Math.round(offset * 100)}%`).join(', ');
-  return `linear-gradient(180deg, ${stops})`;
+  const s = styleById(id);
+  return `linear-gradient(180deg, ${s.top}, ${s.mid} 45%, ${s.bottom})`;
 }

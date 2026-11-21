@@ -1,194 +1,144 @@
-/* Saltline Cover Studio — the editor's chrome.
+/* Saltline Cover Studio — editor chrome.
  *
- * Design tokens first, then the page. The palette is a warm paper-and-ink
- * poster shop: dark ink background, cream cards, a hot orange accent for
- * the active control and gold for the title rules. The display face is
- * Anton for the brand and the big export button, Oswald for labels and
- * buttons, Mr Dafoe for the script accent. Everything is offline: the
- * five faces below are files under fonts/, loaded by @font-face, and no
- * rule here reaches the network.
+ * The shop is paper and ink: a near-black bench, cream cards, hot orange
+ * for the control in use, gold for the rules that frame the poster. Anton
+ * sets the brand and the export button, Oswald sets every label and
+ * button, Mr Dafoe signs the script accent. Nothing here reaches the
+ * network: the five faces are files under fonts/, loaded below.
  *
- * Layout: a three-column workbench (photo rail, stage, control rail) that
- * collapses to one column under 1100 px. The preview canvas scales to
- * its column; the shot stage is hidden unless the body carries
- * .shot-cover, when the app draws one cover full-frame for a screenshot.
+ * The bench is three columns (photos, stage, controls) and collapses to
+ * one under 1100px. The shot stage stays hidden until the body carries
+ * .shot-cover, when one cover is drawn full-frame for a screenshot.
  */
 :root {
-  --ink: #141210;
-  --ink-soft: #3a352f;
+  --bench: #141210;
+  --bench-2: #1d1a16;
+  --cream: #fffaf0;
+  --cream-dim: #ece2d0;
   --paper: #f6efe4;
-  --paper-dim: #ece2d0;
-  --panel: #fffaf0;
-  --line: #d8cbb2;
-  --accent: #e8531f;
-  --accent-deep: #b23a10;
+  --muted: #3a352f;
+  --faint: #8d8271;
+  --rule: #d8cbb2;
+  --flame: #e8531f;
+  --flame-deep: #b23a10;
   --gold: #e8a317;
   --teal: #0f7a6e;
-  --pink: #e84a7a;
+  --rose: #e84a7a;
   --sky: #2f7fb8;
-  --good: #1d7a4c;
-  --radius: 10px;
-  --radius-inner: 6px;
-  --font-ui: "Oswald", "Archivo Black", system-ui, sans-serif;
-  --font-display: "Anton", "Archivo Black", sans-serif;
-  --font-body: system-ui, -apple-system, "Segoe UI", sans-serif;
-  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ok: #1d7a4c;
+  --corner: 10px;
+  --corner-s: 6px;
+  --ui: "Oswald", "Archivo Black", system-ui, sans-serif;
+  --display: "Anton", "Archivo Black", sans-serif;
+  --body: system-ui, -apple-system, "Segoe UI", sans-serif;
 }
 
-/* Base: border-box everywhere, no sideways scroll, antialiased text. */
-* { box-sizing: border-box; }
-html, body { overflow-x: clip; margin: 0; padding: 0; }
-body {
-  background: var(--ink);
-  color: var(--paper);
-  font-family: var(--font-body);
-  font-size: 15px;
-  line-height: 1.5;
-  -webkit-font-smoothing: antialiased;
-}
+*, *::before, *::after { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; overflow-x: clip; }
+body { background: var(--bench); color: var(--paper); font: 15px/1.5 var(--body); -webkit-font-smoothing: antialiased; }
 button, input, select, textarea { font: inherit; color: inherit; }
-button { cursor: pointer; min-height: 44px; }
-button:focus-visible, input:focus-visible, select:focus-visible, [tabindex]:focus-visible {
-  outline: 3px solid var(--gold);
-  outline-offset: 2px;
-}
+button { min-height: 44px; cursor: pointer; }
 button:active { transform: scale(0.96); }
-::selection { background: var(--gold); color: var(--ink); }
+:focus-visible { outline: 3px solid var(--gold); outline-offset: 2px; }
+::selection { background: var(--gold); color: var(--bench); }
 
-/* The five local faces. Oswald is the variable font, so its weight range
- * is declared 200–700 and the UI can use any weight in between. */
 @font-face { font-family: "Anton"; src: url("./fonts/Anton-Regular.ttf") format("truetype"); font-display: swap; }
 @font-face { font-family: "Archivo Black"; src: url("./fonts/ArchivoBlack-Regular.ttf") format("truetype"); font-display: swap; }
 @font-face { font-family: "Oswald"; src: url("./fonts/Oswald.ttf") format("truetype"); font-weight: 200 700; font-display: swap; }
 @font-face { font-family: "Mr Dafoe"; src: url("./fonts/MrDafoe-Regular.ttf") format("truetype"); font-display: swap; }
 @font-face { font-family: "Fascinate Inline"; src: url("./fonts/FascinateInline-Regular.ttf") format("truetype"); font-display: swap; }
 
-/* Top bar: brand on the left, the three-step nav in the middle, undo /
- * redo / surprise / help on the right. The gold rule under it is the
- * poster's top edge. */
-.topbar {
-  display: flex; align-items: center; gap: 18px; flex-wrap: wrap;
-  padding: 10px 18px; background: #1d1a16; border-bottom: 2px solid var(--gold);
-}
-.brand { font-family: var(--font-display); font-size: 26px; letter-spacing: 0.04em; color: var(--paper); white-space: nowrap; }
-.brand em { font-family: "Mr Dafoe", cursive; font-style: normal; color: var(--gold); font-size: 24px; margin-left: 6px; }
-.stepbar { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
-.stepbar button {
-  background: transparent; border: 1px solid var(--line); color: var(--paper);
-  border-radius: 999px; padding: 6px 14px; min-height: 40px; font-family: var(--font-ui);
-  font-size: 14px; letter-spacing: 0.03em;
-}
-.stepbar button[aria-current="step"] { background: var(--accent); border-color: var(--accent); color: #fff; }
+/* Top bar: brand left, three steps middle, actions right, gold rule below. */
+.topbar { display: flex; flex-wrap: wrap; align-items: center; gap: 18px; padding: 10px 18px; background: var(--bench-2); border-bottom: 2px solid var(--gold); }
+.brand { font: 26px var(--display); letter-spacing: 0.04em; white-space: nowrap; }
+.brand em { font: 24px "Mr Dafoe", cursive; font-style: normal; color: var(--gold); margin-left: 6px; }
+.stepbar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.stepbar button { min-height: 40px; padding: 6px 14px; border: 1px solid var(--rule); border-radius: 999px; background: transparent; font: 14px var(--ui); letter-spacing: 0.03em; }
+.stepbar button[aria-current="step"] { background: var(--flame); border-color: var(--flame); color: #fff; }
 .stepbar .arrow { color: var(--gold); }
-.top-actions { margin-left: auto; display: flex; gap: 8px; }
-.top-actions button {
-  background: #2b2721; border: 1px solid var(--line); color: var(--paper);
-  border-radius: var(--radius-inner); padding: 6px 12px; min-height: 40px;
-}
+.stepbar .step-note { color: #cfc4ae; font-size: 13px; }
+.top-actions { display: flex; gap: 8px; margin-left: auto; }
+.top-actions button { min-height: 40px; padding: 6px 12px; border: 1px solid var(--rule); border-radius: var(--corner-s); background: #2b2721; }
 .top-actions button:disabled { opacity: 0.4; cursor: default; }
 
-/* Workbench: two fixed rails around a fluid stage. */
-.workbench { display: grid; grid-template-columns: 300px minmax(0, 1fr) 320px; gap: 14px; padding: 14px 18px 24px; align-items: start; }
+/* Bench: two fixed rails around a fluid stage. */
+.workbench { display: grid; grid-template-columns: 300px minmax(0, 1fr) 320px; gap: 14px; align-items: start; padding: 14px 18px 24px; }
 @media (max-width: 1100px) { .workbench { grid-template-columns: 1fr; } }
-
-/* Cards: cream panels with a soft border and an uppercase heading. */
 .rail { display: flex; flex-direction: column; gap: 14px; }
-.card {
-  background: var(--panel); color: var(--ink); border-radius: var(--radius);
-  padding: 12px 14px; border: 1px solid var(--line);
-}
-.card h2 {
-  font-family: var(--font-ui); font-size: 15px; margin: 0 0 10px;
-  text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-soft);
-}
-.card h2 .count { color: var(--accent); }
-.hint { font-size: 13px; color: var(--ink-soft); margin: 8px 0 0; }
-
-/* Photo tray: four-across thumbnails with a caption under each. The
- * picked photo gets an orange outline. */
-.tray { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
-.tray figure { margin: 0; position: relative; }
-.tray img { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; display: block; border-radius: var(--radius-inner); border: 1px solid var(--line); }
-.tray figcaption { font-size: 11px; text-align: center; padding-top: 2px; color: var(--ink-soft); }
-.tray figure.picked img { outline: 3px solid var(--accent); outline-offset: 1px; }
-.tray .add {
-  aspect-ratio: 4 / 3; border: 2px dashed var(--line); border-radius: var(--radius-inner);
-  background: var(--paper-dim); color: var(--ink-soft); font-size: 22px; min-height: 44px;
-}
-.dropzone { border: 2px dashed var(--line); border-radius: var(--radius-inner); padding: 10px; text-align: center; color: var(--ink-soft); font-size: 13px; margin-top: 10px; }
-.dropzone.over { border-color: var(--accent); background: #fdeee7; }
-
-/* Pickers: two-across buttons. A layout tile is a live mini-drawing, a
- * grade chip is a gradient swatch, a title chip is the style's gradient
- * on the word "Aa". The pressed one gets an orange ring. */
-.picker-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
-.pick { border: 1px solid var(--line); background: var(--paper); border-radius: var(--radius-inner); padding: 6px; text-align: left; min-height: 44px; }
-.pick[aria-pressed="true"] { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent); }
-.pick canvas { width: 100%; height: 44px; display: block; border-radius: 4px; }
-.pick .pick-name { display: block; font-family: var(--font-ui); font-size: 13px; margin-top: 4px; }
-.pick .swatch { display: block; height: 18px; border-radius: 4px; margin-bottom: 4px; }
-.pick .title-chip { display: block; font-family: var(--font-display); font-size: 19px; line-height: 1.05; padding: 4px 2px; }
-
-/* Stage: the preview canvas in a dark frame, then the size label and the
- * readiness line underneath it. */
 .stage { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
-.preview-wrap { position: relative; background: #0c0a08; border-radius: var(--radius); padding: 10px; border: 1px solid #33302b; }
+
+/* Cream cards with an uppercase heading. */
+.card { padding: 12px 14px; border: 1px solid var(--rule); border-radius: var(--corner); background: var(--cream); color: var(--bench); }
+.card h2 { margin: 0 0 10px; font: 15px var(--ui); text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
+.card h2 .count { color: var(--flame); }
+.hint { margin: 8px 0 0; font-size: 13px; color: var(--muted); }
+.foot { padding: 0 18px 24px; font-size: 12px; color: var(--faint); }
+
+/* Photo tray: four-across thumbnails, picked one ringed in orange. */
+.tray { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.tray figure { margin: 0; }
+.tray img { display: block; width: 100%; aspect-ratio: 4 / 3; object-fit: cover; border: 1px solid var(--rule); border-radius: var(--corner-s); }
+.tray figcaption { padding-top: 2px; text-align: center; font-size: 11px; color: var(--muted); }
+.tray figure.picked img { outline: 3px solid var(--flame); outline-offset: 1px; }
+.tray .add { aspect-ratio: 4 / 3; min-height: 44px; border: 2px dashed var(--rule); border-radius: var(--corner-s); background: var(--cream-dim); color: var(--muted); font-size: 22px; }
+.dropzone { margin-top: 10px; padding: 10px; border: 2px dashed var(--rule); border-radius: var(--corner-s); text-align: center; font-size: 13px; color: var(--muted); }
+.dropzone.over { border-color: var(--flame); background: #fdeee7; }
+
+/* Pickers: two-across buttons. Layout tiles draw a live mini-map, grade
+ * chips show the grade ramp, title chips show the style on "Aa". */
+.picker-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+.pick { min-height: 44px; padding: 6px; border: 1px solid var(--rule); border-radius: var(--corner-s); background: var(--paper); text-align: left; }
+.pick[aria-pressed="true"] { border-color: var(--flame); box-shadow: 0 0 0 2px var(--flame); }
+.pick canvas { display: block; width: 100%; height: 44px; border-radius: 4px; }
+.pick .pick-name { display: block; margin-top: 4px; font: 13px var(--ui); }
+.pick .swatch { display: block; height: 18px; margin-bottom: 4px; border-radius: 4px; }
+.pick .title-chip { display: block; padding: 4px 2px; font: 19px/1.05 var(--display); }
+
+/* Preview: dark frame, size line and readiness line beneath it. */
+.preview-wrap { padding: 10px; border: 1px solid #33302b; border-radius: var(--corner); background: #0c0a08; }
 .preview-wrap canvas { display: block; width: 100%; height: auto; border-radius: 4px; }
-.preview-meta { display: flex; justify-content: space-between; gap: 10px; font-size: 13px; color: #cfc4ae; flex-wrap: wrap; }
+.preview-meta { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 10px; font-size: 13px; color: #cfc4ae; }
 .preview-meta output { color: var(--gold); font-variant-numeric: tabular-nums; }
 
-/* Sliders: label, track, value. The inspector's zoom row uses the same
- * shape. Range inputs take the accent colour. */
+/* Sliders: label, track, value. */
 .slider-row { display: grid; grid-template-columns: 92px 1fr 44px; gap: 8px; align-items: center; padding: 5px 0; }
-.slider-row label { font-family: var(--font-ui); font-size: 14px; }
+.slider-row label { font: 14px var(--ui); }
 .slider-row output { text-align: right; font-variant-numeric: tabular-nums; }
-.slider-row input[type="range"] { width: 100%; accent-color: var(--accent); min-height: 24px; }
+.slider-row input[type="range"] { width: 100%; min-height: 24px; accent-color: var(--flame); }
 
-/* Inspector: an 88 px thumbnail beside the panel's name and note. */
+/* Inspector thumbnail: an 88px square beside the panel's name. */
 .inspector-thumb { display: flex; gap: 10px; align-items: center; }
-.inspector-thumb canvas { width: 88px; height: 88px; object-fit: cover; border-radius: var(--radius-inner); border: 1px solid var(--line); background: #222; }
-.inspector-thumb .who { font-family: var(--font-ui); font-size: 15px; }
-.inspector-thumb .who small { display: block; font-family: var(--font-body); font-size: 12px; color: var(--ink-soft); }
+.inspector-thumb canvas { width: 88px; height: 88px; object-fit: cover; border: 1px solid var(--rule); border-radius: var(--corner-s); background: #222; }
+.inspector-thumb .who { font: 15px var(--ui); }
+.inspector-thumb .who small { display: block; font: 12px var(--body); color: var(--muted); }
 
-/* Buttons and fields inside cards. */
-.btn-row { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
-.btn-row button {
-  flex: 1 1 auto; background: var(--paper-dim); border: 1px solid var(--line);
-  border-radius: var(--radius-inner); padding: 6px 8px; min-height: 40px; font-family: var(--font-ui); font-size: 13px;
-}
-.btn-row button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
-.btn-row button.warn { background: var(--ink); color: var(--paper); }
+/* Card buttons and fields. */
+.btn-row { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.btn-row button { flex: 1 1 auto; min-height: 40px; padding: 6px 8px; border: 1px solid var(--rule); border-radius: var(--corner-s); background: var(--cream-dim); font: 13px var(--ui); }
+.btn-row button.primary { background: var(--flame); border-color: var(--flame); color: #fff; }
+.btn-row button.warn { background: var(--bench); color: var(--paper); }
 .field { display: grid; gap: 4px; margin-top: 10px; }
-.field label { font-family: var(--font-ui); font-size: 13px; color: var(--ink-soft); }
-.field input, .field select, .field textarea {
-  background: #fff; border: 1px solid var(--line); border-radius: var(--radius-inner);
-  padding: 8px 10px; min-height: 44px; color: var(--ink);
-}
-.field input[type="checkbox"] { min-height: 20px; width: 20px; accent-color: var(--accent); }
-.check-line { display: flex; align-items: center; gap: 8px; margin-top: 10px; font-size: 14px; }
+.field label { font: 13px var(--ui); color: var(--muted); }
+.field input, .field select, .field textarea { min-height: 44px; padding: 8px 10px; border: 1px solid var(--rule); border-radius: var(--corner-s); background: #fff; color: var(--bench); }
+.field input[type="checkbox"] { width: 20px; min-height: 20px; accent-color: var(--flame); }
+.check-line { display: flex; gap: 8px; align-items: center; margin-top: 10px; font-size: 14px; }
 
-/* Export: three size checkboxes, the big orange button, the status line. */
-.export-sizes label { display: flex; align-items: center; gap: 8px; padding: 6px 0; font-size: 14px; }
-.export-sizes input { width: 20px; height: 20px; accent-color: var(--accent); }
-.export-all {
-  width: 100%; background: var(--accent); color: #fff; border: none; border-radius: var(--radius);
-  font-family: var(--font-display); font-size: 20px; letter-spacing: 0.04em; padding: 12px; margin-top: 10px;
-}
-.status-line { font-size: 13px; color: var(--ink-soft); margin-top: 8px; }
-.status-line.ready { color: var(--good); }
+/* Export: size checkboxes, the big orange button, the status line. */
+.export-sizes label { display: flex; gap: 8px; align-items: center; padding: 6px 0; font-size: 14px; }
+.export-sizes input { width: 20px; height: 20px; accent-color: var(--flame); }
+.export-all { width: 100%; margin-top: 10px; padding: 12px; border: none; border-radius: var(--corner); background: var(--flame); color: #fff; font: 20px var(--display); letter-spacing: 0.04em; }
+.status-line { margin-top: 8px; font-size: 13px; color: var(--muted); }
+.status-line.ready { color: var(--ok); }
 
 /* Help dialog: a cream sheet with the shortcut table. */
-dialog { border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel); color: var(--ink); max-width: 560px; padding: 20px; }
-dialog h2 { font-family: var(--font-display); margin-top: 0; }
-dialog kbd { background: var(--ink); color: var(--paper); border-radius: 4px; padding: 1px 6px; font-family: var(--font-body); }
-dialog table { border-collapse: collapse; width: 100%; font-size: 14px; }
-dialog td { padding: 4px 6px; border-bottom: 1px solid var(--line); }
+dialog { max-width: 560px; padding: 20px; border: 1px solid var(--rule); border-radius: var(--corner); background: var(--cream); color: var(--bench); }
+dialog h2 { margin-top: 0; font-family: var(--display); }
+dialog kbd { padding: 1px 6px; border-radius: 4px; background: var(--bench); color: var(--paper); font-family: var(--body); }
+dialog table { width: 100%; border-collapse: collapse; font-size: 14px; }
+dialog td { padding: 4px 6px; border-bottom: 1px solid var(--rule); }
 dialog td:first-child { white-space: nowrap; }
 
-.foot { padding: 0 18px 24px; color: #8d8271; font-size: 12px; }
-
-/* Shot mode: the app draws one cover full-frame for the screenshot
- * scenes. Everything else hides; the shot canvas fills the viewport. */
+/* Shot mode: everything hides except one cover drawn full-frame. */
 body.shot-cover { background: #000; }
 body.shot-cover .topbar, body.shot-cover .workbench, body.shot-cover .foot, body.shot-cover dialog { display: none; }
 body.shot-cover .shot-stage { display: block; }

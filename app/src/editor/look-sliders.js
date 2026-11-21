@@ -1,48 +1,43 @@
-// The seven look sliders.
-//
-// Paint, Grade, Halftone, Grain, Glow, Title size (60 to 130) and Title
-// lift (minus 40 to 40). Each row shows the name, the slider and the
-// current value; dragging regrades in fast draft mode and settles to full
-// quality when the slider is released, and the release commits the change
-// so undo can step back.
-const SLIDERS = [
-  { key: 'paint', label: 'Paint', min: 0, max: 20, step: 1 },
-  { key: 'grade', label: 'Grade', min: 0, max: 100, step: 1 },
-  { key: 'halftone', label: 'Halftone', min: 0, max: 100, step: 1 },
-  { key: 'grain', label: 'Grain', min: 0, max: 100, step: 1 },
-  { key: 'glow', label: 'Glow', min: 0, max: 100, step: 1 },
-  { key: 'titleSize', label: 'Title size', min: 60, max: 130, step: 1 },
-  { key: 'titleLift', label: 'Title lift', min: -40, max: 40, step: 1 },
+// The look sliders: the seven dials that tune a cover's finish — paint
+// (posterise), grade (ramp strength), halftone (dot overlay), grain
+// (noise), glow (highlight lift), title size and title lift. Dragging a
+// slider redraws the preview live; the change is checkpointed when the
+// drag starts, so one drag is one undo step.
+const SLIDER_DEFS = [
+  { key: 'paint', label: 'Paint', min: 0, max: 100 },
+  { key: 'grade', label: 'Grade', min: 0, max: 100 },
+  { key: 'halftone', label: 'Halftone', min: 0, max: 100 },
+  { key: 'grain', label: 'Grain', min: 0, max: 100 },
+  { key: 'glow', label: 'Glow', min: 0, max: 100 },
+  { key: 'titleSize', label: 'Title size', min: 50, max: 150 },
+  { key: 'titleLift', label: 'Title lift', min: -30, max: 30 },
 ];
 
 export function renderLookSliders(studio) {
   const host = document.getElementById('lookSliders');
   if (!host) return;
   host.innerHTML = '';
-  for (const slider of SLIDERS) {
+  for (const def of SLIDER_DEFS) {
     const row = document.createElement('div');
     row.className = 'slider-row';
     const label = document.createElement('label');
-    label.textContent = slider.label;
-    label.htmlFor = `look-${slider.key}`;
+    label.textContent = def.label;
     const input = document.createElement('input');
     input.type = 'range';
-    input.id = `look-${slider.key}`;
-    input.min = String(slider.min);
-    input.max = String(slider.max);
-    input.step = String(slider.step);
-    input.value = String(studio.doc.look[slider.key]);
-    const output = document.createElement('output');
-    output.textContent = String(studio.doc.look[slider.key]);
+    input.min = String(def.min);
+    input.max = String(def.max);
+    input.value = String(studio.doc.look[def.key]);
+    input.setAttribute('aria-label', def.label);
+    const out = document.createElement('output');
+    out.textContent = String(studio.doc.look[def.key]);
+    input.addEventListener('pointerdown', () => studio.checkpoint());
     input.addEventListener('input', () => {
-      studio.doc.look[slider.key] = Number(input.value);
-      output.textContent = input.value;
-      studio.renderPreviewDraft();
+      studio.doc.look[def.key] = Number(input.value);
+      out.textContent = input.value;
+      studio.drawPreview();
     });
-    input.addEventListener('change', () => studio.commit(`look ${slider.label}`));
-    row.appendChild(label);
-    row.appendChild(input);
-    row.appendChild(output);
+    input.addEventListener('change', () => studio.drawPreview());
+    row.append(label, input, out);
     host.appendChild(row);
   }
 }

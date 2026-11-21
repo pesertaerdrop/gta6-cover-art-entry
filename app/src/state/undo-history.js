@@ -1,43 +1,51 @@
-// Undo and redo for the document. Each entry is a full JSON snapshot of
-// the document taken just before a change, with the time, the label the UI
-// shows, and the cover size it covers. The stacks hold at most 50 entries.
+// Undo history: a bounded stack of document snapshots. Every committed
+// change pushes the document's JSON before the change, so undo restores
+// exactly what was there. A new change after an undo drops the redo tail.
+// Snapshots are plain JSON strings, so the history never holds a live
+// reference to a document the editor keeps mutating.
 export function createUndoHistory(limit = 50) {
-  let undoStack = [];
-  let redoStack = [];
+  const past = [];
+  const future = [];
+  let current = null;
 
-  function takeSnapshot(doc) {
-    return JSON.stringify(doc);
-  }
-
-  function applySnapshot(doc, saved) {
-    for (const key of Object.keys(doc)) delete doc[key];
-    Object.assign(doc, JSON.parse(saved));
-  }
+  const snap = (doc) => JSON.stringify(doc);
+  const thaw = (json) => JSON.parse(json);
 
   return {
-    push(doc, label, size) {
-      undoStack.push({ snapshot: takeSnapshot(doc), time: Date.now(), label, size });
-      if (undoStack.length > limit) undoStack.shift();
-      redoStack = [];
+    // Remember the document as it is now, before the next change.
+    push(doc) {
+      if (current !== null) {
+        past.push(current);
+        if (past.length > limit) past.shift();
+      }
+      current = snap(doc);
+      future.length = 0;
     },
-    undo(doc) {
-      const step = undoStack.pop();
-      if (!step) return false;
-      redoStack.push({ snapshot: takeSnapshot(doc), time: Date.now(), label: step.label, size: step.size });
-      applySnapshot(doc, step.snapshot);
-      return true;
+    // Step back one change; returns the restored document or null.
+    undo() {
+      if (past.length === 0) return null;
+      future.push(current);
+      current = past.pop();
+      return thaw(current);
     },
-    redo(doc) {
-      const step = redoStack.pop();
-      if (!step) return false;
-      undoStack.push({ snapshot: takeSnapshot(doc), time: Date.now(), label: step.label, size: step.size });
-      applySnapshot(doc, step.snapshot);
-      return true;
+    // Step forward again after an undo; returns the document or null.
+    redo() {
+      if (future.length === 0) return null;
+      past.push(current);
+      current = future.pop();
+      return thaw(current);
     },
-    canUndo() { return undoStack.length > 0; },
-    canRedo() { return redoStack.length > 0; },
-    undoLabel() { return undoStack.length ? undoStack[undoStack.length - 1].label : ''; },
-    redoLabel() { return redoStack.length ? redoStack[redoStack.length - 1].label : ''; },
-    clear() { undoStack = []; redoStack = []; },
+    canUndo() {
+      return past.length > 0;
+    },
+    canRedo() {
+      return future.length > 0;
+    },
+    // Forget everything and start from a document.
+    clear(doc) {
+      past.length = 0;
+      future.length = 0;
+      current = doc ? snap(doc) : null;
+    },
   };
 }

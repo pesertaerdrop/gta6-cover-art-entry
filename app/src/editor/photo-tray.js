@@ -1,79 +1,84 @@
-// The photo tray.
-//
-// The seventeen sample photos as a grid, an Add photos button (file
-// picker, drag-and-drop onto the dropzone, and paste from the clipboard),
-// and the count line. Tapping a sample fills the selected panel with it;
-// uploaded photos join the grid under their upload: key and stay on this
-// machine — nothing is ever sent anywhere.
-import { SAMPLE_PHOTOS } from '../photos/sample-photos.js';
-
-// The tray's items: the samples first, then the uploads, each with the
-// source to show and the label under it.
-function trayItems(studio) {
-  const samples = SAMPLE_PHOTOS.map((photo) => ({ src: photo.src, label: photo.scene, sample: true }));
-  const uploads = [...studio.uploaded.keys()].map((key) => ({ src: key, label: 'Uploaded', sample: false }));
-  return [...samples, ...uploads];
-}
+// The photo tray: the grid of sample photos on the left rail, plus the
+// inputs that bring the user's own photos in (Add photos button, file
+// input, drag-and-drop onto the tray, paste from the clipboard). Clicking
+// a photo places it into the selected panel; a user's photo is read on
+// their own machine and never leaves it.
+import { SAMPLE_PHOTOS, labelOf } from '../photos/sample-photos.js';
 
 export function renderPhotoTray(studio) {
   const host = document.getElementById('photoTray');
   if (!host) return;
   host.innerHTML = '';
-  const selected = studio.doc.panels[studio.doc.selected];
-  for (const item of trayItems(studio)) {
+  const count = document.getElementById('photoCount');
+  if (count) count.textContent = `${SAMPLE_PHOTOS.length} samples`;
+  for (const photo of SAMPLE_PHOTOS) {
     const figure = document.createElement('figure');
-    if (selected && selected.photo === item.src) figure.className = 'picked';
     const img = document.createElement('img');
-    img.src = item.sample ? `./${item.src}` : item.src;
-    img.alt = item.label;
-    img.loading = 'lazy';
-    const caption = document.createElement('figcaption');
-    caption.textContent = item.label;
-    figure.appendChild(img);
-    figure.appendChild(caption);
-    figure.addEventListener('click', () => {
-      const slot = studio.selectedSlot();
-      if (!slot) return;
-      slot.photo = item.src;
-      studio.commit('set photo');
-    });
+    img.src = photo.src;
+    img.alt = photo.label;
+    img.draggable = true;
+    img.addEventListener('dragstart', (e) => e.dataTransfer.setData('text/plain', photo.src));
+    const cap = document.createElement('figcaption');
+    cap.textContent = photo.label;
+    figure.append(img, cap);
+    const picked = studio.doc.panels[studio.doc.selected];
+    if (picked && picked.photo === photo.src) figure.classList.add('picked');
+    figure.addEventListener('click', () => studio.commit(() => {
+      studio.doc.panels[studio.doc.selected].photo = photo.src;
+    }));
     host.appendChild(figure);
   }
-  const count = document.getElementById('photoCount');
-  if (count) {
-    count.textContent = studio.uploaded.size > 0
-      ? `${SAMPLE_PHOTOS.length} samples + ${studio.uploaded.size} uploaded`
-      : `${SAMPLE_PHOTOS.length} samples`;
-  }
+  const add = document.createElement('button');
+  add.type = 'button';
+  add.className = 'add';
+  add.textContent = '+';
+  add.title = 'Add photos';
+  add.addEventListener('click', () => document.getElementById('fileInput').click());
+  host.appendChild(add);
 }
 
-// Wire the three ways in: the Add photos button opens the file picker,
-// the dropzone takes dragged files, and pasting an image anywhere adds it.
+// Wire the file input, the dropzone and paste for the user's own photos.
 export function setupPhotoInput(studio) {
-  const addBtn = document.getElementById('addPhotosBtn');
   const input = document.getElementById('fileInput');
   const dropzone = document.getElementById('dropzone');
-  if (addBtn && input) {
-    addBtn.addEventListener('click', () => input.click());
-    input.addEventListener('change', () => {
-      if (input.files && input.files.length) studio.addUploadedFiles(input.files);
-      input.value = '';
-    });
-  }
+  const addBtn = document.getElementById('addPhotosBtn');
+
+  const takeFiles = (files) => {
+    for (const file of files) {
+      if (!file.type.startsWith('image/')) continue;
+      const reader = new FileReader();
+      reader.onload = () => {
+        const src = String(reader.result);
+        const img = new Image();
+        img.onload = () => {
+          studio.images.set(src, img);
+          studio.commit(() => {
+            studio.doc.panels[studio.doc.selected].photo = src;
+          });
+          studio.redraw();
+        };
+        img.src = src;
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  if (input) input.addEventListener('change', () => takeFiles(input.files || []));
+  if (addBtn) addBtn.addEventListener('click', () => input.click());
   if (dropzone) {
-    dropzone.addEventListener('dragover', (event) => {
-      event.preventDefault();
+    dropzone.addEventListener('dragover', (e) => {
+      e.preventDefault();
       dropzone.classList.add('over');
     });
     dropzone.addEventListener('dragleave', () => dropzone.classList.remove('over'));
-    dropzone.addEventListener('drop', (event) => {
-      event.preventDefault();
+    dropzone.addEventListener('drop', (e) => {
+      e.preventDefault();
       dropzone.classList.remove('over');
-      if (event.dataTransfer.files.length) studio.addUploadedFiles(event.dataTransfer.files);
+      takeFiles(e.dataTransfer.files || []);
     });
   }
-  document.addEventListener('paste', (event) => {
-    const files = [...(event.clipboardData?.files || [])].filter((file) => file.type.startsWith('image/'));
-    if (files.length) studio.addUploadedFiles(files);
+  document.addEventListener('paste', (e) => {
+    const files = [...(e.clipboardData?.files || [])].filter((f) => f.type.startsWith('image/'));
+    if (files.length) takeFiles(files);
   });
 }

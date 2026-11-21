@@ -1,16 +1,29 @@
-// The six grades. A grade is a gradient map: a shadow colour, a midtone
-// colour and a highlight colour. A pixel's brightness picks where it falls
-// between them, so one grade re-tints a whole photo while keeping its light
-// and shadow. Each grade also carries its three swatch colours for the
-// chips in the editor.
-export const GRADE_LIST = [
-  { id: 'sunset', label: 'Sunset', shadow: [26, 12, 42], mid: [218, 92, 40], light: [255, 214, 130] },
-  { id: 'neon-night', label: 'Neon Night', shadow: [8, 10, 34], mid: [122, 54, 206], light: [140, 238, 255] },
-  { id: 'golden-hour', label: 'Golden Hour', shadow: [38, 20, 10], mid: [236, 148, 42], light: [255, 232, 170] },
-  { id: 'tropic-teal', label: 'Tropic Teal', shadow: [8, 32, 34], mid: [38, 158, 152], light: [190, 255, 220] },
-  { id: 'ember-blaze', label: 'Ember Blaze', shadow: [52, 12, 10], mid: [232, 84, 32], light: [255, 205, 130] },
-  { id: 'rose-dusk', label: 'Rose Dusk', shadow: [40, 12, 34], mid: [214, 70, 138], light: [255, 196, 222] },
-];
+// The six colour grades. A grade re-tints a photo through a three-stop
+// ramp: shadows land near the first stop, midtones near the second and
+// highlights near the third. The ramp is applied as a 256-entry lookup
+// table blended back toward the pixel's own brightness, so a grade never
+// flattens a photo completely. Colours are hex strings on purpose: the
+// editor builds its swatch chips from the same values the canvas uses.
+const HEX = (h) => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
+
+const GRADE_DEFS = {
+  sunset: { label: 'Sunset', stops: ['#1a0c2a', '#da5c28', '#ffd682'] },
+  'neon-night': { label: 'Neon Night', stops: ['#080a22', '#7a36ce', '#8ceeff'] },
+  'golden-hour': { label: 'Golden Hour', stops: ['#26140a', '#ec942a', '#ffe8aa'] },
+  'tropic-teal': { label: 'Tropic Teal', stops: ['#082022', '#269e98', '#beffdc'] },
+  'ember-blaze': { label: 'Ember Blaze', stops: ['#340c0a', '#e85420', '#ffcd82'] },
+  'rose-dusk': { label: 'Rose Dusk', stops: ['#280c22', '#d6468a', '#ffc4de'] },
+};
+
+export const GRADE_ORDER = ['sunset', 'neon-night', 'golden-hour', 'tropic-teal', 'ember-blaze', 'rose-dusk'];
+
+export const GRADE_LIST = GRADE_ORDER.map((id) => ({
+  id,
+  label: GRADE_DEFS[id].label,
+  shadow: HEX(GRADE_DEFS[id].stops[0]),
+  mid: HEX(GRADE_DEFS[id].stops[1]),
+  light: HEX(GRADE_DEFS[id].stops[2]),
+}));
 
 export function gradeById(id) {
   return GRADE_LIST.find((g) => g.id === id) || GRADE_LIST[0];
@@ -20,29 +33,23 @@ export function gradeName(id) {
   return gradeById(id).label;
 }
 
-// Build the 256-entry lookup table for a grade at a strength (0–100):
-// each entry is the colour a pixel of that brightness maps to, blended
-// back toward the pixel's own brightness as the strength falls.
+// Blend two RGB triples and round the result.
+function mix(a, b, t) {
+  return [Math.round(a[0] + (b[0] - a[0]) * t), Math.round(a[1] + (b[1] - a[1]) * t), Math.round(a[2] + (b[2] - a[2]) * t)];
+}
+
+// Build the 256-entry lookup table for a grade at a strength (0-100).
+// Each brightness level maps onto the ramp, then is blended back toward
+// its own brightness as the strength falls below 100.
 export function buildLut(grade, strength) {
   const lut = new Uint8Array(256 * 3);
   const amount = Math.max(0, Math.min(100, strength)) / 100;
   for (let i = 0; i < 256; i++) {
     const t = i / 255;
-    let r, g, b;
-    if (t < 0.5) {
-      const u = t * 2;
-      r = grade.shadow[0] + (grade.mid[0] - grade.shadow[0]) * u;
-      g = grade.shadow[1] + (grade.mid[1] - grade.shadow[1]) * u;
-      b = grade.shadow[2] + (grade.mid[2] - grade.shadow[2]) * u;
-    } else {
-      const u = (t - 0.5) * 2;
-      r = grade.mid[0] + (grade.light[0] - grade.mid[0]) * u;
-      g = grade.mid[1] + (grade.light[1] - grade.mid[1]) * u;
-      b = grade.mid[2] + (grade.light[2] - grade.mid[2]) * u;
-    }
-    lut[i * 3] = Math.round(i + (r - i) * amount);
-    lut[i * 3 + 1] = Math.round(i + (g - i) * amount);
-    lut[i * 3 + 2] = Math.round(i + (b - i) * amount);
+    const ramp = t < 0.5 ? mix(grade.shadow, grade.mid, t * 2) : mix(grade.mid, grade.light, (t - 0.5) * 2);
+    lut[i * 3] = Math.round(i + (ramp[0] - i) * amount);
+    lut[i * 3 + 1] = Math.round(i + (ramp[1] - i) * amount);
+    lut[i * 3 + 2] = Math.round(i + (ramp[2] - i) * amount);
   }
   return lut;
 }
