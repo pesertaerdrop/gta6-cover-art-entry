@@ -1,9 +1,14 @@
 # Saltline Cover Studio
 
+[![make.fun · gta6-cover-art-01](https://make.fun/badge/gta6-cover-art-01.svg)](https://make.fun/bounty/gta6-cover-art-01?utm_source=github&utm_medium=readme&utm_campaign=gta6-cover-art-01)
+[![rank](https://make.fun/badge/gta6-cover-art-01/pesertaerdrop/gta6-cover-art-entry/rank.svg)](https://make.fun/bounty/gta6-cover-art-01/leaderboard?utm_source=github&utm_medium=readme&utm_campaign=gta6-cover-art-01)
+[![reward](https://make.fun/badge/gta6-cover-art-01/pesertaerdrop/gta6-cover-art-entry/reward.svg)](https://make.fun/bounty/gta6-cover-art-01?utm_source=github&utm_medium=readme&utm_campaign=gta6-cover-art-01)
+
 Turn any photo and a caption into GTA-style cover art: a multi-panel poster
 with bold chrome lettering, a Vice City sunset or neon grade, and a full
 poster finish — callout tags, a seal, a volume tag, a five-star review bar,
-a billing block, a generated barcode, and a coming-soon line. The giant
+a billing block, a generated barcode, and a coming-soon line. Part of the
+[make.fun GTA 6 cover art bounty](https://make.fun/bounty/gta6-cover-art-01). The giant
 chrome title sits in its own title field along the foot of the cover — a
 designed gradient with a palm, grid or skyline motif — so it reads at any
 size, no panel ever runs under a letter, and no face is ever covered.
