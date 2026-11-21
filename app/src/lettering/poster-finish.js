@@ -4,7 +4,9 @@
 // The billing line shrinks to fit its box (measuring with the active font,
 // ×0.92 a step, down to a floor of max(8px, 0.55× the requested size), and
 // wrapping to two lines if it still does not fit) — it never truncates and
-// never uses an ellipsis.
+// never uses an ellipsis. The billing line and the title cluster each sit
+// on a dark strip (the billing strip here, the title band in render-cover),
+// so white text always reads over any photo.
 const FONT_DISPLAY = (px) => `${px}px Anton, 'Archivo Black', sans-serif`;
 const FONT_SCRIPT = (px) => `${px}px 'Mr Dafoe', cursive`;
 
@@ -139,6 +141,16 @@ export function drawBillingLine(ctx, x, y, maxWidth, text, requestedSize) {
   drawBillingBlock(ctx, x + maxWidth / 2, y, maxWidth, text, floor);
 }
 
+// A dark strip behind the billing line, so white billing text always reads
+// over any photo or panel border beneath it. The strip spans the billing
+// box with a little padding on every side.
+export function drawBillingStrip(ctx, x, y, maxWidth, size) {
+  ctx.save();
+  ctx.fillStyle = 'rgba(0,0,0,0.55)';
+  ctx.fillRect(x - 10, y - 5, maxWidth + 20, size + 10);
+  ctx.restore();
+}
+
 export function drawBarcode(ctx, x, y, w, h) {
   ctx.save();
   ctx.fillStyle = '#fff';
@@ -183,10 +195,9 @@ export function drawPosterFinish(ctx, plan, doc) {
   const caption = plan.caption;
   // Callout tags, one per panel. The hero panel's tag sits below the
   // volume tag (top-left of the cover) so the two never collide, and any
-  // tag that would fall across the title glyphs or the tagline ribbon
-  // drops just below both.
+  // tag that would fall across the title band drops just below the band.
   const glyphTop = plan.titleRect.y + plan.titleRect.h / 2 - plan.titleLift - plan.titleSize / 2;
-  const titleZoneBottom = plan.titleRect.y + plan.titleRect.h * 0.8 + Math.round(h * 0.032);
+  const bandBottom = plan.titleBand ? plan.titleBand.y + plan.titleBand.h : plan.titleRect.y + plan.titleRect.h * 0.8 + Math.round(h * 0.032);
   plan.panels.forEach((panel, i) => {
     if (!panel.tagOn || !panel.tag) return;
     const tagSize = Math.max(11, Math.round(w * 0.011));
@@ -195,7 +206,7 @@ export function drawPosterFinish(ctx, plan, doc) {
     const width = ctx.measureText(panel.tag).width + 16;
     const height = Math.round(tagSize * 1.7);
     let tagY = i === 0 ? Math.round(0.03 * h) + 30 : panel.rect.y + 8;
-    if (tagY + height > glyphTop && tagY < titleZoneBottom) tagY = titleZoneBottom + 6;
+    if (tagY + height > glyphTop && tagY < bandBottom) tagY = bandBottom + 6;
     ctx.fillStyle = '#111';
     ctx.fillRect(panel.rect.x + 8, tagY, width, height);
     ctx.fillStyle = '#fff';
@@ -212,11 +223,14 @@ export function drawPosterFinish(ctx, plan, doc) {
   // Volume tag top-left, coming soon top-right.
   drawVolTag(ctx, 0.04 * w, 0.03 * h, doc.vol || caption.vol);
   drawComingSoon(ctx, 0.96 * w, 0.03 * h, doc.comingSoon || caption.comingSoon);
-  // Review bar and billing above the bottom edge.
+  // Review bar and billing above the bottom edge. The billing strip is
+  // painted first so the billing line reads over any photo beneath it.
   const barH = Math.round(h * 0.055);
   drawReviewBar(ctx, { x: 0.04 * w, y: h - barH - 12, w: 0.92 * w, h: barH }, doc.quote || caption.quote, doc.outlet || caption.outlet);
   const billingSize = doc.size === '4:5' ? 17 : 15;
-  drawBillingLine(ctx, 0.1 * w, h - barH - 12 - billingSize - 8, 0.72 * w, doc.billing || caption.billing, billingSize);
+  const billingY = h - barH - 12 - billingSize - 8;
+  drawBillingStrip(ctx, 0.1 * w, billingY, 0.72 * w, billingSize);
+  drawBillingLine(ctx, 0.1 * w, billingY, 0.72 * w, doc.billing || caption.billing, billingSize);
   // Barcode bottom-right, clear of the billing box and of the review bar.
   drawBarcode(ctx, 0.86 * w, h - barH - 68, Math.round(0.09 * w), 30);
 }

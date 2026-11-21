@@ -3,8 +3,10 @@
 Turn any photo and a caption into GTA-style cover art: a multi-panel poster
 with bold chrome lettering, a Vice City sunset or neon grade, and a full
 poster finish — callout tags, a seal, a volume tag, a five-star review bar,
-a billing block, a generated barcode, and a coming-soon line. Exports PNGs
-in 1080×1080, 1080×1350, and 1920×1080, all offline in the browser. Your
+a billing block, a generated barcode, and a coming-soon line. The giant
+chrome title sits in its own clear band on a dark strip, so it reads at any
+size, and the billing line sits on a dark strip too. Exports PNGs in
+1080×1080, 1080×1350, and 1920×1080, all offline in the browser. Your
 photos never leave the machine.
 
 ## How it works
@@ -23,8 +25,9 @@ photos never leave the machine.
   size re-matches photos so every panel stays filled.
 - **6 grades** (Sunset, Neon Night, Golden Hour, Tropic Teal, Ember Blaze,
   Rose Dusk) as gradient-map LUTs with swatch chips.
-- **6 title styles plus Auto** (match grade), giant chrome title, neon
-  script overlapping the caps, tagline ribbon with side triangles.
+- **6 title styles plus Auto** (match grade), giant chrome title in its own
+  clear band, neon script overlapping the caps, tagline ribbon with side
+  triangles.
 - **7 look sliders** — Paint, Grade, Halftone, Grain, Glow, Title size,
   Title lift — with draft-mode regrading while dragging.
 - **Panel inspector** — 88×88 thumbnail, zoom slider 100–400%, Photo

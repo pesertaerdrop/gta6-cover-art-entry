@@ -1,7 +1,8 @@
-// The six title styles plus Auto. A style is a chrome gradient ramp, a
-// stroke colour and a shadow colour. Auto picks the style that matches the
-// cover's grade, so a sunset cover gets dusk chrome and a neon cover gets
-// glacier neon without the user having to choose.
+// The six title styles plus Auto. A style is a chrome gradient ramp (a
+// list of [offset, colour] stops), a stroke colour and a glow colour.
+// Auto picks the style that matches the cover's grade, so a sunset cover
+// gets dusk chrome and a neon cover gets glacier neon without the user
+// having to choose.
 export const TITLE_STYLES = [
   {
     id: 'dusk-chrome', label: 'Dusk Chrome',
@@ -35,6 +36,7 @@ export const TITLE_STYLES = [
   },
 ];
 
+// The style each grade maps to when the title style is Auto.
 const AUTO_STYLE_BY_GRADE = {
   sunset: 'dusk-chrome',
   'neon-night': 'glacier-neon',

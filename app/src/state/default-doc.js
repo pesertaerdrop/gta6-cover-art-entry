@@ -1,7 +1,8 @@
-// The starting document: the default document (used by the app's main
-// function and by the layout module's defaults) and the six-entry caption
-// deck every cover draws its title, script, tagline, quote, outlet,
-// billing, volume tag and coming-soon line from.
+// The starting document and the caption deck. The deck holds six
+// ready-made captions; every cover draws its title, script line, tagline,
+// review quote and outlet, billing line, volume tag and coming-soon line
+// from the deck entry its caption index points at. Anything the user types
+// by hand wins over the deck entry.
 import { SAMPLE_PHOTOS } from '../photos/sample-photos.js';
 
 export const CAPTION_DECK = [
@@ -73,10 +74,10 @@ export const CAPTION_DECK = [
   },
 ];
 
-// The full set of default values a document gets, with the default panels
-// (the first seven photos, each with its own tag) and look (paint 10,
-// grade 62, halftone 20, grain 22, glow 26, title size 100, title lift 0,
-// size 16:9, hero mosaic, sunset grade, auto title style).
+// A fresh document: 16:9 wide, hero mosaic, sunset grade, auto title
+// style, the first deck caption, the first seven sample photos in the
+// panels, and the default look (paint 10, grade 62, halftone 20, grain 22,
+// glow 26, title size 100, title lift 0).
 export function defaultDoc() {
   return {
     size: '16:9',
@@ -94,7 +95,7 @@ export function defaultDoc() {
     comingSoon: '',
     look: { paint: 10, grade: 62, halftone: 20, grain: 22, glow: 26, titleSize: 100, titleLift: 0 },
     selected: 0,
-    panels: SAMPLE_PHOTOS.slice(0, 7).map((photo, i) => ({
+    panels: SAMPLE_PHOTOS.slice(0, 7).map((photo) => ({
       photo: photo.src,
       tag: photo.tag,
       tagOn: true,

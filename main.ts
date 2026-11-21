@@ -8,7 +8,10 @@
 // review bar, billing block, generated barcode, coming soon). Seventeen
 // image-model sample photos follow one invented cast — Mira and Suki, a
 // Vice City duo — so the callouts tell one story across three different
-// covers. Exports are PNGs in 1080x1080, 1080x1350 and 1920x1080, offline.
+// covers. The giant chrome title sits in its own clear band on a dark
+// strip, so no panel ever covers a letter and the title reads at 300 px;
+// the billing line sits on a dark strip too, so it stays legible over any
+// photo. Exports are PNGs in 1080x1080, 1080x1350 and 1920x1080, offline.
 //
 // This program (Node 22, standard library only) hands the app in: it copies
 // app/ and screenshots/ from beside this file to /output and writes

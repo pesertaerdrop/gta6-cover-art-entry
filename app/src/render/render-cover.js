@@ -1,9 +1,16 @@
 // Draws a whole cover onto a canvas from a document and a map of loaded
 // photos. One function, renderCover, owns the full stack: white panel
-// borders, treated photos, numbered badges, the giant chrome title with
+// borders, treated photos, the title band, the giant chrome title with
 // its neon script, the tagline ribbon, the script line, and the seven
 // poster-finish elements. Editor overlays (selection outline, crosshair,
 // zoom badge) come from opts.editor.
+//
+// The title band is the fix for the giant title: after the panels are
+// painted and before the title is drawn, a solid dark strip is painted
+// across the title band (plan.titleBand, y 0.60h–0.84h) with thin accent
+// rules top and bottom. The title, its script line and its ribbon all
+// live inside that band, so no panel photo can ever touch a letter and
+// the title reads as a clean billboard at any size, down to 300 px.
 import { planCover } from '../layouts/plan-cover.js';
 import { drawPanelPhoto } from '../effects/poster-photo.js';
 import { gradientFor } from '../lettering/title-styles.js';
@@ -20,6 +27,22 @@ export const ACCENT_BY_GRADE = {
 
 export function accentForGrade(grade) {
   return ACCENT_BY_GRADE[grade] || ACCENT_BY_GRADE.sunset;
+}
+
+// Paint the title band: a solid dark strip across the title's clear zone,
+// with thin accent rules top and bottom, so the title sits on a clean
+// billboard instead of over busy photos.
+export function drawTitleBand(ctx, plan, doc) {
+  const band = plan.titleBand;
+  if (!band) return;
+  const accent = accentForGrade(doc.grade);
+  ctx.save();
+  ctx.fillStyle = 'rgba(10,8,14,0.94)';
+  ctx.fillRect(band.x, band.y, band.w, band.h);
+  ctx.fillStyle = accent;
+  ctx.fillRect(band.x, band.y, band.w, 2);
+  ctx.fillRect(band.x, band.y + band.h - 2, band.w, 2);
+  ctx.restore();
 }
 
 // Fit the title text to the title rectangle, shrinking the font until it
@@ -164,6 +187,7 @@ export function renderCover(ctx, doc, images, opts = {}) {
       ctx.fillRect(panel.inner.x, panel.inner.y, panel.inner.w, panel.inner.h);
     }
   }
+  drawTitleBand(ctx, plan, doc);
   drawTitle(ctx, plan, doc);
   drawTaglineRibbon(ctx, plan, doc);
   drawPosterFinish(ctx, plan, doc);

@@ -1,8 +1,8 @@
-// The six grades. A grade is a gradient-map lookup table: a shadow
-// colour, a midtone colour and a highlight colour. A pixel's brightness
-// picks where it falls between them, so one grade re-tints a whole photo
-// while keeping its light and shadow. Each grade also carries its three
-// swatch colours for the chips in the editor.
+// The six grades. A grade is a gradient map: a shadow colour, a midtone
+// colour and a highlight colour. A pixel's brightness picks where it falls
+// between them, so one grade re-tints a whole photo while keeping its light
+// and shadow. Each grade also carries its three swatch colours for the
+// chips in the editor.
 export const GRADE_LIST = [
   { id: 'sunset', label: 'Sunset', shadow: [26, 12, 42], mid: [218, 92, 40], light: [255, 214, 130] },
   { id: 'neon-night', label: 'Neon Night', shadow: [8, 10, 34], mid: [122, 54, 206], light: [140, 238, 255] },
@@ -20,9 +20,9 @@ export function gradeName(id) {
   return gradeById(id).label;
 }
 
-// Build the 256-entry LUT for a grade at a strength (0–100): each entry is
-// the colour a pixel of that brightness maps to, blended back toward the
-// pixel's own brightness as the strength falls.
+// Build the 256-entry lookup table for a grade at a strength (0–100):
+// each entry is the colour a pixel of that brightness maps to, blended
+// back toward the pixel's own brightness as the strength falls.
 export function buildLut(grade, strength) {
   const lut = new Uint8Array(256 * 3);
   const amount = Math.max(0, Math.min(100, strength)) / 100;

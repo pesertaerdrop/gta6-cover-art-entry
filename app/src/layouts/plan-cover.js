@@ -1,7 +1,16 @@
 // Turns a document into a concrete cover plan: pixel rectangles for every
 // panel (with gutters and white borders), the title and script rectangles,
-// the resolved title style, and the panels the document describes. Also
-// the caption lookup, the shot-scene applier, and the auto-layout picker.
+// the title band, the resolved title style, and the panels the document
+// describes. Also the caption lookup, the shot-scene applier, and the
+// auto-layout picker.
+//
+// The title band is the fix for the giant title: the title, its script
+// line and its tagline ribbon all live inside one band (y 0.60h–0.84h)
+// that the renderer paints as a solid dark strip over the panels before
+// drawing the title. No panel photo can ever touch a letter, and the
+// title reads as a clean billboard at any size, down to 300 px. The
+// billing strip in poster-finish.js does the same job for the billing
+// line at the foot of the cover.
 import { CAPTION_DECK } from '../state/default-doc.js';
 import { rectsForLayout, layoutPanelCount } from './layout-presets.js';
 import { resolveTitleStyle } from '../lettering/title-styles.js';
@@ -48,6 +57,11 @@ export function planCover(doc, overrideSize) {
     h,
     panels,
     titleRect: { x: 0.04 * w, y: 0.58 * h, w: 0.92 * w, h: 0.26 * h },
+    // The title band: the clear zone for the whole title cluster, full
+    // width, from just above the script line to just below the ribbon.
+    // The renderer paints this band as a solid dark strip over the panels,
+    // then draws the title on top of it.
+    titleBand: { x: 0, y: Math.round(0.60 * h), w, h: Math.round(0.24 * h) },
     scriptRect: { x: 0.05 * w, y: 0.9 * h, w: 0.9 * w, h: 0.05 * h },
     titleStyle: resolveTitleStyle(doc.titleStyle, doc.grade),
     titleSize: w * 0.075 * (doc.look.titleSize / 100),

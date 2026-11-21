@@ -1,7 +1,9 @@
 // The seven cover layouts. A preset is a function of the cover's pixel
 // size returning panel rectangles as fractions of the cover (each a
-// [x, y, w, h] tuple from the top-left). One panel keeps the original
-// aspect ratio of the photo it is given, and the export is a fixed size.
+// [x, y, w, h] tuple from the top-left). Some layouts change shape with
+// the cover: the hero mosaic and seven mosaic pack differently on wide
+// and tall covers, the filmstrip runs across on wide and down on tall,
+// and postcards use thirds on wide and halves on tall.
 function rect(x, y, w, h) { return [x, y, w, h]; }
 
 function thirds(w, h) {

@@ -1,7 +1,8 @@
 // The sample library: seventeen image-model photos of one invented cast —
-// Mira, long silver-lilac hair, and Suki, short teal bob — a Vice City duo
-// around one pink classic convertible. The default tags, the cast table,
-// and the helpers for the editor's sample strip and the cover renderer.
+// Mira, long silver-lilac hair, and Suki, a short teal bob — a Vice City
+// duo around one pink classic convertible. Every photo carries its scene,
+// its cast and its default callout tag; the helpers below serve the
+// editor's sample strip and the cover renderer.
 export const CAST = [
   { id: 'mira', name: 'Mira', role: 'long silver-lilac hair' },
   { id: 'suki', name: 'Suki', role: 'short teal bob' },
@@ -37,7 +38,7 @@ export function isSamplePhoto(src) {
 }
 
 // The next (dir +1) or previous (dir -1) sample photo after src, wrapping
-// around the library; unknown sources fall back to the first photo.
+// around the library; an unknown source falls back to the first photo.
 export function nextSamplePhoto(src, dir = 1) {
   const index = SAMPLE_PHOTOS.findIndex((photo) => photo.src === src);
   const next = (index < 0 ? 0 : index + dir + SAMPLE_PHOTOS.length) % SAMPLE_PHOTOS.length;
